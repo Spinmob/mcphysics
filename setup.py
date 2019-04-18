@@ -12,5 +12,5 @@ setup(name           = 'McPhysics',
       author_email   = 'jack.sankey@gmail.com',
       url            = 'https://github.com/sankeylab/mcphysics/wiki',
       packages       = ['mcphysics'],
-      package_dir    = {'spinmob' : '.'}
+      package_dir    = {'mcphysics' : '.'}
      )
