@@ -594,7 +594,7 @@ class sillyscope(_g.BaseObject):
         self.grid_bot  = self.window.place_object(_g.GridLayout(False), alignment=0)
         
         self.button_connect   = self.grid_top.place_object(_g.Button('Connect', True, False))
-        self.button_1         = self.grid_top.place_object(_g.Button('1',True).set_width(25))
+        self.button_1         = self.grid_top.place_object(_g.Button('1',True).set_width(25).set_checked(True))
         self.button_2         = self.grid_top.place_object(_g.Button('2',True).set_width(25))
         self.button_3         = self.grid_top.place_object(_g.Button('3',True).set_width(25))
         self.button_4         = self.grid_top.place_object(_g.Button('4',True).set_width(25))
