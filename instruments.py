@@ -32,7 +32,7 @@ def _debug(*a):
 
 
 
-class Sillyscope():
+class _sillyscope():
     """
     Class for talking to a Tektronix Scope. Designed for TDS 1000 series, but 
     simple enough that it probably works for other models.
@@ -578,7 +578,7 @@ class Sillyscope():
             
 
 
-class SillyscopeGUI(_g.BaseObject):
+class sillyscope(_g.BaseObject):
     """
     Graphical front-end for the TekScope interface.
     """
@@ -817,8 +817,8 @@ class SillyscopeGUI(_g.BaseObject):
             if not self.scope == None: self.scope.instrument.close()
             
             # Make the new one
-            self.scope = Sillyscope(self.settings['VISA/Device'], 
-                    simulation = self.settings['VISA/Device']=='Simulation')
+            self.scope = _sillyscope(self.settings['VISA/Device'], 
+                simulation = self.settings['VISA/Device']=='Simulation')
             
             # Tell the user what scope is connected
             self.label_scope_name.set_text(self.scope._idn)
@@ -971,5 +971,5 @@ class SillyscopeGUI(_g.BaseObject):
 
 if __name__ == '__main__':
          
-    self = SillyscopeGUI()
+    self = sillyscope()
 
