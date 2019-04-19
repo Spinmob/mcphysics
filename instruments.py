@@ -617,7 +617,7 @@ class sillyscope(_g.BaseObject):
         self.button_transfer  = self.grid_top.place_object(_g.Button('Transfer',True).set_width(70))
         self.label_scope_name = self.grid_top.place_object(_g.Label('Disconnected'))
         
-        self.settings  = self.grid_bot.place_object(_g.TreeDictionary(autosettings_path+'_settings.txt')).set_width(250)
+        self.settings  = self.grid_bot.place_object(_g.TreeDictionary(autosettings_path+'_settings.txt')).set_width(257)
         self.tabs_data = self.grid_bot.place_object(_g.TabArea(autosettings_path+'_tabs_data.txt'), alignment=0)
         self.tab_raw   = self.tabs_data.add_tab('Raw Data')
         self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.txt', autosettings_path+'_plot_raw.txt'), alignment=0)
