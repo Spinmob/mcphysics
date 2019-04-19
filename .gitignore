@@ -6,4 +6,4 @@
 build/
 dist/
 *.cfg
-*/.egg_settings/
+*/egg_settings/*
