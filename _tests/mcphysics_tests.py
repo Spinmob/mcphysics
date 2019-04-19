@@ -19,7 +19,7 @@ class Test_errthing(_ut.TestCase):
         return _os.path.join(self.data_path, filename)
 
     def setUp(self):
-        self.data_path = _os.path.join(_os.path.dirname(_m.__file__), 'tests', 'data')
+        self.data_path = _os.path.join(_os.path.dirname(_m.__file__), '_tests', 'data')
         return
     
     def tearDown(self):
