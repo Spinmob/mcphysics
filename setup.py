@@ -1,6 +1,6 @@
 
 
-version = '1.0.2'
+version = '1.0.3'
 
 
 
@@ -10,7 +10,7 @@ setup(name           = 'McPhysics',
       description    = 'Useful tools for the McGill Undergraduate Physics Labs',
       author         = 'Jack Sankey',
       author_email   = 'jack.sankey@gmail.com',
-      url            = 'https://github.com/sankeylab/mcphysics/wiki',
+      url            = 'https://github.com/sankeylab/mcphysics',
       packages       = ['mcphysics'],
       package_dir    = {'mcphysics' : '.'}
      )
