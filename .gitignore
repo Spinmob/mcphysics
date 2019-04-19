@@ -8,3 +8,4 @@ dist/
 *.cfg
 egg_settings
 MANIFEST
+README.rst
