@@ -13,14 +13,14 @@ Tools for the McGill University's undergraduate physics labs
    ```
    pip install spinmob mcphysics
    ```
-4. Open Spyder and start playing. For example:
+4. Open Spyder and start playing. Example script:
    ```
    import mcphysics
    mcphysics.playground.fitting_statistics_demo()
    ```
 
 ## Organization
-This library is organized heirarchically, and you should use Spyder's code completion suggestions to navigate it. You can also type `<ctrl>-i` while your cursor is beside an object to access its documentation. Below is a list of the existing functionality as of 2019-04-19:
+The McPhysics library is organized heirarchically, and you should use Spyder's code completion suggestions to navigate it. You can also type `<ctrl>-i` while your cursor is beside an object to access its documentation. Below is a list of the existing functionality as of 2019-04-19:
 
 ### mcphysics.data
  * __load_chn():__ Loads a Maestro .Chn file, returning a [spinmob databox](https://github.com/Spinmob/spinmob/wiki/2.-Data-Handling).
