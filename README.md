@@ -19,9 +19,9 @@ Tools for the McGill University's undergraduate physics labs
    mcphysics.playground.fitting_statistics_demo()
    ```
 To upgrade to the latest version,
-```
-pip install spinmob --upgrade --no-cache-dir
-```
+   ```
+   pip install spinmob --upgrade --no-cache-dir
+   ```
 
 ## Organization
 The McPhysics library is organized heirarchically, and you should use Spyder's code completion suggestions to navigate it. You can also type `<ctrl>-i` while your cursor is beside an object to access its documentation. Below is a list of the existing functionality as of 2019-04-19:
