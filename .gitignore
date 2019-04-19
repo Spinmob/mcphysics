@@ -5,6 +5,5 @@
 /.project
 build/
 dist/
-Spinmob.egg*/
 *.cfg
-gui_settings/
+*/.egg_settings/

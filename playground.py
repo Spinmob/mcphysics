@@ -41,14 +41,14 @@ class fitting_statistics_demo():
     
     Parameters
     ----------
-    block_command_line=True
+    block=True
         Whether to block the command line when the window is first shown.
     """
     
     
-    def __init__(self, block_command_line=True):
+    def __init__(self, block=False):
         
-        self._build_gui(block_command_line)
+        self._build_gui(block)
 
     def _build_gui(self, block_command_line=False):
         """
@@ -57,6 +57,7 @@ class fitting_statistics_demo():
         # Make a window with a left grid for settings and controls, and
         # a right grid for visualization.
         self.window        = _g.Window('Fake Data Taker', autosettings_path='window.cfg')
+        self.window.event_close = self.event_close
         self.grid_controls = self.window.place_object(_g.GridLayout(False))
         self.grid_plotting = self.window.place_object(_g.GridLayout(False), alignment=0)
         
@@ -375,4 +376,10 @@ class fitting_statistics_demo():
         """
         self.update_fit_plot()
         self.update_histograms_plot()
+    
+    def event_close(self, *a):
+        """
+        Quits acquisition when the window closes.
+        """
+        self.button_loop.set_checked(False)
             

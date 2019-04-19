@@ -241,7 +241,7 @@ class _sillyscope():
             t2 = _t.time()
             
             # Rename the columns to simulate the scope output
-            d.rename_column(0, 't')
+            d.rename_column(0, 'x')
             d.rename_column(1, 'y'+c)
             
             # Shorten the bitdepth
@@ -580,15 +580,28 @@ class _sillyscope():
 
 class sillyscope(_g.BaseObject):
     """
-    Graphical front-end for the TekScope interface.
+    Graphical front-end for RIGOL 1000 B/D/E/Z and Tektronix TBS/TDS 1000.
+    
+    Parameters
+    ----------
+    autosettings_path='sillyscope'
+        Which file to use for saving the gui stuff. This will also be the first
+        part of the filename for the other settings files.
+    
+    pyvisa_py=False
+        Whether to use pyvisa_py or not.
+        
+    block=False
+        Whether to block the command line while showing the window.
     """
-    def __init__(self, autosettings_path='scope_gui.txt', pyvisa_py=False):
+    def __init__(self, autosettings_path='sillyscope', pyvisa_py=False, block=False):
         
         # No scope selected yet
         self.scope = None
 
         # Build the GUI
-        self.window    = _g.Window('TekScope', autosettings_path='window')
+        self.window    = _g.Window('Sillyscope', autosettings_path='window')
+        self.window.event_close = self.event_close
         self.grid_top  = self.window.place_object(_g.GridLayout(False))
         self.window.new_autorow()
         self.grid_bot  = self.window.place_object(_g.GridLayout(False), alignment=0)
@@ -604,10 +617,10 @@ class sillyscope(_g.BaseObject):
         self.button_transfer  = self.grid_top.place_object(_g.Button('Transfer',True).set_width(70))
         self.label_scope_name = self.grid_top.place_object(_g.Label('Disconnected'))
         
-        self.settings  = self.grid_bot.place_object(_g.TreeDictionary('settings.txt'))
-        self.tabs_data = self.grid_bot.place_object(_g.TabArea('tabs_data'), alignment=0)
+        self.settings  = self.grid_bot.place_object(_g.TreeDictionary(autosettings_path+'_settings.txt'))
+        self.tabs_data = self.grid_bot.place_object(_g.TabArea(autosettings_path+'_tabs_data.txt'), alignment=0)
         self.tab_raw   = self.tabs_data.add_tab('Raw Data')
-        self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.txt', 'plot_raw'), alignment=0)
+        self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.txt', autosettings_path+'_plot_raw.txt'), alignment=0)
         
         # Keep track of previous plot
         self._previous_data = _s.data.databox()
@@ -657,7 +670,7 @@ class sillyscope(_g.BaseObject):
         
         
         # Show the window.
-        self.window.show()
+        self.window.show(block)
     
     def _unlock(self):
         """
@@ -961,7 +974,14 @@ class sillyscope(_g.BaseObject):
         
         # Unlock the RIGOL1000E front panel
         self._unlock()
-        
+    
+    
+    
+    def event_close(self, *a):
+        """
+        Quits acquisition loop when the window closes.
+        """
+        self.button_acquire.set_checked(False)
             
             
 

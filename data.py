@@ -57,7 +57,7 @@ def load_chn(path=None):
     
     return d
 
-def load_multiple_chn(paths=None):
+def load_chns(paths=None):
     """
     Loads multiple chn files, returning a list of databoxes.
     
@@ -99,7 +99,7 @@ def plot_chn_files(xscript='d[0]', yscript='d[1]', eyscript='sqrt(d[1])', marker
     if paths==None: return
     
     # Load the files
-    ds = load_multiple_chn(paths)
+    ds = load_chns(paths)
     
     # Get the title
     title = _os.path.split(ds[0].path)[0]
@@ -134,7 +134,7 @@ try:
         return _imageio.imread(path)
         
     
-    def load_multiple_images(paths=None):
+    def load_images(paths=None):
         """
         Loads multiple images, returning a list of 3D arrays, as per load_image.
         
