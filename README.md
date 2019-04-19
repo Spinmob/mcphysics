@@ -9,6 +9,7 @@ Tools for the McGill University's undergraduate physics labs
    ```
    conda install numpy scipy imageio matplotlib pyqtgraph spyder
    ```
+   (You can also install these packages via anaconda-navigator, but why?)
 3. Install spinmob and mcphysics via pip:
    ```
    pip install spinmob mcphysics
