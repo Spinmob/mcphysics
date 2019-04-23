@@ -15,6 +15,9 @@ import numpy   as _n
 import time    as _t
 import spinmob as _s
 import spinmob.egg as _egg
+import serial  as _serial
+import atexit  as _atexit
+import time    as _time
 _g = _egg.gui
 
 
@@ -32,20 +35,18 @@ def _debug(*a):
 
 
 
-class sillyscope_command_line():
+class sillyscope_api():
     """
-    Class for talking to a Tektronix Scope. Designed for TDS 1000 series, but 
-    simple enough that it probably works for other models.
+    Class for talking to a Tektronix TDS/TBS 1000 series and Rigol 1000 B/D/E/Z
+    sillyscopes.
     
     Parameters
     ----------
     name='TDS1012B'
-        Name of the scope, as it appears in the VISA Instrument Manager.
-        Note this name can be set in the OpenChoice Instrument Manager, and 
-        the default value is uggly with lots of "::"
+        Name of the scope, as it appears in the VISA resource manager.
     
     pyvisa_py=False
-        Set to True if using pyvisa-py instead of, e.g., TekVISA or NI-VISA.
+        Set to True if using pyvisa-py instead of, e.g., R&S VISA or NI-VISA.
     
     simulation=False
         Set to True to enable simulation mode.
@@ -617,7 +618,7 @@ class sillyscope(_g.BaseObject):
         self.button_transfer  = self.grid_top.place_object(_g.Button('Transfer',True).set_width(70))
         self.label_scope_name = self.grid_top.place_object(_g.Label('Disconnected'))
         
-        self.settings  = self.grid_bot.place_object(_g.TreeDictionary(autosettings_path+'_settings.txt')).set_width(257)
+        self.settings  = self.grid_bot.place_object(_g.TreeDictionary(autosettings_path+'_settings.txt')).set_width(250)
         self.tabs_data = self.grid_bot.place_object(_g.TabArea(autosettings_path+'_tabs_data.txt'), alignment=0)
         self.tab_raw   = self.tabs_data.add_tab('Raw Data')
         self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.txt', autosettings_path+'_plot_raw.txt'), alignment=0)
@@ -830,7 +831,7 @@ class sillyscope(_g.BaseObject):
             if not self.scope == None: self.scope.instrument.close()
             
             # Make the new one
-            self.scope = sillyscope_command_line(self.settings['VISA/Device'], 
+            self.scope = sillyscope_api(self.settings['VISA/Device'], 
                 simulation = self.settings['VISA/Device']=='Simulation')
             
             # Tell the user what scope is connected
@@ -983,7 +984,307 @@ class sillyscope(_g.BaseObject):
         """
         self.button_acquire.set_checked(False)
             
+#     TO DO: Automate the continuous mode triggering on init.
+#     TO DO: Import data file monitor.           
+class keithley_dmm_api():
+    """
+    This object lets you query the Keithley 199 or 2700 for voltages on any of its
+    channels. It is based on old code from those before us.
+    
+    FAQ: Use shift + scan setup on the front panel to choose a channel, and
+    shift + trig setup to set the trigger mode to "continuous". Finally, 
+    make sure the range is appropriate, such that the voltage does not overload.
+    Basically, if you see a fluctuating number on the front panel, it's 
+    all set to take data via self.get_voltage() (see below).
+    
+    
+    Methods Jack has inspected
+    --------------------------
+    get_voltage(n=0)    
+        This is the workhorse function about which your automation should
+        be built. Basically you just need to write a loop that queries all
+        the voltages you care about continuously while you "do stuff" to
+        the apparatus. 
+    
+    write(string)
+        Allows you to send low-level commands to the device.
+    
+    read()
+        Returns a string if one exists from the buffer.
+        
+    switch_to_local_mode()
+        Allows you to use the buttons on the DMM
+    
+    switch_to_remote_mode()
+        Locks the front panel buttons.
+        
+    close()
+        Closes the serial connection.
+        
+    reset()
+        Resets the device.
+    """     
+    
+    # Define constants for flags
+    _D_ALL  = 255
+    _D_SEND = 8
+    _D_READ = 4
+    _D_INIT = 2
+    _D_INFO = 1
+    _D_NONE = 0
+    
+    def __init__(self, timeout=5):
+        
+        # Set the debug level.
+        self._debug_level = self._D_INFO+self._D_INIT
+        
+        # Get time t=t0
+        self._t0 = _time.time()
+        
+        # Loop over the COM ports to see if one of them has the DMM on it.
+        for i in range(10):
             
+            # Make the device string
+            dev = "COM%d" % (i)
+            if self._D_INIT & self._debug_level: print("dev = %s"%(dev))
+            
+            # Try connecting over this COM port.
+            try:
+                self.instrument = _serial.Serial(dev,baudrate=9600)
+            
+            # Whoops didn't work!
+            except _serial.serialutil.SerialException:
+                if self._D_INIT & self._debug_level: print("serial.Serial(dev,baudrate=9600) threw serial.serialutil.SerialException")
+                continue
+            
+            # If it worked, self.instrument will be a serial.Serial object.
+            # If not, bomb out.
+            if not type(self.instrument) == _serial.Serial:
+                if self._D_INIT & self._debug_level: print("self.instrument != serial.Serial")
+                continue
+            
+            # Set the default timeout in seconds.
+            self.instrument.timeout = timeout
+            if self._D_INIT & self._debug_level: print(self.instrument)
+            
+            # Apparently had to do with converting the code from a linux base. 
+            # Not sure if all this is necessary.
+            #
+            # The prologix is the USB-GPIB controller. This thing apparently
+            # can also handle the RS232 COM ports as well!
+            if "ttyUSB" == "ttyUSB":
+                if not self._is_prologix():
+                    self.instrument.close()
+                    continue
+                self.instrument.write(b"++addr 26\r\n")
+                self.instrument.write(b"++auto 0\r\n")
+                self.instrument.write(b"++clr\r\n")
+                self.instrument.write(b"++mode 1\r\n")
+                self.instrument.write(b"++read_tmo_ms 2000\r\n")
+
+            # Set it up so when we shut down the terminal we safely close the
+            # connection first.
+            _atexit.register(lambda: self.instrument.close())
+            
+            # Special considerations for the 199 model
+            if self._is_199():
+                self._device_name = "Keithley 199"
+                if self._D_INFO & self._debug_level: print("Found a %s on %s"%(self._device_name,dev))
+                self.reset()     # Trigger of GET (++trg), Data format: reading no prefix, with channel, 5.5 digits
+                return
+            
+            # Special considerations for the 2700 model
+            if self._is_2700():
+                self._device_name = "Keithley 2700"
+                if self._D_INFO & self._debug_level: print("Found a %s on %s"%(self._device_name,dev))
+                self.reset()
+                return
+        
+        # If it bombed out
+        raise RuntimeError("Uh-oh! I can't identify the model!")
+    
+    
+    def _is_199(self):
+        if self._D_INIT & self._debug_level: print("_is_199()")
+        self.instrument.write(b"U0X\r\n")
+        self.instrument.write(b"++read 10\r\n")
+        resp = self.instrument.readline()
+        if self._D_INIT & self._debug_level: print("resp: ",resp)
+        if b"199" == resp[0:3]:
+            if self._D_INIT & self._debug_level: print("_is_199() ... yes")
+            self.scanner = int(resp[31:32])
+            return True
+        if "100" == resp[0:3]: # this happens, not documented
+            if self._D_INIT & self._debug_level: print("_is_199() ... yes")
+            self.scanner = int(resp[31:32])
+            return True
+        if self._D_INIT & self._debug_level: print("_is_199() ... no")
+        return False
+    
+    def _is_prologix(self):
+        if self._D_INIT & self._debug_level: print("_is_prologix()")
+        self.instrument.write(b"++ver\r\n")
+        resp = self.instrument.readline()
+        if b"Prologix" == resp[0:8]:
+            if self._D_INIT & self._debug_level: print("_is_prologix() ... yes")
+            return True
+        if self._D_INIT & self._debug_level: print("_is_prologix() ... no")
+        return False
+    
+    def _is_2700(self):
+        if self._D_INIT & self._debug_level: print("_is_2700()")
+        self.instrument.write(b"*IDN?\r\n")
+        if self._D_INIT & self._debug_level: print("sent *IDN?\\r\\n")
+        resp = self.instrument.read(256)
+        if self._D_INIT & self._debug_level: print("received '%s'"%(resp))
+        if b"KEITHLEY INSTRUMENTS INC.,MODEL 2700" == resp[0:36]:
+            if self._D_INIT & self._debug_level: print("_is_2700() ... yes")
+            return True
+        if self._D_INIT & self._debug_level: print("_is_2700() ... no")
+        return False
+    
+    
+    def write(self,string, process_events=None):
+        """
+        Write a command string to the Keithley.
+        """
+        
+        if self._D_SEND & self._debug_level: print("write('%s')"%(string))
+        #self.instrument.write('IFC\r\n')
+        
+        if not process_events==None: process_events()
+        _time.sleep(0.02)
+        self.instrument.write(string.encode())
+        
+        if not process_events==None: process_events()
+        _time.sleep(0.02)
+        self.instrument.write(b"\r\n")
+    
+    
+    def read(self, process_events=None):
+        """
+        Read the output of the Keithley. Returns a string if it doesn't time out.
+        """
+        if "Keithley 199" == self._device_name:
+            if not process_events==None: process_events()
+            _time.sleep(0.02)
+            resp = self.instrument.readline().decode()
+
+        elif "Keithley 2700" == self._device_name:
+            if not process_events==None: process_events()
+            _time.sleep(0.02)
+            resp = self.instrument.read(256).decode()
+
+        else:
+            raise NotImplementedError("Keithley.read() only knows how to handle Keithley 199 and 2700 DMMs")
+
+        if self._D_READ & self._debug_level:
+            print("read() '%s'"%(resp.replace("\r","<cr>").replace("\n","<lf>")))
+
+        return resp.replace("\r","").replace("\n","")
+    
+    
+    def reset(self):
+        """
+        We should look up the command that is actually sent.
+        """
+        
+        if self._device_name == "Keithley 199":
+            self.write("L0XT3G5S1X")
+        elif self._device_name == "Keithley 2700":
+            self.write("INIT:CONT OFF")
+            self.write("CONF:VOLT:DC")
+    
+    def switch_to_local_mode(self):
+        """
+        Tells the Keithley to listen to the front panel buttons and ignore instructions from the computer.
+        """
+        self.instrument.write(b"++loc\r\n")
+         
+         
+    def switch_to_remote_mode(self):
+        """
+        Tells the Keithley to ignore the front panel buttons and listen to instructions from the computer.
+        """
+        self.instrument.write(b"++llo\r\n")
+
+
+    def get_voltage(self, channel=1, process_events=None):
+        """
+        Returns the trigger time and voltage value for the supplied channel.
+        
+        Parameters
+        ----------
+        channel=0:
+            Channel number to read (integer).
+        process_events=None:
+            Optional function that will run whenever possible 
+            (e.g. to update a gui).
+        """
+        
+        
+        if "Keithley 199" == self._device_name:
+            self.write("F0R0N%dX"%channel, process_events)
+            
+            # Tell it to trigger
+            self.write("++trg", process_events)
+            
+#            # Apparently we poll and see if it switched from 0 to 16. 
+#            # When it switched to 16, the measurement is done.
+#            result = 0 # Indicator that measurement is done
+#            n      = 0 # Timeout integer
+#            while not result == 16 and n < 500:
+#                
+#                # Don't overload the buffer.
+#                _time.sleep(0.01)
+#                self.write("++spoll")
+#                result = int(self.read().strip())
+#               
+# This waiting part made an infinite loop at 16.
+#            for n in range(10):
+#                self.write("++spoll")
+#                if 8 & int(self.read()):
+#                    break
+
+            # Ask for the voltage
+            self.write("++read 10", process_events)
+            
+            # Comes back with a number,channel.
+            result = self.read(process_events) 
+            words  = result.split(',')
+            
+            # Mark the time
+            t = _time.time() - self._t0
+            
+            # Make sure we got the right format!
+            if not len(words) == 2:
+                print("WARNING: Returned value is not the right format: '"+result+"'")
+                return t, None
+
+            # Make sure we got the channel we asked for!
+            got_channel = int(words[1])
+            if not got_channel == channel:
+                raise RuntimeError("requested channel %d, got %d"%(channel,got_channel))
+            
+            # Return the voltage
+            return t, float(words[0])
+
+        # Not tested by Jack
+        if "Keithley 2700" == self._device_name:
+            self.write("ROUT:CLOS (@10%d)"%channel)
+            self.write("READ?")
+            resp = self.read()
+            words = resp.split(",")
+            if 3 != len(words):
+                raise RuntimeError
+            if "VDC" != words[0][-3:]:
+                raise RuntimeError
+            return float(words[0][0:-3])
+        raise NotImplementedError("dmm.get_voltage() only knows how to handle Keithley 199 and 2700 DMMs")
+
+
+    def close(self): self.instrument.close()
+
 
 ############################
 # Example code
@@ -991,5 +1292,5 @@ class sillyscope(_g.BaseObject):
 
 if __name__ == '__main__':
          
-    self = sillyscope()
+    self = keithley_dmm_api()
 
