@@ -15,15 +15,11 @@ import numpy   as _n
 import time    as _t
 import spinmob as _s
 import spinmob.egg as _egg
-import serial  as _serial
-import atexit  as _atexit
 import time    as _time
 _g = _egg.gui
 
-
-
 try:    import visa as _v
-except: print('VISA driver and / or pyvisa not installed. On Windows, consider Rhode & Schwartz VISA or NI-VISA, then pip install pyvisa. On Linux, pip install pyvisa and pyvisa-py')
+except: print('Visa driver and / or pyvisa not installed. On Windows, consider Rhode & Schwartz VISA or NI-VISA, then pip install pyvisa. On Linux, pip install pyvisa and pyvisa-py')
 
 _debug_enabled = False
 def _debug(*a):
@@ -31,6 +27,9 @@ def _debug(*a):
         s = []
         for x in a: s.append(str(x))
         print(', '.join(s))
+
+
+
 
 
 
@@ -598,10 +597,10 @@ class sillyscope(_g.BaseObject):
     def __init__(self, autosettings_path='sillyscope', pyvisa_py=False, block=False):
         
         # No scope selected yet
-        self.scope = None
+        self.api = None
 
         # Build the GUI
-        self.window    = _g.Window('Sillyscope', autosettings_path='window')
+        self.window    = _g.Window('Sillyscope', autosettings_path=autosettings_path+'window')
         self.window.event_close = self.event_close
         self.grid_top  = self.window.place_object(_g.GridLayout(False))
         self.window.new_autorow()
@@ -678,17 +677,17 @@ class sillyscope(_g.BaseObject):
         If we're using a RIGOLDE/B and wish to unlock, send the :FORC command.
         """
         if self.settings['Acquisition/RIGOL1000BDE/Unlock']:
-            if self.scope.model in ['RIGOLDE']:
-                self.scope.write(':KEY:FORC')   
-            elif self.scope.model in ['RIGOLB']:
-                self.scope.write(':KEY:LOCK DIS')
+            if self.api.model in ['RIGOLDE']:
+                self.api.write(':KEY:FORC')   
+            elif self.api.model in ['RIGOLB']:
+                self.api.write(':KEY:LOCK DIS')
     
     def _settings_trigger_changed(self, *a):
         """
         Called when someone clicks the Trigger checkbox.
         """
         if self.settings['Acquisition/Trigger']: 
-            self.scope.set_mode_single_trigger()
+            self.api.set_mode_single_trigger()
             self._unlock()
     
     def connect(self):
@@ -715,11 +714,11 @@ class sillyscope(_g.BaseObject):
         """
         _debug('get_status_finished()')
         
-        if self.scope.model == 'TEKTRONIX':
+        if self.api.model == 'TEKTRONIX':
             _debug('  TEK')
-            return not bool(int(self.scope.query('ACQ:STATE?')))
+            return not bool(int(self.api.query('ACQ:STATE?')))
         
-        elif self.scope.model == 'RIGOLZ':
+        elif self.api.model == 'RIGOLZ':
             _debug('  RIGOLZ')
             
             # If the waveforms are empty (we cleared it!)
@@ -727,11 +726,11 @@ class sillyscope(_g.BaseObject):
             if len(self.plot_raw[0]) > 0: return True
             else:                         return False
        
-        elif self.scope.model in ['RIGOLDE', 'RIGOLB']:
+        elif self.api.model in ['RIGOLDE', 'RIGOLB']:
             _debug('  RIGOLDE/B')
                         
             self.window.sleep(self.settings['Acquisition/RIGOL1000BDE/Trigger_Delay'])
-            s = self.scope.query(':TRIG:STAT?').strip()
+            s = self.api.query(':TRIG:STAT?').strip()
             return s == 'STOP'
             
 
@@ -767,7 +766,7 @@ class sillyscope(_g.BaseObject):
         if self.button_1.get_value():
             
             # Actually get it.
-            d = self.scope.get_waveform(1, use_previous_header=not get_header)
+            d = self.api.get_waveform(1, use_previous_header=not get_header)
             
             # Update the main plot
             self.plot_raw['x']  = d['x']
@@ -779,7 +778,7 @@ class sillyscope(_g.BaseObject):
         if self.button_2.get_value():
             
             # Actually get it
-            d = self.scope.get_waveform(2, use_previous_header=not get_header)
+            d = self.api.get_waveform(2, use_previous_header=not get_header)
             
             # Update teh main plot
             self.plot_raw['x']  = d['x']
@@ -791,7 +790,7 @@ class sillyscope(_g.BaseObject):
         if self.button_3.get_value():
             
             # Actually get it
-            d = self.scope.get_waveform(3, use_previous_header=not get_header)
+            d = self.api.get_waveform(3, use_previous_header=not get_header)
             
             # Update teh main plot
             self.plot_raw['x']  = d['x']
@@ -803,7 +802,7 @@ class sillyscope(_g.BaseObject):
         if self.button_4.get_value():
             
             # Actually get it
-            d = self.scope.get_waveform(4, use_previous_header=not get_header)
+            d = self.api.get_waveform(4, use_previous_header=not get_header)
             
             # Update teh main plot
             self.plot_raw['x']  = d['x']
@@ -828,24 +827,24 @@ class sillyscope(_g.BaseObject):
         if self.button_connect.get_value():
             
             # Close it if it exists for some reason
-            if not self.scope == None: self.scope.instrument.close()
+            if not self.api == None: self.api.instrument.close()
             
             # Make the new one
-            self.scope = sillyscope_api(self.settings['VISA/Device'], 
+            self.api = sillyscope_api(self.settings['VISA/Device'], 
                 simulation = self.settings['VISA/Device']=='Simulation')
             
             # Tell the user what scope is connected
-            self.label_scope_name.set_text(self.scope._idn)
+            self.label_scope_name.set_text(self.api._idn)
             
             # Enable the Acquire button
             self.button_acquire.enable()
             
-        elif not self.scope == None:
+        elif not self.api == None:
             
             # Close down the instrument
-            if not self.scope.instrument == None:
-                self.scope.instrument.close()
-            self.scope = None
+            if not self.api.instrument == None:
+                self.api.instrument.close()
+            self.api = None
             self.label_scope_name.set_text('Disconnected')
             
             # Disable the acquire button
@@ -861,7 +860,7 @@ class sillyscope(_g.BaseObject):
         if not self.button_acquire.is_checked(): return
 
         # Don't proceed if we have no connection
-        if self.scope == None: 
+        if self.api == None: 
             self.button_acquire.set_checked(False)
             return
 
@@ -873,7 +872,7 @@ class sillyscope(_g.BaseObject):
         
         # If we're triggering, set to single sequence mode
         if self.settings['Acquisition/Trigger']: 
-            self.scope.set_mode_single_trigger()
+            self.api.set_mode_single_trigger()
             
         _debug('  beginning loop')
 
@@ -893,11 +892,11 @@ class sillyscope(_g.BaseObject):
                 _debug('  TRIGGERING')
                 
                 # Set it to acquire the sequence.
-                self.scope.trigger_single() # For RigolZ, this clears the trace
+                self.api.trigger_single() # For RigolZ, this clears the trace
                 
                 # Simulation mode: "wait" for it to finish
                 _debug('  WAITING')
-                if self.scope.instrument == None: self.window.sleep(0.1)
+                if self.api.instrument == None: self.window.sleep(0.1)
                 
                 # Actual scope: wait for it to finish
                 else:
@@ -911,11 +910,11 @@ class sillyscope(_g.BaseObject):
             # is to clear it and keep asking for the waveform.
             
             # Not triggering but RIGOLZ mode: clear the data first and then wait for data
-            elif self.scope.model in ['RIGOLZ']:
+            elif self.api.model in ['RIGOLZ']:
                 
                 # Clear the scope if we're not in free running mode
                 if self.settings['Acquisition/RIGOL1000Z/Always_Clear']:
-                    self.scope.write(':CLE')
+                    self.api.write(':CLE')
                     
                 # Wait for it to complete
                 while not self.get_status_finished() and self.button_acquire.is_checked(): 
@@ -933,7 +932,7 @@ class sillyscope(_g.BaseObject):
                 # after clearing the scope and seeing if there is data returned.
                 
                 # Triggered RIGOLZ scopes already have the data
-                if self.scope.model in [None, 'TEKTRONIX', 'RIGOLDE', 'RIGOLB'] or \
+                if self.api.model in [None, 'TEKTRONIX', 'RIGOLDE', 'RIGOLB'] or \
                    not self.settings['Acquisition/Trigger']: 
                        
                        # Query the scope for the data and stuff it into the plotter
@@ -997,238 +996,177 @@ class keithley_dmm_api():
     Basically, if you see a fluctuating number on the front panel, it's 
     all set to take data via self.get_voltage() (see below).
     
+    Parameters
+    ----------
+    name='ASRL3::INSTR'
+        Visa resource name. Use R&S Tester 64-bit or NI-MAX to find this.
     
-    Methods Jack has inspected
-    --------------------------
-    get_voltage(n=0)    
-        This is the workhorse function about which your automation should
-        be built. Basically you just need to write a loop that queries all
-        the voltages you care about continuously while you "do stuff" to
-        the apparatus. 
+    pyvisa_py=False
+        If True, use the all-python VISA implementation. On Windows, the simplest
+        Visa implementation seems to be Rhode & Schwarz (streamlined) or NI-VISA (bloaty),
+        with pyvisa_py=False.
+    """
     
-    write(string)
-        Allows you to send low-level commands to the device.
     
-    read()
-        Returns a string if one exists from the buffer.
+    
+    def __init__(self, name='ASRL3::INSTR', pyvisa_py=False):
         
-    switch_to_local_mode()
-        Allows you to use the buttons on the DMM
-    
-    switch_to_remote_mode()
-        Locks the front panel buttons.
-        
-    close()
-        Closes the serial connection.
-        
-    reset()
-        Resets the device.
-    """     
-    
-    # Define constants for flags
-    _D_ALL  = 255
-    _D_SEND = 8
-    _D_READ = 4
-    _D_INIT = 2
-    _D_INFO = 1
-    _D_NONE = 0
-    
-    def __init__(self, timeout=5):
-        
-        # Set the debug level.
-        self._debug_level = self._D_INFO+self._D_INIT
+        # Create a resource management object
+        if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
+        else:         self.resource_manager = _v.ResourceManager()
         
         # Get time t=t0
         self._t0 = _time.time()
         
-        # Loop over the COM ports to see if one of them has the DMM on it.
-        for i in range(10):
-            
-            # Make the device string
-            dev = "COM%d" % (i)
-            if self._D_INIT & self._debug_level: print("dev = %s"%(dev))
-            
-            # Try connecting over this COM port.
+        # Try to open the instrument.
+        try:
+            self.instrument = self.resource_manager.open_resource(name)
+
+            # Test that it's responding and figure out the type.
             try:
-                self.instrument = _serial.Serial(dev,baudrate=9600)
-            
-            # Whoops didn't work!
-            except _serial.serialutil.SerialException:
-                if self._D_INIT & self._debug_level: print("serial.Serial(dev,baudrate=9600) threw serial.serialutil.SerialException")
-                continue
-            
-            # If it worked, self.instrument will be a serial.Serial object.
-            # If not, bomb out.
-            if not type(self.instrument) == _serial.Serial:
-                if self._D_INIT & self._debug_level: print("self.instrument != serial.Serial")
-                continue
-            
-            # Set the default timeout in seconds.
-            self.instrument.timeout = timeout
-            if self._D_INIT & self._debug_level: print(self.instrument)
-            
-            # Apparently had to do with converting the code from a linux base. 
-            # Not sure if all this is necessary.
-            #
-            # The prologix is the USB-GPIB controller. This thing apparently
-            # can also handle the RS232 COM ports as well!
-            if "ttyUSB" == "ttyUSB":
-                if not self._is_prologix():
+                # Clear out the buffer, in case the instrument was
+                # Just turned on.
+                self.read()
+                
+                # Ask for the model identifier
+                s = self.query('U0X')
+                
+                # DMM model 199
+                if s[0:3] in ['100', '199']: self.model = 'KEITHLEY199'
+                else: 
+                    print("ERROR: Currently we only handle Keithley 199 DMMs")
                     self.instrument.close()
-                    continue
-                self.instrument.write(b"++addr 26\r\n")
-                self.instrument.write(b"++auto 0\r\n")
-                self.instrument.write(b"++clr\r\n")
-                self.instrument.write(b"++mode 1\r\n")
-                self.instrument.write(b"++read_tmo_ms 2000\r\n")
-
-            # Set it up so when we shut down the terminal we safely close the
-            # connection first.
-            _atexit.register(lambda: self.instrument.close())
+                    self.instrument = None
+                    
+            except:
+                print("ERROR: Instrument did not reply to ID query. Entering simulation mode.")
+                self.instrument.close()
+                self.instrument = None
+                
+        except:
+            print("ERROR: Could not open instrument. Entering simulation mode.")
+            self.instrument = None
             
-            # Special considerations for the 199 model
-            if self._is_199():
-                self._device_name = "Keithley 199"
-                if self._D_INFO & self._debug_level: print("Found a %s on %s"%(self._device_name,dev))
-                self.reset()     # Trigger of GET (++trg), Data format: reading no prefix, with channel, 5.5 digits
-                return
+            # Now list all available resources
+            print("Available Instruments:")
+            for name in self.resource_manager.list_resources(): print("  "+name)
             
-            # Special considerations for the 2700 model
-            if self._is_2700():
-                self._device_name = "Keithley 2700"
-                if self._D_INFO & self._debug_level: print("Found a %s on %s"%(self._device_name,dev))
-                self.reset()
-                return
-        
-        # If it bombed out
-        raise RuntimeError("Uh-oh! I can't identify the model!")
-    
-    
-    def _is_199(self):
-        if self._D_INIT & self._debug_level: print("_is_199()")
-        self.instrument.write(b"U0X\r\n")
-        self.instrument.write(b"++read 10\r\n")
-        resp = self.instrument.readline()
-        if self._D_INIT & self._debug_level: print("resp: ",resp)
-        if b"199" == resp[0:3]:
-            if self._D_INIT & self._debug_level: print("_is_199() ... yes")
-            self.scanner = int(resp[31:32])
-            return True
-        if "100" == resp[0:3]: # this happens, not documented
-            if self._D_INIT & self._debug_level: print("_is_199() ... yes")
-            self.scanner = int(resp[31:32])
-            return True
-        if self._D_INIT & self._debug_level: print("_is_199() ... no")
-        return False
-    
-    def _is_prologix(self):
-        if self._D_INIT & self._debug_level: print("_is_prologix()")
-        self.instrument.write(b"++ver\r\n")
-        resp = self.instrument.readline()
-        if b"Prologix" == resp[0:8]:
-            if self._D_INIT & self._debug_level: print("_is_prologix() ... yes")
-            return True
-        if self._D_INIT & self._debug_level: print("_is_prologix() ... no")
-        return False
-    
-    def _is_2700(self):
-        if self._D_INIT & self._debug_level: print("_is_2700()")
-        self.instrument.write(b"*IDN?\r\n")
-        if self._D_INIT & self._debug_level: print("sent *IDN?\\r\\n")
-        resp = self.instrument.read(256)
-        if self._D_INIT & self._debug_level: print("received '%s'"%(resp))
-        if b"KEITHLEY INSTRUMENTS INC.,MODEL 2700" == resp[0:36]:
-            if self._D_INIT & self._debug_level: print("_is_2700() ... yes")
-            return True
-        if self._D_INIT & self._debug_level: print("_is_2700() ... no")
-        return False
-    
-    
-    def write(self,string, process_events=None):
+    def write(self, message, process_events=False): 
         """
-        Write a command string to the Keithley.
-        """
+        Writes the supplied message.
         
-        if self._D_SEND & self._debug_level: print("write('%s')"%(string))
-        #self.instrument.write('IFC\r\n')
-        
-        if not process_events==None: process_events()
-        _time.sleep(0.02)
-        self.instrument.write(string.encode())
-        
-        if not process_events==None: process_events()
-        _time.sleep(0.02)
-        self.instrument.write(b"\r\n")
-    
-    
-    def read(self, process_events=None):
+        Parameters
+        ----------
+        message
+            String message to send to the DMM.
+            
+        process_events=False
+            Optional function to be called in between communications, e.g., to 
+            update a gui.
         """
-        Read the output of the Keithley. Returns a string if it doesn't time out.
+        _debug('write('+"'"+message+"'"+')')
+        
+        if self.instrument == None: s = None
+        else:                       s = self.instrument.write(message)
+        
+        if process_events: process_events()
+        return s
+    
+    def read(self, process_events=False):          
         """
-        if "Keithley 199" == self._device_name:
-            if not process_events==None: process_events()
-            _time.sleep(0.02)
-            resp = self.instrument.readline().decode()
-
-        elif "Keithley 2700" == self._device_name:
-            if not process_events==None: process_events()
-            _time.sleep(0.02)
-            resp = self.instrument.read(256).decode()
-
-        else:
-            raise NotImplementedError("Keithley.read() only knows how to handle Keithley 199 and 2700 DMMs")
-
-        if self._D_READ & self._debug_level:
-            print("read() '%s'"%(resp.replace("\r","<cr>").replace("\n","<lf>")))
-
-        return resp.replace("\r","").replace("\n","")
+        Reads a message and returns it.
+        
+        Parameters
+        ----------
+        process_events=False
+            Optional function to be called in between communications, e.g., to 
+            update a gui.
+        """
+        _debug('read()')
+        self.write('++read 10')
+        
+        if process_events: process_events()
     
+        if self.instrument == None: response = ''
+        else:                       response = self.instrument.read()
+        
+        if process_events: process_events()
     
+        _debug('  '+repr(response))
+        return response.strip()
+    
+    def query(self, message='U0X', process_events=False):
+        """
+        Writes the supplied message and reads the response.
+        """
+        _debug("query('"+message+"')")
+        
+        self.write(message, process_events)
+        return self.read(process_events)
+
     def reset(self):
         """
         We should look up the command that is actually sent.
         """
-        
-        if self._device_name == "Keithley 199":
+        if self._device_name == "KEITHLEY199":
             self.write("L0XT3G5S1X")
-        elif self._device_name == "Keithley 2700":
+        elif self._device_name == "KEITHLEY2700":
             self.write("INIT:CONT OFF")
             self.write("CONF:VOLT:DC")
-    
-    def switch_to_local_mode(self):
+
+    def unlock(self):
         """
         Tells the Keithley to listen to the front panel buttons and ignore instructions from the computer.
         """
-        self.instrument.write(b"++loc\r\n")
-         
-         
-    def switch_to_remote_mode(self):
+        self.write("++loc")
+
+    def lock(self):
         """
         Tells the Keithley to ignore the front panel buttons and listen to instructions from the computer.
         """
-        self.instrument.write(b"++llo\r\n")
+        self.write("++llo")
 
-
-    def get_voltage(self, channel=1, process_events=None):
+    def get_voltage(self, channel=1, process_events=False):
         """
-        Returns the trigger time and voltage value for the supplied channel.
+        Returns the time just after reading the voltage and voltage value 
+        for the supplied channel.
         
         Parameters
         ----------
         channel=0:
             Channel number to read (integer).
-        process_events=None:
+        process_events=False:
             Optional function that will run whenever possible 
-            (e.g. to update a gui).
+            (e.g., to update a gui).
         """
+        # Simulation mode
+        if self.instrument == None:
+            _t.sleep(0.4)
+            return _time.time() - self._t0, _n.random.rand()
         
-        
-        if "Keithley 199" == self._device_name:
-            self.write("F0R0N%dX"%channel, process_events)
+        # Real deal
+        elif self.model == 'KEITHLEY199':
             
-            # Tell it to trigger
-            self.write("++trg", process_events)
+            # Select the channel
+            self.write("F0R0N%dX" % channel, process_events)
             
+            # Ask for the voltage & get rid of the garbage
+            try:
+                s = self.read(process_events)
+            except:
+                print("ERROR: Timeout on channel "+str(channel))
+                return _time.time() - self._t0, _n.nan
+            
+            # Return the voltage
+            try:
+                return _time.time() - self._t0, float(s[4:].strip())
+            except:
+                print("ERROR: Bad format "+repr(s))
+                return _time.time() - self._t0, _n.nan
+            
+#            # Tell it to trigger
+#            self.write("++trg")
+#            
 #            # Apparently we poll and see if it switched from 0 to 16. 
 #            # When it switched to 16, the measurement is done.
 #            result = 0 # Indicator that measurement is done
@@ -1240,50 +1178,256 @@ class keithley_dmm_api():
 #                self.write("++spoll")
 #                result = int(self.read().strip())
 #               
-# This waiting part made an infinite loop at 16.
+#            # This waiting part made an infinite loop at 16.
 #            for n in range(10):
 #                self.write("++spoll")
 #                if 8 & int(self.read()):
 #                    break
-
-            # Ask for the voltage
-            self.write("++read 10", process_events)
+#        # Not tested by Jack, but probably the visa approach is much better.
+#        if "Keithley 2700" == self._device_name:
+#            self.write("ROUT:CLOS (@10%d)"%channel)
+#            self.write("READ?")
+#            resp = self.read()
+#            words = resp.split(",")
+#            if 3 != len(words):
+#                raise RuntimeError
+#            if "VDC" != words[0][-3:]:
+#                raise RuntimeError
+#            return float(words[0][0:-3])
             
-            # Comes back with a number,channel.
-            result = self.read(process_events) 
-            words  = result.split(',')
+    def close(self): 
+        """
+        Closes the connection to the device.
+        """
+        _debug("close()")
+        self.instrument.close()
+
+
+class keithley_dmm(_g.BaseObject):
+    """
+    Graphical front-end for the Keithley 199 DMM.
+    
+    Parameters
+    ----------
+    autosettings_path='keithley_dmm'
+        Which file to use for saving the gui stuff. This will also be the first
+        part of the filename for the other settings files.
+    
+    pyvisa_py=False
+        Whether to use pyvisa_py or not.
+        
+    block=False
+        Whether to block the command line while showing the window.
+    """
+    def __init__(self, autosettings_path='keithley_dmm', pyvisa_py=False, block=False):
+        
+        # No scope selected yet
+        self.api = None
+        
+        # Internal parameters
+        self._pyvisa_py = pyvisa_py
+
+        # Build the GUI
+        self.window    = _g.Window('Keithley DMM', autosettings_path=autosettings_path+'_window')
+        self.window.event_close = self.event_close
+        self.grid_top  = self.window.place_object(_g.GridLayout(False))
+        self.window.new_autorow()
+        self.grid_bot  = self.window.place_object(_g.GridLayout(False), alignment=0)
+        
+        self.button_connect   = self.grid_top.place_object(_g.Button('Connect', True, False))
+        
+        # Button list for channels
+        self.buttons = []
+        for n in range(8): 
+            self.buttons.append(self.grid_top.place_object(_g.Button(str(n+1),True, True).set_width(25)))
+            self.buttons[n].signal_toggled.connect(self.save_gui_settings)
+        
+        self.button_acquire   = self.grid_top.place_object(_g.Button('Acquire',True).disable())
+        self.label_dmm_name   = self.grid_top.place_object(_g.Label('Disconnected'))
+        
+        self.settings  = self.grid_bot.place_object(_g.TreeDictionary(autosettings_path+'_settings.txt')).set_width(250)
+        self.tabs_data = self.grid_bot.place_object(_g.TabArea(autosettings_path+'_tabs_data.txt'), alignment=0)
+        self.tab_raw   = self.tabs_data.add_tab('Raw Data')
+        self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.txt', autosettings_path+'_plot_raw.txt', autoscript=2), alignment=0)
+        
+        # Create a resource management object to populate the list
+        if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
+        else:         self.resource_manager = _v.ResourceManager()
+        names = []
+        for x in self.resource_manager.list_resources(): names.append(x)
+                
+        # VISA settings
+        self.settings.add_parameter('VISA/Device', 0, type='list', values=['Simulation']+names)
+
+        # Acquisition settings
+        self.settings.add_parameter('Acquisition/Unlock', True, tip='Unlock the device\'s front panel after acquisition.')
+        
+        # Connect all the signals
+        self.button_connect.signal_clicked.connect(self.button_connect_clicked)
+        self.button_acquire.signal_clicked.connect(self.button_acquire_clicked)
+        
+        # Convenience
+        self.d = self.plot_raw
+
+        # Run the base object stuff and autoload settings
+        _g.BaseObject.__init__(self, autosettings_path=autosettings_path)
+        self._autosettings_controls = [
+                                       'self.buttons[0]', 'self.buttons[1]',
+                                       'self.buttons[2]', 'self.buttons[3]',
+                                       'self.buttons[4]', 'self.buttons[5]',
+                                       'self.buttons[6]', 'self.buttons[7]']
+        self.load_gui_settings()
+        
+        # Show the window.
+        self.window.show(block)
+
+    def button_connect_clicked(self, *a):
+        """
+        Connects or disconnects the VISA resource.
+        """
+        
+        # If we're supposed to connect
+        if self.button_connect.get_value():
             
-            # Mark the time
-            t = _time.time() - self._t0
+            # Close it if it exists for some reason
+            if not self.api == None: self.api.close()
             
-            # Make sure we got the right format!
-            if not len(words) == 2:
-                print("WARNING: Returned value is not the right format: '"+result+"'")
-                return t, None
-
-            # Make sure we got the channel we asked for!
-            got_channel = int(words[1])
-            if not got_channel == channel:
-                raise RuntimeError("requested channel %d, got %d"%(channel,got_channel))
+            # Make the new one
+            self.api = keithley_dmm_api(self.settings['VISA/Device'], self._pyvisa_py)
             
-            # Return the voltage
-            return t, float(words[0])
+            # Tell the user what dmm is connected
+            if self.api.instrument == None: self.label_dmm_name.set_text('Simulation')
+            else:                           self.label_dmm_name.set_text(self.api.model)
+            
+            # Enable the Acquire button
+            self.button_acquire.enable()
+            
+        elif not self.api == None:
+            
+            # Close down the instrument
+            if not self.api.instrument == None:
+                self.api.instrument.close()
+            self.api = None
+            self.label_scope_name.set_text('Disconnected')
+            
+            # Disable the acquire button
+            self.button_acquire.disable()
+            
+    def button_acquire_clicked(self, *a):
+        """
+        Get the enabled curves, storing them in plot_raw.
+        """
+        _debug('button_acquire_clicked()')
+        
+        # Don't double-loop!
+        if not self.button_acquire.is_checked(): return
 
-        # Not tested by Jack
-        if "Keithley 2700" == self._device_name:
-            self.write("ROUT:CLOS (@10%d)"%channel)
-            self.write("READ?")
-            resp = self.read()
-            words = resp.split(",")
-            if 3 != len(words):
-                raise RuntimeError
-            if "VDC" != words[0][-3:]:
-                raise RuntimeError
-            return float(words[0][0:-3])
-        raise NotImplementedError("dmm.get_voltage() only knows how to handle Keithley 199 and 2700 DMMs")
+        # Don't proceed if we have no connection
+        if self.api == None: 
+            self.button_acquire.set_checked(False)
+            return
+
+        # Ask the user for the dump file
+        self.path = _s.dialogs.save('*.csv', 'Select an output file.', force_extension='*.csv')
+        if self.path == None: return
+    
+        _debug('  path='+repr(self.path))
+    
+        # Disable the connection button
+        self._set_acquisition_mode(True)
+    
+        # For easy coding
+        d = self.plot_raw
+    
+        # Set up the databox columns
+        _debug('  setting up databox')
+        d.clear()
+        for n in range(len(self.buttons)):
+            if self.buttons[n].is_checked():
+                d['t'+str(n+1)] = []
+                d['v'+str(n+1)] = []
+        
+        # Reset the clock and record it as header
+        self.api._t0 = _t.time()
+        self._dump(['Date:', _t.ctime()], 'w')
+        self._dump(['Time:', self.api._t0])
+        
+        # And the column labels!
+        self._dump(self.plot_raw.ckeys)
+        
+        # Loop until the user quits
+        _debug('  starting the loop')
+        while self.button_acquire.is_checked():
+    
+            # Next line of data
+            data = []
+            
+            # Get all the voltages we're supposed to
+            for n in range(len(self.buttons)):
+                
+                # If the button is enabled, get the time and voltage
+                if self.buttons[n].is_checked():
+                    
+                    _debug('    getting the voltage')
+                    
+                    # Get the time and voltage, updating the window in between commands
+                    t, v = self.api.get_voltage(n+1, self.window.process_events)
+                    
+                    # Append the new data points
+                    d['t'+str(n+1)] = _n.append(d['t'+str(n+1)], t)
+                    d['v'+str(n+1)] = _n.append(d['v'+str(n+1)], v)
+                    
+                    # Update the plot
+                    self.plot_raw.plot()
+                    self.window.process_events()
+                    
+                    # Append this to the list
+                    data = data + [t,v]
+                
+            # Write the line to the dump file
+            self._dump(data)
+         
+        _debug('  Loop complete!')
+        
+        # Unlock the front panel if we're supposed to
+        if self.settings['Acquisition/Unlock']: self.api.unlock()
+        
+        # Re-enable the connect button
+        self._set_acquisition_mode(False)
+
+    def _dump(self, a, mode='a'):
+        """
+        Opens self.path, writes the list a, closes self.path. mode is the file
+        open mode.
+        """
+        _debug('_dump('+str(a)+', '+ repr(mode)+')')
+        
+        # Make sure everything is a string
+        for n in range(len(a)): a[n] = str(a[n])
+        self.a = a
+        # Write it.
+        f = open(self.path, mode)
+        f.write(','.join(a)+'\n')
+        f.close()
+
+    def _set_acquisition_mode(self, mode=True):
+        """
+        Enables / disables the appropriate buttons, depending on the mode.
+        """
+        _debug('_set_acquisition_mode('+repr(mode)+')')
+        self.button_connect.disable(mode)
+        for b in self.buttons: b.disable(mode)
+        
+    def event_close(self, *a):
+        """
+        Quits acquisition loop when the window closes.
+        """
+        self.button_acquire.set_checked(False)
+
+    
 
 
-    def close(self): self.instrument.close()
+
 
 
 ############################
@@ -1292,5 +1436,5 @@ class keithley_dmm_api():
 
 if __name__ == '__main__':
          
-    self = keithley_dmm_api()
-
+    self = keithley_dmm()
+    
