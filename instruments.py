@@ -1200,7 +1200,7 @@ class keithley_dmm_api():
         Closes the connection to the device.
         """
         _debug("close()")
-        self.instrument.close()
+        if not self.instrument == None: self.instrument.close()
 
 
 class keithley_dmm(_g.BaseObject):
@@ -1306,9 +1306,9 @@ class keithley_dmm(_g.BaseObject):
             
             # Close down the instrument
             if not self.api.instrument == None:
-                self.api.instrument.close()
+                self.api.close()
             self.api = None
-            self.label_scope_name.set_text('Disconnected')
+            self.label_dmm_name.set_text('Disconnected')
             
             # Disable the acquire button
             self.button_acquire.disable()
@@ -1436,5 +1436,5 @@ class keithley_dmm(_g.BaseObject):
 
 if __name__ == '__main__':
          
-    self = keithley_dmm()
+    self = keithley_dmm_api()
     

@@ -50,9 +50,10 @@ class Test_errthing(_ut.TestCase):
                              1e-6,5,1000,g=_m.functions.__dict__)
     
     def test_instruments(self):
-        global a
+        global a, c
         
         a = _m.instruments.sillyscope(block=True)
+        c = _m.instruments.keithley_dmm(block=True)
     
     def test_playground(self):
         global b
