@@ -7,7 +7,7 @@ Tools for the McGill University's undergraduate physics labs
 
 2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the requisite packages available in the conda repository:
    ```
-   conda install numpy scipy imageio matplotlib pyqtgraph spyder pyserial
+   conda install numpy scipy imageio matplotlib pyqtgraph spyder
    ```
 3. Install spinmob and mcphysics via pip:
    ```
@@ -41,7 +41,9 @@ The McPhysics library is organized heirarchically, and you should use Spyder's c
  
  ### mcphysics.instruments
   * __sillyscope():__ Semi-unified graphical interface for interacting with an assortment of Rigol and Tektronix Oscilloscopes.
-  * __sillyscope_command_line():__ Lower level, non-graphical interface.
+  * __sillyscope_api():__ Lower level, non-graphical interface.
+  * __keithley_dmm():__ Graphical interface for our the Keithley digital multimeters (currently 199 and soon 2700).
+  * __keithley_dmm_api():__ Lower level, non-graphical interface.
   
  ### mcphysics.playground
   * __fitting_statistics_demo():__ Graphical fake data generator and fitter. Useful for visualizing fit statistics.
