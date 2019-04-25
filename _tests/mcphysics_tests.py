@@ -59,6 +59,8 @@ class Test_errthing(_ut.TestCase):
         global b
         
         b = _m.playground.fitting_statistics_demo(block=True)
+        
+        print()
         _m.playground.plot_and_integrate_reduced_chi2()
     
 if __name__ == "__main__":
