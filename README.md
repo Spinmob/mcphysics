@@ -20,7 +20,7 @@ Tools for the McGill University's undergraduate physics labs
    ```
 To upgrade to the latest version,
    ```
-   pip install mcphysics --upgrade --no-cache-dir
+   pip install mcphysics spinmob --upgrade --no-cache-dir
    ```
 
 ## Organization
