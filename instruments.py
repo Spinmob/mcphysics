@@ -232,7 +232,7 @@ class sillyscope_api():
             
             # Create the fake data
             d = _s.fun.generate_fake_data('20*sin(x)', _n.linspace(-5,5,1024), 
-                                          ey=2, include_errors=False)
+                                          ey=20, include_errors=False)
             
             # Fake the acquisition time
             _t.sleep(0.01)
@@ -584,24 +584,29 @@ class sillyscope(_g.BaseObject):
     
     Parameters
     ----------
-    autosettings_path='sillyscope'
+    name='sillyscope'
         Which file to use for saving the gui stuff. This will also be the first
         part of the filename for the other settings files.
+   
+    show=True
+        Whether to show the window immediately.
+         
+    block=False
+        Whether to block the command line while showing the window.
     
     pyvisa_py=False
         Whether to use pyvisa_py or not.
-        
-    block=False
-        Whether to block the command line while showing the window.
+   
     """
-    def __init__(self, autosettings_path='sillyscope', pyvisa_py=False, block=False):
+    def __init__(self, name='sillyscope', show=True, block=False, pyvisa_py=False):
+        self.name = name
         
         # No scope selected yet
         self.api = None
 
         # Build the GUI
-        self.window    = _g.Window('Sillyscope', autosettings_path=autosettings_path+'window')
-        self.window.event_close = self.event_close
+        self.window    = _g.Window('Sillyscope', autosettings_path=name+'window')
+        self.window.event_close = self._event_close
         self.grid_top  = self.window.place_object(_g.GridLayout(False))
         self.window.new_autorow()
         self.grid_bot  = self.window.place_object(_g.GridLayout(False), alignment=0)
@@ -617,10 +622,10 @@ class sillyscope(_g.BaseObject):
         self.button_transfer  = self.grid_top.place_object(_g.Button('Transfer',True).set_width(70))
         self.label_scope_name = self.grid_top.place_object(_g.Label('Disconnected'))
         
-        self.settings  = self.grid_bot.place_object(_g.TreeDictionary(autosettings_path+'_settings.txt')).set_width(250)
-        self.tabs_data = self.grid_bot.place_object(_g.TabArea(autosettings_path+'_tabs_data.txt'), alignment=0)
-        self.tab_raw   = self.tabs_data.add_tab('Raw Data')
-        self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.txt', autosettings_path+'_plot_raw.txt'), alignment=0)
+        self.settings  = self.grid_bot.place_object(_g.TreeDictionary(name+'_settings.txt', name)).set_width(255)
+        self.tabs_data = self.grid_bot.place_object(_g.TabArea(name+'_tabs_data.txt'), alignment=0)
+        self.tab_raw   = self.tabs_data.add_tab('Raw')
+        self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.txt', name+'_plot_raw.txt'), alignment=0)
         
         # Keep track of previous plot
         self._previous_data = _s.data.databox()
@@ -650,37 +655,20 @@ class sillyscope(_g.BaseObject):
         
         # Connect all the signals
         self.settings.connect_signal_changed('Acquisition/Trigger', self._settings_trigger_changed)
-        self.button_connect.signal_clicked.connect(self.button_connect_clicked)
-        self.button_acquire.signal_clicked.connect(self.button_acquire_clicked)
+        self.button_connect.signal_toggled.connect(self._button_connect_clicked)
+        self.button_acquire.signal_toggled.connect(self._button_acquire_clicked)
         self.button_1.signal_toggled.connect(self.save_gui_settings)
         self.button_2.signal_toggled.connect(self.save_gui_settings)
         self.button_3.signal_toggled.connect(self.save_gui_settings)
         self.button_4.signal_toggled.connect(self.save_gui_settings)
         
-
-
-        # Convenience
-        self.d = self.plot_raw
-
         # Run the base object stuff and autoload settings
-        _g.BaseObject.__init__(self, autosettings_path=autosettings_path)
-        self._autosettings_controls = ['self.button_1', 'self.button_2',
-                                       'self.button_3', 'self.button_4']
+        _g.BaseObject.__init__(self, autosettings_path=name)
+        self._autosettings_controls = ['self.button_1', 'self.button_2', 'self.button_3', 'self.button_4']
         self.load_gui_settings()
         
-        
         # Show the window.
-        self.window.show(block)
-    
-    def _unlock(self):
-        """
-        If we're using a RIGOLDE/B and wish to unlock, send the :FORC command.
-        """
-        if self.settings['Acquisition/RIGOL1000BDE/Unlock']:
-            if self.api.model in ['RIGOLDE']:
-                self.api.write(':KEY:FORC')   
-            elif self.api.model in ['RIGOLB']:
-                self.api.write(':KEY:LOCK DIS')
+        if show: self.window.show(block)
     
     def _settings_trigger_changed(self, *a):
         """
@@ -688,23 +676,10 @@ class sillyscope(_g.BaseObject):
         """
         if self.settings['Acquisition/Trigger']: 
             self.api.set_mode_single_trigger()
-            self._unlock()
+            self.unlock()
+
     
-    def connect(self):
-        """
-        Pushes the Connect button.
-        """
-        self.button_connect.set_checked()
-        self.button_connect_clicked()
-
-    def acquire(self):
-        """
-        Presses the Acquire button.
-        """
-        self.button_acquire.set_checked()
-        self.button_acquire_clicked()        
-
-    def get_status_finished(self):
+    def acquisition_is_finished(self):
         """
         Returns True if the acquisition is complete.
         
@@ -712,7 +687,7 @@ class sillyscope(_g.BaseObject):
         self.plot_raw(), which is the best way to get the status. This avoids
         the issue of the single trigger taking time to get moving.
         """
-        _debug('get_status_finished()')
+        _debug('acquisition_is_finished()')
         
         if self.api.model == 'TEKTRONIX':
             _debug('  TEK')
@@ -722,7 +697,7 @@ class sillyscope(_g.BaseObject):
             _debug('  RIGOLZ')
             
             # If the waveforms are empty (we cleared it!)
-            self.get_waveforms()
+            self.get_waveforms(plot=False)
             if len(self.plot_raw[0]) > 0: return True
             else:                         return False
        
@@ -734,7 +709,7 @@ class sillyscope(_g.BaseObject):
             return s == 'STOP'
             
 
-    def get_waveforms(self):
+    def get_waveforms(self, plot=True):
         """
         Queries all the waveforms that are enabled, overwriting self.plot_raw
         """
@@ -812,13 +787,25 @@ class sillyscope(_g.BaseObject):
         
         # Tell the user we're done transferring data
         self.button_transfer.set_checked(False)
-        self.window.process_events()
+        
+        # Plot.
+        if plot:
+            self.plot_raw.plot()
+            self.window.process_events()
         
         _debug('get_waveforms() complete')
 
-        
+    def unlock(self):
+        """
+        If we're using a RIGOLDE/B and wish to unlock, send the :FORC command.
+        """
+        if self.settings['Acquisition/RIGOL1000BDE/Unlock']:
+            if self.api.model in ['RIGOLDE']:
+                self.api.write(':KEY:FORC')   
+            elif self.api.model in ['RIGOLB']:
+                self.api.write(':KEY:LOCK DIS')        
 
-    def button_connect_clicked(self, *a):
+    def _button_connect_clicked(self, *a):
         """
         Connects or disconnects the VISA resource.
         """
@@ -849,21 +836,12 @@ class sillyscope(_g.BaseObject):
             
             # Disable the acquire button
             self.button_acquire.disable()
-            
-    def button_acquire_clicked(self, *a):
+    
+    def _setup_acquisition(self):
         """
-        Get the enabled curves, storing them in plot_raw.
+        Sets up the GUI and scope for the acquisition loop.
         """
-        _debug('button_acquire_clicked()')
         
-        # Don't double-loop!
-        if not self.button_acquire.is_checked(): return
-
-        # Don't proceed if we have no connection
-        if self.api == None: 
-            self.button_acquire.set_checked(False)
-            return
-
         # Disable the connection button
         self.button_connect.disable()
         
@@ -871,113 +849,141 @@ class sillyscope(_g.BaseObject):
         self.number_count.set_value(0)
         
         # If we're triggering, set to single sequence mode
-        if self.settings['Acquisition/Trigger']: 
-            self.api.set_mode_single_trigger()
-            
-        _debug('  beginning loop')
-
-        # Continue until unchecked        
-        while self.button_acquire.is_checked():
-            
-            # Update the user
-            self.button_waiting.set_checked(True)
-            
-            # Transfer the current data to the previous
-            self._previous_data.clear()
-            self._previous_data.copy_all(self.plot_raw)
-            
-            # Trigger
-            if self.settings['Acquisition/Trigger']:
-                
-                _debug('  TRIGGERING')
-                
-                # Set it to acquire the sequence.
-                self.api.trigger_single() # For RigolZ, this clears the trace
-                
-                # Simulation mode: "wait" for it to finish
-                _debug('  WAITING')
-                if self.api.instrument == None: self.window.sleep(0.1)
-                
-                # Actual scope: wait for it to finish
-                else:
-                    while not self.get_status_finished() and self.button_acquire.is_checked(): 
-                        self.window.sleep(0.02)
-                
-                # Tell the user it's done acquiring.
-                _debug('  TRIGGERING DONE')
-            
-            # For RIGOL scopes, the most reliable / fast way to wait for a trace
-            # is to clear it and keep asking for the waveform.
-            
-            # Not triggering but RIGOLZ mode: clear the data first and then wait for data
-            elif self.api.model in ['RIGOLZ']:
-                
-                # Clear the scope if we're not in free running mode
-                if self.settings['Acquisition/RIGOL1000Z/Always_Clear']:
-                    self.api.write(':CLE')
-                    
-                # Wait for it to complete
-                while not self.get_status_finished() and self.button_acquire.is_checked(): 
-                    self.window.sleep(0.005)
-            
-            
-            self.button_waiting.set_checked(False)
-                
-            # If the user hasn't canceled yet
-            if self.button_acquire.is_checked():
-                
-                _debug('  getting data')
+        if self.settings['Acquisition/Trigger']: self.api.set_mode_single_trigger()
+    
+    def _acquire_and_plot(self):
+        """
+        Acquires the data and plots it (one iteration of the loop).
+        """
+        # Update the user
+        self.button_waiting.set_checked(True)
         
-                # The Z RIGOL models best check the status by getting the waveforms
-                # after clearing the scope and seeing if there is data returned.
-                
-                # Triggered RIGOLZ scopes already have the data
-                if self.api.model in [None, 'TEKTRONIX', 'RIGOLDE', 'RIGOLB'] or \
-                   not self.settings['Acquisition/Trigger']: 
-                       
-                       # Query the scope for the data and stuff it into the plotter
-                       self.get_waveforms()
-                       _debug('  got '+str(self.plot_raw))
-                
-                _debug('  processing')
+        # Transfer the current data to the previous
+        self._previous_data.clear()
+        self._previous_data.copy_all(self.plot_raw)
+        
+        # Trigger
+        if self.settings['Acquisition/Trigger']:
             
-                # Increment the counter, but only if the data is new
-                self.number_count.increment()
-                
-                # Decrement if it's identical to the previous trace
-                if self.settings['Acquisition/Discard_Identical']:
-                    is_identical = self.plot_raw == self._previous_data
-                    _debug('  Is identical to previous?', is_identical)
-                    if is_identical: self.number_count.increment(-1)
-                
-                # Update the plot
-                _debug('  plotting', len(self.plot_raw[0]), len(self.plot_raw[1]))
-                self.plot_raw.plot()
-                
-                _debug('  plotting done')
-                self.window.process_events()
-        
-                # Autosave if enabled.
-                _debug('  autosaving')
-                self.plot_raw.autosave()
+            _debug('  TRIGGERING')
             
-                # End condition
-                _debug('  checking end condition')
-                N = self.settings['Acquisition/Iterations']
-                if self.number_count.get_value() >= N and not N <= 0: 
-                    self.button_acquire.set_checked(False)
+            # Set it to acquire the sequence.
+            self.api.trigger_single() # For RigolZ, this clears the trace
+            
+            # Simulation mode: "wait" for it to finish
+            _debug('  WAITING')
+            if self.api.instrument == None: self.window.sleep(0.1)
+            
+            # Actual scope: wait for it to finish
+            else:
+                while not self.acquisition_is_finished() and self.button_acquire.is_checked(): 
+                    self.window.sleep(0.02)
+            
+            # Tell the user it's done acquiring.
+            _debug('  TRIGGERING DONE')
         
-        _debug('  loop done')
+        # For RIGOL scopes, the most reliable / fast way to wait for a trace
+        # is to clear it and keep asking for the waveform.
         
+        # Not triggering but RIGOLZ mode: clear the data first and then wait for data
+        elif self.api.model in ['RIGOLZ']:
+            
+            # Clear the scope if we're not in free running mode
+            if self.settings['Acquisition/RIGOL1000Z/Always_Clear']:
+                self.api.write(':CLE')
+                
+            # Wait for it to complete
+            while not self.acquisition_is_finished() and self.button_acquire.is_checked(): 
+                self.window.sleep(0.005)
+        
+        self.button_waiting.set_checked(False)
+            
+        # If the user hasn't canceled yet
+        if self.button_acquire.is_checked():
+            
+            _debug('  getting data')
+    
+            # The Z RIGOL models best check the status by getting the waveforms
+            # after clearing the scope and seeing if there is data returned.
+            
+            # Triggered RIGOLZ scopes already have the data
+            if self.api.model in [None, 'TEKTRONIX', 'RIGOLDE', 'RIGOLB'] or \
+               not self.settings['Acquisition/Trigger']: 
+                   
+                   # Query the scope for the data and stuff it into the plotter
+                   self.get_waveforms(plot=False)
+                   _debug('  got '+str(self.plot_raw))
+            
+            _debug('  processing')
+        
+            # Increment the counter, but only if the data is new
+            self.number_count.increment()
+            
+            # Decrement if it's identical to the previous trace
+            if self.settings['Acquisition/Discard_Identical']:
+                is_identical = self.plot_raw == self._previous_data
+                _debug('  Is identical to previous?', is_identical)
+                if is_identical: self.number_count.increment(-1)
+            
+            # Transfer all the header info
+            self.settings.send_to_databox_header(self.plot_raw)
+            
+            # Update the plot
+            _debug('  plotting', len(self.plot_raw[0]), len(self.plot_raw[1]))
+            self.plot_raw.plot()
+            
+            _debug('  plotting done')
+            self.window.process_events()
+    
+            # Autosave if enabled.
+            _debug('  autosaving')
+            self.plot_raw.autosave()
+        
+            # End condition
+            _debug('  checking end condition')
+            N = self.settings['Acquisition/Iterations']
+            if self.number_count.get_value() >= N and not N <= 0: 
+                self.button_acquire.set_checked(False)
+        
+    def _post_acquisition(self):
+        """
+        Fixes up the GUI and scope after the acquisition loop.
+        """
         # Enable the connect button
         self.button_connect.enable()
         
         # Unlock the RIGOL1000E front panel
-        self._unlock()
+        self.unlock()
     
+    def _button_acquire_clicked(self, *a):
+        """
+        Get the enabled curves, storing them in plot_raw.
+        """
+        _debug('_button_acquire_clicked()')
+        
+        # Don't double-loop!
+        if not self.button_acquire.is_checked(): return
+
+        # Don't proceed if we have no connection
+        if self.api == None: 
+            self.button_acquire.set_checked(False)
+            self.button_acquire.disable()
+            return
+
+        # Set up the GUI and scope for acquisition.
+        self._setup_acquisition()
+            
+        _debug('  beginning loop')
+
+        # Continue until unchecked        
+        while self.button_acquire.is_checked(): self._acquire_and_plot()
+        
+        _debug('  loop done')
+        
+        # Fixes up the GUI and unlocks the scope
+        self._post_acquisition()
     
-    
-    def event_close(self, *a):
+    def _event_close(self, *a):
         """
         Quits acquisition loop when the window closes.
         """
@@ -1263,16 +1269,12 @@ class keithley_dmm(_g.BaseObject):
         self.settings.add_parameter('Acquisition/Unlock', True, tip='Unlock the device\'s front panel after acquisition.')
         
         # Connect all the signals
-        self.button_connect.signal_clicked.connect(self.button_connect_clicked)
-        self.button_acquire.signal_clicked.connect(self.button_acquire_clicked)
+        self.button_connect.signal_clicked.connect(self._button_connect_clicked)
+        self.button_acquire.signal_clicked.connect(self._button_acquire_clicked)
         
-        # Convenience
-        self.d = self.plot_raw
-
         # Run the base object stuff and autoload settings
         _g.BaseObject.__init__(self, autosettings_path=autosettings_path)
-        self._autosettings_controls = [
-                                       'self.buttons[0]', 'self.buttons[1]',
+        self._autosettings_controls = ['self.buttons[0]', 'self.buttons[1]',
                                        'self.buttons[2]', 'self.buttons[3]',
                                        'self.buttons[4]', 'self.buttons[5]',
                                        'self.buttons[6]', 'self.buttons[7]']
@@ -1281,7 +1283,7 @@ class keithley_dmm(_g.BaseObject):
         # Show the window.
         self.window.show(block)
 
-    def button_connect_clicked(self, *a):
+    def _button_connect_clicked(self, *a):
         """
         Connects or disconnects the VISA resource.
         """
@@ -1313,11 +1315,11 @@ class keithley_dmm(_g.BaseObject):
             # Disable the acquire button
             self.button_acquire.disable()
             
-    def button_acquire_clicked(self, *a):
+    def _button_acquire_clicked(self, *a):
         """
         Get the enabled curves, storing them in plot_raw.
         """
-        _debug('button_acquire_clicked()')
+        _debug('_button_acquire_clicked()')
         
         # Don't double-loop!
         if not self.button_acquire.is_checked(): return
@@ -1436,5 +1438,5 @@ class keithley_dmm(_g.BaseObject):
 
 if __name__ == '__main__':
          
-    self = keithley_dmm_api()
+    self = sillyscope()
     
