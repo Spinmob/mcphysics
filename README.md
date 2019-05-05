@@ -23,6 +23,8 @@ To upgrade to the latest version,
    pip install mcphysics spinmob --upgrade --no-cache-dir
    ```
 
+To access instruments (see below) you will also need a VISA driver, such as Rhode & Schwartz VISA or National Instruments VISA. I recommend [Rhode & Schwarz](https://www.rohde-schwarz.com/ca/driver-pages/remote-control/3-visa-and-tools_231388.html).
+
 ## Organization
 The McPhysics library is organized heirarchically, and you should use Spyder's code completion suggestions to navigate it. You can also type `<ctrl>-i` while your cursor is beside an object to access its documentation. Below is a list of the existing functionality as of 2019-04-19:
 
