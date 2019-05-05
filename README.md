@@ -11,7 +11,7 @@ Tools for the McGill University's undergraduate physics labs
    ```
 3. Install spinmob and mcphysics via pip:
    ```
-   pip install spinmob mcphysics
+   pip install spinmob mcphysics pyvisa
    ```
 4. Open Spyder and start playing. Example script:
    ```
