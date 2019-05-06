@@ -54,6 +54,10 @@ class sillyscope_api():
     
     def __init__(self, name='TDS1012B', pyvisa_py=False, simulation=False):
         
+        # Simulation settings
+        self._simulation_sleep  = 0.01
+        self._simulation_points = 1200
+        
         # Create a resource management object
         if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
         else:         self.resource_manager = _v.ResourceManager()
@@ -231,11 +235,11 @@ class sillyscope_api():
             t1 = _t.time()
             
             # Create the fake data
-            d = _s.fun.generate_fake_data('20*sin(x)', _n.linspace(-5,5,1024), 
+            d = _s.fun.generate_fake_data('20*sin(x)', _n.linspace(-5,5,self._simulation_points), 
                                           ey=20, include_errors=False)
             
             # Fake the acquisition time
-            _t.sleep(0.01)
+            _t.sleep(self._simulation_sleep)
             
             # For duty cycle calculation
             t2 = _t.time()
@@ -872,7 +876,7 @@ class sillyscope(_g.BaseObject):
             
             # Simulation mode: "wait" for it to finish
             _debug('  WAITING')
-            if self.api.instrument == None: self.window.sleep(0.1)
+            if self.api.instrument == None: self.window.sleep(self.api._simulation_sleep)
             
             # Actual scope: wait for it to finish
             else:
