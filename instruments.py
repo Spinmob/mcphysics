@@ -795,6 +795,7 @@ class sillyscope(_g.BaseObject):
         # Plot.
         if plot:
             self.plot_raw.plot()
+            self.plot_raw.autosave()
             self.window.process_events()
         
         _debug('get_waveforms() complete')
@@ -935,6 +936,7 @@ class sillyscope(_g.BaseObject):
             # Update the plot
             _debug('  plotting', len(self.plot_raw[0]), len(self.plot_raw[1]))
             self.plot_raw.plot()
+            self.plot_raw.autosave()
             
             _debug('  plotting done')
             self.window.process_events()
@@ -1384,7 +1386,7 @@ class keithley_dmm(_g.BaseObject):
                     d['v'+str(n+1)] = _n.append(d['v'+str(n+1)], v)
                     
                     # Update the plot
-                    self.plot_raw.plot()
+                    #self.plot_raw.plot()
                     self.window.process_events()
                     
                     # Append this to the list
