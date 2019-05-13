@@ -235,7 +235,7 @@ class sillyscope_api():
             t1 = _t.time()
             
             # Create the fake data
-            d = _s.fun.generate_fake_data('20*sin(x)', _n.linspace(-5,5,self._simulation_points), 
+            d = _s.fun.generate_fake_data('5*sin(20*(1+random.normal(0,0.04,len(x)))*x + random.normal(0,4))', _n.linspace(-5,5,self._simulation_points), 
                                           ey=20, include_errors=False)
             
             # Fake the acquisition time
@@ -646,19 +646,19 @@ class sillyscope(_g.BaseObject):
         self.settings.add_parameter('VISA/Device', 0, type='list', values=['Simulation']+names)
 
         # Acquisition settings
-        self.settings.add_parameter('Acquisition/Iterations',       0,    tip='How many iterations to perform. Set to 0 to keep looping.')
-        self.settings.add_parameter('Acquisition/Trigger',          True, tip='Halt acquisition and arm / wait for a single trigger.')
-        self.settings.add_parameter('Acquisition/Get_First_Header', True, tip='Get the header (calibration) information the first time. Disabling this will return uncalibrated data.')
-        self.settings.add_parameter('Acquisition/Get_All_Headers',  True, tip='Get the header (calibration) information EVERY time. Disabling this will use the first header repeatedly.')
-        self.settings.add_parameter('Acquisition/Discard_Identical',False,tip='Do not continue until the data is different.')
+        self.settings.add_parameter('Acquire/Iterations',       0,    tip='How many iterations to perform. Set to 0 to keep looping.')
+        self.settings.add_parameter('Acquire/Trigger',          True, tip='Halt acquisition and arm / wait for a single trigger.')
+        self.settings.add_parameter('Acquire/Get_First_Header', True, tip='Get the header (calibration) information the first time. Disabling this will return uncalibrated data.')
+        self.settings.add_parameter('Acquire/Get_All_Headers',  True, tip='Get the header (calibration) information EVERY time. Disabling this will use the first header repeatedly.')
+        self.settings.add_parameter('Acquire/Discard_Identical',False,tip='Do not continue until the data is different.')
         
         # Device-specific settings
-        self.settings.add_parameter('Acquisition/RIGOL1000BDE/Trigger_Delay', 0.05, bounds=(1e-3,10), siPrefix=True, suffix='s', dec=True, tip='How long after "trigger" command to wait before checking status. Some scopes appear to be done for a moment between the trigger command and arming.')
-        self.settings.add_parameter('Acquisition/RIGOL1000BDE/Unlock',        True, tip='Unlock the device\'s frong panel after acquisition.')
-        self.settings.add_parameter('Acquisition/RIGOL1000Z/Always_Clear',    True, tip='Clear the scope prior to acquisition even in untriggered mode (prevents duplicates but may slow acquisition).')
+        self.settings.add_parameter('Acquire/RIGOL1000BDE/Trigger_Delay', 0.05, bounds=(1e-3,10), siPrefix=True, suffix='s', dec=True, tip='How long after "trigger" command to wait before checking status. Some scopes appear to be done for a moment between the trigger command and arming.')
+        self.settings.add_parameter('Acquire/RIGOL1000BDE/Unlock',        True, tip='Unlock the device\'s frong panel after acquisition.')
+        self.settings.add_parameter('Acquire/RIGOL1000Z/Always_Clear',    True, tip='Clear the scope prior to acquisition even in untriggered mode (prevents duplicates but may slow acquisition).')
         
         # Connect all the signals
-        self.settings.connect_signal_changed('Acquisition/Trigger', self._settings_trigger_changed)
+        self.settings.connect_signal_changed('Acquire/Trigger', self._settings_trigger_changed)
         self.button_connect.signal_toggled.connect(self._button_connect_clicked)
         self.button_acquire.signal_toggled.connect(self._button_acquire_clicked)
         self.button_1.signal_toggled.connect(self.save_gui_settings)
@@ -678,7 +678,7 @@ class sillyscope(_g.BaseObject):
         """
         Called when someone clicks the Trigger checkbox.
         """
-        if self.settings['Acquisition/Trigger']: 
+        if self.settings['Acquire/Trigger']: 
             self.api.set_mode_single_trigger()
             self.unlock()
 
@@ -708,7 +708,7 @@ class sillyscope(_g.BaseObject):
         elif self.api.model in ['RIGOLDE', 'RIGOLB']:
             _debug('  RIGOLDE/B')
                         
-            self.window.sleep(self.settings['Acquisition/RIGOL1000BDE/Trigger_Delay'])
+            self.window.sleep(self.settings['Acquire/RIGOL1000BDE/Trigger_Delay'])
             s = self.api.query(':TRIG:STAT?').strip()
             return s == 'STOP'
             
@@ -721,8 +721,8 @@ class sillyscope(_g.BaseObject):
         
         
         # Find out if we should get the header
-        get_header = self.settings['Acquisition/Get_All_Headers']  \
-                  or self.settings['Acquisition/Get_First_Header'] \
+        get_header = self.settings['Acquire/Get_All_Headers']  \
+                  or self.settings['Acquire/Get_First_Header'] \
                  and self.number_count.get_value() == 0
         
         # Tell the user we're getting data
@@ -803,7 +803,7 @@ class sillyscope(_g.BaseObject):
         """
         If we're using a RIGOLDE/B and wish to unlock, send the :FORC command.
         """
-        if self.settings['Acquisition/RIGOL1000BDE/Unlock']:
+        if self.settings['Acquire/RIGOL1000BDE/Unlock']:
             if self.api.model in ['RIGOLDE']:
                 self.api.write(':KEY:FORC')   
             elif self.api.model in ['RIGOLB']:
@@ -853,7 +853,7 @@ class sillyscope(_g.BaseObject):
         self.number_count.set_value(0)
         
         # If we're triggering, set to single sequence mode
-        if self.settings['Acquisition/Trigger']: self.api.set_mode_single_trigger()
+        if self.settings['Acquire/Trigger']: self.api.set_mode_single_trigger()
     
     def _acquire_and_plot(self):
         """
@@ -867,7 +867,7 @@ class sillyscope(_g.BaseObject):
         self._previous_data.copy_all(self.plot_raw)
         
         # Trigger
-        if self.settings['Acquisition/Trigger']:
+        if self.settings['Acquire/Trigger']:
             
             _debug('  TRIGGERING')
             
@@ -893,7 +893,7 @@ class sillyscope(_g.BaseObject):
         elif self.api.model in ['RIGOLZ']:
             
             # Clear the scope if we're not in free running mode
-            if self.settings['Acquisition/RIGOL1000Z/Always_Clear']:
+            if self.settings['Acquire/RIGOL1000Z/Always_Clear']:
                 self.api.write(':CLE')
                 
             # Wait for it to complete
@@ -912,7 +912,7 @@ class sillyscope(_g.BaseObject):
             
             # Triggered RIGOLZ scopes already have the data
             if self.api.model in [None, 'TEKTRONIX', 'RIGOLDE', 'RIGOLB'] or \
-               not self.settings['Acquisition/Trigger']: 
+               not self.settings['Acquire/Trigger']: 
                    
                    # Query the scope for the data and stuff it into the plotter
                    self.get_waveforms(plot=False)
@@ -924,7 +924,7 @@ class sillyscope(_g.BaseObject):
             self.number_count.increment()
             
             # Decrement if it's identical to the previous trace
-            if self.settings['Acquisition/Discard_Identical']:
+            if self.settings['Acquire/Discard_Identical']:
                 is_identical = self.plot_raw == self._previous_data
                 _debug('  Is identical to previous?', is_identical)
                 if is_identical: self.number_count.increment(-1)
@@ -945,7 +945,7 @@ class sillyscope(_g.BaseObject):
         
             # End condition
             _debug('  checking end condition')
-            N = self.settings['Acquisition/Iterations']
+            N = self.settings['Acquire/Iterations']
             if self.number_count.get_value() >= N and not N <= 0: 
                 self.button_acquire.set_checked(False)
         
@@ -1270,7 +1270,7 @@ class keithley_dmm(_g.BaseObject):
         self.settings.add_parameter('VISA/Device', 0, type='list', values=['Simulation']+names)
 
         # Acquisition settings
-        self.settings.add_parameter('Acquisition/Unlock', True, tip='Unlock the device\'s front panel after acquisition.')
+        self.settings.add_parameter('Acquire/Unlock', True, tip='Unlock the device\'s front panel after acquisition.')
         
         # Connect all the signals
         self.button_connect.signal_clicked.connect(self._button_connect_clicked)
@@ -1396,7 +1396,7 @@ class keithley_dmm(_g.BaseObject):
         _debug('  Loop complete!')
         
         # Unlock the front panel if we're supposed to
-        if self.settings['Acquisition/Unlock']: self.api.unlock()
+        if self.settings['Acquire/Unlock']: self.api.unlock()
         
         # Re-enable the connect button
         self._set_acquisition_mode(False)
