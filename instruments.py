@@ -18,6 +18,9 @@ import spinmob.egg as _egg
 import time    as _time
 _g = _egg.gui
 
+import traceback as _traceback
+_p = _traceback.print_last
+
 try:    import visa as _v
 except: print('Visa driver and / or pyvisa not installed. On Windows, consider Rhode & Schwartz VISA or NI-VISA, then pip install pyvisa. On Linux, pip install pyvisa and pyvisa-py')
 
@@ -1386,7 +1389,7 @@ class keithley_dmm(_g.BaseObject):
                     d['v'+str(n+1)] = _n.append(d['v'+str(n+1)], v)
                     
                     # Update the plot
-                    #self.plot_raw.plot()
+                    self.plot_raw.plot()
                     self.window.process_events()
                     
                     # Append this to the list
@@ -1444,5 +1447,5 @@ class keithley_dmm(_g.BaseObject):
 
 if __name__ == '__main__':
          
-    self = sillyscope()
+    self = keithley_dmm()
     
