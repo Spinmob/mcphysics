@@ -714,7 +714,13 @@ class sillyscope(_g.BaseObject):
             self.window.sleep(self.settings['Acquire/RIGOL1000BDE/Trigger_Delay'])
             s = self.api.query(':TRIG:STAT?').strip()
             return s == 'STOP'
-            
+        
+    def analyze_data(self):
+        """
+        Overwrite this function to insert your own customized analysis, to 
+        be performed after each raw data acquisition.
+        """
+        return self
 
     def get_waveforms(self, plot=True):
         """
@@ -947,6 +953,9 @@ class sillyscope(_g.BaseObject):
             # Autosave if enabled.
             _debug('  autosaving')
             self.plot_raw.autosave()
+        
+            # External analysis
+            self.analyze_data()
         
             # End condition
             _debug('  checking end condition')
@@ -1447,5 +1456,5 @@ class keithley_dmm(_g.BaseObject):
 
 if __name__ == '__main__':
          
-    self = keithley_dmm()
+    self = sillyscope()
     
