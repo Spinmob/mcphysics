@@ -768,7 +768,7 @@ class sillyscope(_g.BaseObject):
             # Actually get it
             d = self.api.get_waveform(2, use_previous_header=not get_header)
             
-            # Update teh main plot
+            # Update the main plot
             self.plot_raw['x']  = d['x']
             self.plot_raw['y2'] = d['y2']
             self.plot_raw.copy_headers(d)
@@ -780,7 +780,7 @@ class sillyscope(_g.BaseObject):
             # Actually get it
             d = self.api.get_waveform(3, use_previous_header=not get_header)
             
-            # Update teh main plot
+            # Update the main plot
             self.plot_raw['x']  = d['x']
             self.plot_raw['y3'] = d['y3']
             self.plot_raw.copy_headers(d)
@@ -792,7 +792,7 @@ class sillyscope(_g.BaseObject):
             # Actually get it
             d = self.api.get_waveform(4, use_previous_header=not get_header)
             
-            # Update teh main plot
+            # Update the main plot
             self.plot_raw['x']  = d['x']
             self.plot_raw['y4'] = d['y4']
             self.plot_raw.copy_headers(d)
