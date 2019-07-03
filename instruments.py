@@ -15,6 +15,7 @@ import numpy   as _n
 import time    as _t
 import spinmob as _s
 import spinmob.egg as _egg
+import mcphysics as _mp
 import time    as _time
 _g = _egg.gui
 
@@ -37,7 +38,7 @@ def _debug(*a):
 
 
 
-class sillyscope_api():
+class sillyscope_api(_mp.visa_tools.visa_api_base):
     """
     Class for talking to a Tektronix TDS/TBS 1000 series and Rigol 1000 B/D/E/Z
     sillyscopes.
@@ -52,18 +53,24 @@ class sillyscope_api():
     
     simulation=False
         Set to True to enable simulation mode.
+    
+    timeout=3e3
+        Command timeout (ms)
+        
+    write_sleep=0.01
+        How long to sleep after a write operation (sec)
+        
     """
     
     
-    def __init__(self, name='TDS1012B', pyvisa_py=False, simulation=False):
+    def __init__(self, name='TDS1012B', pyvisa_py=False, simulation=False, timeout=3e3, write_sleep=0.0):
+        
+        # Run the basic stuff
+        _mp.visa_tools.visa_api_base.__init__(self, name=name, pyvisa_py=pyvisa_py, simulation=simulation, timeout=timeout, write_sleep=write_sleep)
         
         # Simulation settings
         self._simulation_sleep  = 0.01
         self._simulation_points = 1200
-        
-        # Create a resource management object
-        if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
-        else:         self.resource_manager = _v.ResourceManager()
         
         # Set up the info
         self.t_duty_cycle = 0
@@ -76,54 +83,29 @@ class sillyscope_api():
         self.model = None
         self._channel = 1
         
-        # If we're in simulation mode, return
-        if simulation:
-            self.instrument = None
-            self._idn = 'Simulation Mode'
-            return
         
-        # Try to open the instrument.
-        try:
-            self.instrument = self.resource_manager.open_resource(name)
-
-            # Test that it's responding and is a Tektronix device.
-            try:
-                # Get the ID of the instrument
-                self._idn = idn = self.query('*IDN?').strip()
-                
-                # Remember if it's a Tektronix scope
-                if   idn[0:9] == 'TEKTRONIX': self.model='TEKTRONIX'
-                
-                # Need to distinguish 'Rigol Technologies,DS1052E,DS1ET161453620,00.04.01.00.02'
-                # Which is janky and not working. (What is the GD data format??)
-                elif idn[0:5].upper() == 'RIGOL': 
-                    
-                    # Get the model string
-                    m = idn.split(',')[1]
-                    
-                    # Find out if it's a d/e or a z:
-                    if   m[-1] in ['Z']: self.model='RIGOLZ'
-                    elif m[-1] in ['B']: self.model='RIGOLB'
-                    else:                self.model='RIGOLDE'
-                
-                # Poop out.
-                else: self.model=None
-                
-                # Set the type of encoding for the binary data returned
-                self.set_binary_encoding()
-            
-            except:
-                print("ERROR: Instrument did not reply to IDN query. Entering simulation mode.")
-                self.instrument.close()
-                self.instrument = None
-        except:
-            print("ERROR: Could not open instrument. Entering simulation mode.")
-            self.instrument = None
-            
-            # Now list all available resources
-            print("Available Instruments:")
-            for name in self.resource_manager.list_resources(): print("  "+name)
+        # Remember if it's a Tektronix scope
+        if self._idn[0:9] == 'TEKTRONIX': self.model='TEKTRONIX'
         
+        # Need to distinguish 'Rigol Technologies,DS1052E,DS1ET161453620,00.04.01.00.02'
+        # Which is janky and not working. (What is the GD data format??)
+        elif self._idn[0:5].upper() == 'RIGOL': 
+            
+            # Get the model string
+            m = self._idn.split(',')[1]
+            
+            # Find out if it's a d/e or a z:
+            if   m[-1] in ['Z']: self.model='RIGOLZ'
+            elif m[-1] in ['B']: self.model='RIGOLB'
+            else:                self.model='RIGOLDE'
+        
+        # Poop out.
+        else: self.model=None
+        
+        # Set the type of encoding for the binary data returned
+        self.set_binary_encoding()
+            
+       
         
     # These can be modified later to make them safe, add delays, etc.
     def command(self, message='*IDN?'):
@@ -585,7 +567,7 @@ class sillyscope_api():
             
 
 
-class sillyscope(_g.BaseObject):
+class sillyscope(_mp.visa_tools.visa_gui_base):
     """
     Graphical front-end for RIGOL 1000 B/D/E/Z and Tektronix TBS/TDS 1000.
     
@@ -606,19 +588,13 @@ class sillyscope(_g.BaseObject):
    
     """
     def __init__(self, name='sillyscope', show=True, block=False, pyvisa_py=False):
-        self.name = name
         
-        # No scope selected yet
-        self.api = None
-
+        # Run the baseline stuff
+        _mp.visa_tools.visa_gui_base.__init__(self, name=name, show=show, block=block, api=sillyscope_api, pyvisa_py=pyvisa_py)
+        
         # Build the GUI
-        self.window    = _g.Window('Sillyscope', autosettings_path=name+'window')
         self.window.event_close = self._event_close
-        self.grid_top  = self.window.place_object(_g.GridLayout(False))
-        self.window.new_autorow()
-        self.grid_bot  = self.window.place_object(_g.GridLayout(False), alignment=0)
         
-        self.button_connect   = self.grid_top.place_object(_g.Button('Connect', True, False))
         self.button_1         = self.grid_top.place_object(_g.Button('1',True).set_width(25).set_checked(True))
         self.button_2         = self.grid_top.place_object(_g.Button('2',True).set_width(25))
         self.button_3         = self.grid_top.place_object(_g.Button('3',True).set_width(25))
@@ -627,9 +603,7 @@ class sillyscope(_g.BaseObject):
         self.number_count     = self.grid_top.place_object(_g.NumberBox(0).disable())
         self.button_waiting   = self.grid_top.place_object(_g.Button('Waiting', True).set_width(70))
         self.button_transfer  = self.grid_top.place_object(_g.Button('Transfer',True).set_width(70))
-        self.label_scope_name = self.grid_top.place_object(_g.Label('Disconnected'))
         
-        self.settings  = self.grid_bot.place_object(_g.TreeDictionary(name+'_settings.txt', name)).set_width(255)
         self.tabs_data = self.grid_bot.place_object(_g.TabArea(name+'_tabs_data.txt'), alignment=0)
         self.tab_raw   = self.tabs_data.add_tab('Raw')
         self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.txt', name+'_plot_raw.txt'), alignment=0)
@@ -637,23 +611,12 @@ class sillyscope(_g.BaseObject):
         # Keep track of previous plot
         self._previous_data = _s.data.databox()
         
-        # Create a resource management object
-        if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
-        else:         self.resource_manager = _v.ResourceManager()
-        
-        names = []
-        for x in self.resource_manager.list_resources():
-            names.append(x)
-                
-        # VISA settings
-        self.settings.add_parameter('VISA/Device', 0, type='list', values=['Simulation']+names)
-
         # Acquisition settings
-        self.settings.add_parameter('Acquire/Iterations',       0,    tip='How many iterations to perform. Set to 0 to keep looping.')
-        self.settings.add_parameter('Acquire/Trigger',          True, tip='Halt acquisition and arm / wait for a single trigger.')
-        self.settings.add_parameter('Acquire/Get_First_Header', True, tip='Get the header (calibration) information the first time. Disabling this will return uncalibrated data.')
-        self.settings.add_parameter('Acquire/Get_All_Headers',  True, tip='Get the header (calibration) information EVERY time. Disabling this will use the first header repeatedly.')
-        self.settings.add_parameter('Acquire/Discard_Identical',False,tip='Do not continue until the data is different.')
+        self.settings.add_parameter('Acquire/Iterations',       1,     tip='How many iterations to perform. Set to 0 to keep looping.')
+        self.settings.add_parameter('Acquire/Trigger',          False, tip='Halt acquisition and arm / wait for a single trigger.')
+        self.settings.add_parameter('Acquire/Get_First_Header', True,  tip='Get the header (calibration) information the first time. Disabling this will return uncalibrated data.')
+        self.settings.add_parameter('Acquire/Get_All_Headers',  True,  tip='Get the header (calibration) information EVERY time. Disabling this will use the first header repeatedly.')
+        self.settings.add_parameter('Acquire/Discard_Identical',False, tip='Do not continue until the data is different.')
         
         # Device-specific settings
         self.settings.add_parameter('Acquire/RIGOL1000BDE/Trigger_Delay', 0.05, bounds=(1e-3,10), siPrefix=True, suffix='s', dec=True, tip='How long after "trigger" command to wait before checking status. Some scopes appear to be done for a moment between the trigger command and arming.')
@@ -662,7 +625,6 @@ class sillyscope(_g.BaseObject):
         
         # Connect all the signals
         self.settings.connect_signal_changed('Acquire/Trigger', self._settings_trigger_changed)
-        self.button_connect.signal_toggled.connect(self._button_connect_clicked)
         self.button_acquire.signal_toggled.connect(self._button_acquire_clicked)
         self.button_1.signal_toggled.connect(self.save_gui_settings)
         self.button_2.signal_toggled.connect(self.save_gui_settings)
@@ -670,13 +632,23 @@ class sillyscope(_g.BaseObject):
         self.button_4.signal_toggled.connect(self.save_gui_settings)
         
         # Run the base object stuff and autoload settings
-        _g.BaseObject.__init__(self, autosettings_path=name)
         self._autosettings_controls = ['self.button_1', 'self.button_2', 'self.button_3', 'self.button_4']
-        self.load_gui_settings()
-        
-        # Show the window.
-        if show: self.window.show(block)
+        self.load_gui_settings()        
     
+    def _after_connect(self):
+        """
+        Called after a successful connection.
+        """
+        self.button_acquire.enable()
+            
+    def _after_disconnect(self):
+        """
+        Called after a successful disconnect.
+        """
+        self.button_acquire.disable()
+
+
+
     def _settings_trigger_changed(self, *a):
         """
         Called when someone clicks the Trigger checkbox.
@@ -818,38 +790,6 @@ class sillyscope(_g.BaseObject):
                 self.api.write(':KEY:FORC')   
             elif self.api.model in ['RIGOLB']:
                 self.api.write(':KEY:LOCK DIS')        
-
-    def _button_connect_clicked(self, *a):
-        """
-        Connects or disconnects the VISA resource.
-        """
-        
-        # If we're supposed to connect
-        if self.button_connect.get_value():
-            
-            # Close it if it exists for some reason
-            if not self.api == None: self.api.instrument.close()
-            
-            # Make the new one
-            self.api = sillyscope_api(self.settings['VISA/Device'], 
-                simulation = self.settings['VISA/Device']=='Simulation')
-            
-            # Tell the user what scope is connected
-            self.label_scope_name.set_text(self.api._idn)
-            
-            # Enable the Acquire button
-            self.button_acquire.enable()
-            
-        elif not self.api == None:
-            
-            # Close down the instrument
-            if not self.api.instrument == None:
-                self.api.instrument.close()
-            self.api = None
-            self.label_scope_name.set_text('Disconnected')
-            
-            # Disable the acquire button
-            self.button_acquire.disable()
     
     def _setup_acquisition(self):
         """
@@ -1029,6 +969,12 @@ class keithley_dmm_api():
         If True, use the all-python VISA implementation. On Windows, the simplest
         Visa implementation seems to be Rhode & Schwarz (streamlined) or NI-VISA (bloaty),
         with pyvisa_py=False.
+    
+    NOTE
+    ----
+    At some point we should inherit the common functionality of these visa
+    objects with those found in visa_tools.py. All new instruments should be
+    written this way, for sure! This instrument might be too low-level though...
     """
     
     
@@ -1278,8 +1224,9 @@ class keithley_dmm(_g.BaseObject):
         if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
         else:         self.resource_manager = _v.ResourceManager()
         names = []
-        for x in self.resource_manager.list_resources(): names.append(x)
-                
+        for x in self.resource_manager.list_resources(): 
+            names.append(str(self.resource_manager.resource_info(x).alias))
+            
         # VISA settings
         self.settings.add_parameter('VISA/Device', 0, type='list', values=['Simulation']+names)
 
