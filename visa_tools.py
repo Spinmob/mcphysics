@@ -45,7 +45,7 @@ class visa_api_base():
     
     
     def __init__(self, name='VISA_Alias', pyvisa_py=False, simulation=False, timeout=2000, write_sleep=0.01):
-        
+        _debug('api_base.__init__()')
         # Store it
         self._write_sleep = write_sleep
         self._idn         = None
@@ -94,6 +94,8 @@ class visa_api_base():
         """
         Shortcut for coding. Runs a query() if there is a question mark, and a write() if there is not.
         """
+        _debug('api_base.command('+message+')')
+        
         if message.find('?') >= 0: return self.query(message)
         else:                      return self.write(message)
     
@@ -101,7 +103,7 @@ class visa_api_base():
         """
         Sends the supplied message and returns the response.
         """
-        _debug('query('+"'"+message+"'"+')')
+        _debug('api_base.query('+"'"+message+"'"+')')
         
         if self.instrument == None:
             _t.sleep(self._write_sleep)
@@ -114,7 +116,7 @@ class visa_api_base():
         """
         Writes the supplied message.
         """
-        _debug('write('+"'"+message+"'"+')')
+        _debug('api_base.write('+"'"+message+"'"+')')
         
         if self.instrument == None: 
             _t.sleep(self._write_sleep)
@@ -129,7 +131,7 @@ class visa_api_base():
         """
         Reads a message and returns it.
         """
-        _debug('read()')
+        _debug('api_base.read()')
         
         if self.instrument == None: return
         else:                       return self.instrument.read()
@@ -138,7 +140,7 @@ class visa_api_base():
         """
         Reads a raw message (e.g. a binary stream) and returns it.
         """
-        _debug('read_raw()')
+        _debug('api_base.read_raw()')
         
         if self.instrument == None: return 
         else:                       return self.instrument.read_raw()
@@ -175,6 +177,7 @@ class visa_gui_base(_g.BaseObject):
    
     """
     def __init__(self, name='visa_gui', show=True, block=False, api=visa_api_base, timeout=2000, write_sleep=0.01, pyvisa_py=False):
+        _debug('gui_base.__init__()')
         
         # Remember the name
         self.name = name
@@ -230,6 +233,7 @@ class visa_gui_base(_g.BaseObject):
         """
         Connects or disconnects the VISA resource.
         """
+        _debug('gui_base._button_connect_clicked', a)
         
         # If we're supposed to connect
         if self.button_connect.get_value():
@@ -269,12 +273,14 @@ class visa_gui_base(_g.BaseObject):
         """
         Overload this function to define what happens after a successful connection.
         """
+        _debug('gui_base._after_connect()')
         return
 
     def _after_disconnect(self):
         """
         Overload this function to define what happens after a successful disconnection.
         """
+        _debug('gui_base._after_disconnect()')
         return
 
 if __name__ == '__main__':
