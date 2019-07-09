@@ -85,14 +85,14 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
         
         
         # Remember if it's a Tektronix scope
-        if self._idn[0:9] == 'TEKTRONIX': self.model='TEKTRONIX'
+        if self.idn[0:9] == 'TEKTRONIX': self.model='TEKTRONIX'
         
         # Need to distinguish 'Rigol Technologies,DS1052E,DS1ET161453620,00.04.01.00.02'
         # Which is janky and not working. (What is the GD data format??)
-        elif self._idn[0:5].upper() == 'RIGOL': 
+        elif self.idn[0:5].upper() == 'RIGOL': 
             
             # Get the model string
-            m = self._idn.split(',')[1]
+            m = self.idn.split(',')[1]
             
             # Find out if it's a d/e or a z:
             if   m[-1] in ['Z']: self.model='RIGOLZ'
@@ -394,7 +394,7 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
             d.insert_header('ymultiplier'+c, yinc)
         
         else: 
-            print('ERROR: get_header() unhandled model '+self.model)
+            print('ERROR: get_header() unhandled model '+str(self.model))
         
         _debug('  Done with model-specifics.')
         
@@ -524,7 +524,7 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
             self.write(':WAV:FORM BYTE') # Use WORD to have two bytes per point.
             
         else:
-            _debug('  ERROR: unhandled model '+self.model)
+            _debug('  ERROR: unhandled model '+str(self.model))
 
     def set_channel(self, channel=1):
         """
@@ -543,7 +543,7 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
             self.write(':WAV:SOUR CHAN%d' % channel)
         
         else:
-            _debug('  ERROR: unhandled model '+self.model)
+            _debug('  ERROR: unhandled model '+str(self.model))
         
         # Keep this for future use.
         self._channel = channel
@@ -590,7 +590,7 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
     def __init__(self, name='sillyscope', show=True, block=False, pyvisa_py=False):
         
         # Run the baseline stuff
-        _mp.visa_tools.visa_gui_base.__init__(self, name=name, show=show, block=block, api=sillyscope_api, pyvisa_py=pyvisa_py)
+        _mp.visa_tools.visa_gui_base.__init__(self, name=name, show=False, block=False, api=sillyscope_api, pyvisa_py=pyvisa_py, window_size=[1000,500])
         
         # Build the GUI
         self.window.event_close = self._event_close
@@ -633,7 +633,10 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
         
         # Run the base object stuff and autoload settings
         self._autosettings_controls = ['self.button_1', 'self.button_2', 'self.button_3', 'self.button_4']
-        self.load_gui_settings()        
+        self.load_gui_settings() 
+        
+        # Show it
+        if show: self.window.show(block_command_line=block)
     
     def _after_connect(self):
         """

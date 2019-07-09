@@ -1,7 +1,5 @@
 import time    as _t
-import spinmob as _s
 import spinmob.egg as _egg
-import time    as _time
 _g = _egg.gui
 
 import traceback as _traceback
@@ -48,7 +46,7 @@ class visa_api_base():
         _debug('api_base.__init__()')
         # Store it
         self._write_sleep = write_sleep
-        self._idn         = None
+        self.idn         = None
         
         # Create a resource management object
         if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
@@ -57,7 +55,7 @@ class visa_api_base():
         # If we're in simulation mode, return
         if simulation:
             self.instrument = None
-            self._idn = 'Simulation Mode'
+            self.idn = 'Simulation Mode'
             return
         
         # Try to open the instrument.
@@ -70,18 +68,18 @@ class visa_api_base():
                 self.instrument.timeout = timeout
                 
                 # Get the ID of the instrument
-                self._idn = self.query('*IDN?').strip()
+                self.idn = self.query('*IDN?').strip()
                 
             except:
                 print("ERROR: Instrument did not reply to IDN query. Entering simulation mode.")
                 self.instrument.close()
                 self.instrument = None
-                self._idn = "Simulation Mode"
+                self.idn = "Simulation Mode"
         
         except:
             print("ERROR: Could not open instrument. Entering simulation mode.")
             self.instrument = None
-            self._idn = "Simulation Mode"
+            self.idn = "Simulation Mode"
             
             # Now list all available resources
             print("Available Instruments:")
@@ -174,9 +172,12 @@ class visa_gui_base(_g.BaseObject):
     
     pyvisa_py=False
         Whether to use pyvisa_py or not.
+        
+    window_size=[1,1]
+        Default window size.
    
     """
-    def __init__(self, name='visa_gui', show=True, block=False, api=visa_api_base, timeout=2000, write_sleep=0.01, pyvisa_py=False):
+    def __init__(self, name='visa_gui', show=True, block=False, api=visa_api_base, timeout=2000, write_sleep=0.01, pyvisa_py=False, window_size=[1,1]):
         _debug('gui_base.__init__()')
         
         # Remember the name
@@ -189,7 +190,7 @@ class visa_gui_base(_g.BaseObject):
         self._api_base = api
 
         # Build the GUI
-        self.window    = _g.Window(name, size=[1,200], autosettings_path=name+'_window')
+        self.window    = _g.Window(name, size=window_size, autosettings_path=name+'_window')
         self.grid_top  = self.window.place_object(_g.GridLayout(False))
         self.window.new_autorow()
         self.grid_bot  = self.window.place_object(_g.GridLayout(False), alignment=0)
@@ -197,7 +198,7 @@ class visa_gui_base(_g.BaseObject):
         self.button_connect        = self.grid_top.place_object(_g.Button('Connect', True, False))
         self.label_instrument_name = self.grid_top.place_object(_g.Label('Disconnected'), 100, 0)
         
-        self.settings  = self.grid_bot.place_object(_g.TreeDictionary(name+'_settings.txt', name)).set_width(255)
+        self.settings  = self.grid_bot.place_object(_g.TreeDictionary(name+'_settings.txt', name), alignment=0)
         
         # Create a resource management object
         self._pyvisa_py = pyvisa_py
@@ -249,7 +250,7 @@ class visa_gui_base(_g.BaseObject):
                                       write_sleep= self._write_sleep)
             
             # Tell the user what scope is connected
-            self.label_instrument_name.set_text(self.api._idn)
+            self.label_instrument_name.set_text(self.api.idn)
         
             # Connecting was successful!
             self._after_connect()

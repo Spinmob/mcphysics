@@ -3,9 +3,12 @@ import numpy     as _n
 import spinmob   as _s
 import mcphysics as _m
 import unittest  as _ut
+import shutil    as _sh
 
 # Globals for monkeywork on the command line
 a = b = c = d = x = None
+
+if _os.path.exists('egg_settings'): _sh.rmtree('egg_settings')
 
 class Test_errthing(_ut.TestCase):
     """

@@ -56,7 +56,7 @@ class fitting_statistics_demo():
         """
         # Make a window with a left grid for settings and controls, and
         # a right grid for visualization.
-        self.window        = _g.Window('Fake Data Taker', autosettings_path='window.cfg')
+        self.window = _g.Window('Fake Data Taker', size=[1000,700], autosettings_path='window.cfg')
         self.window.event_close = self.event_close
         self.grid_controls = self.window.place_object(_g.GridLayout(False))
         self.grid_plotting = self.window.place_object(_g.GridLayout(False), alignment=0)
@@ -95,7 +95,7 @@ class fitting_statistics_demo():
         # Tab for raw data
         self.tab_raw  = self.tabs_plotting.add_tab('Raw Data')
         self.plot_raw = self.tab_raw.place_object(
-                _g.DataboxPlot(autosettings_path='plot_data.cfg', autoscript=4), 
+                _g.DataboxPlot(autosettings_path='plot_raw.cfg', autoscript=1), 
                 alignment=0)
         self.plot_raw.autoscript_custom = self._autoscript_raw
         
