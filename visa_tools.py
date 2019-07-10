@@ -190,7 +190,7 @@ class visa_gui_base(_g.BaseObject):
         self._api_base = api
 
         # Build the GUI
-        self.window    = _g.Window(name, size=window_size, autosettings_path=name+'_window')
+        self.window    = _g.Window(name, size=window_size, autosettings_path=name+'_window.txt')
         self.grid_top  = self.window.place_object(_g.GridLayout(False))
         self.window.new_autorow()
         self.grid_bot  = self.window.place_object(_g.GridLayout(False), alignment=0)
