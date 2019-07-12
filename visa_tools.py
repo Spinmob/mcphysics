@@ -132,7 +132,10 @@ class visa_api_base():
         _debug('api_base.read()')
         
         if self.instrument == None: return
-        else:                       return self.instrument.read()
+        else:                       
+            s = self.instrument.read()
+            _debug('  '+str(s))
+            return s
     
     def read_raw(self):       
         """
@@ -141,7 +144,10 @@ class visa_api_base():
         _debug('api_base.read_raw()')
         
         if self.instrument == None: return 
-        else:                       return self.instrument.read_raw()
+        else:                       
+            s = self.instrument.read_raw()
+            _debug('  '+ str(s))
+            return s
 
 
 class visa_gui_base(_g.BaseObject):
