@@ -27,7 +27,7 @@ To access instruments (see below) you will also need a VISA driver, such as Rhod
 
 Finally, since Spinmob relies on interactive plots, we must first tell IPython NOT plot things "in line". In Spyder, select the menu "Tools -> Preferences" then select "IPython console" on the left. Under the "Graphics" tab, set the "Backend" to "Automatic" or "Qt5":
 
-![](/Spinmob/spinmob/wiki/Home/Images/IPython1.png)
+![](https://github.com/Spinmob/spinmob/wiki/Home/Images/IPython1.png)
 
 You can alternatively specify Qt4 if that happens to be your version. These days, it's Qt5 by default.
 
