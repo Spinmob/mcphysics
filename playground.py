@@ -4,7 +4,7 @@ import scipy.stats as _stats
 # For embedding matplotlib figures
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg    as _canvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as _navbar
-from matplotlib.figure import Figure as _figure
+from matplotlib.figure                  import Figure               as _figure
 
 import mcphysics   as _m 
 import spinmob     as _s
@@ -222,47 +222,43 @@ class fitting_statistics_demo():
             row  .append(e[n])
         
         # If the parameters haven't changed, just append the data
-        if ckeys == self.plot_parameters.ckeys:
-            self.plot_parameters.append_data_point(row)
+        self.plot_parameters.append_data_point(row, ckeys=ckeys)
+        
+        # If this is the first row, set up the histograms
+        if len(self.plot_parameters[0]) == 1:
+            
+            # PARAMETERS: Send the settings to the header
             self.tree_settings.send_to_databox_header(self.plot_parameters)
             
-        # Otherwise, clear it out and rebuild it, and rebuild the histograms plot.
-        else:
-            # Clear it out and add the first row of data
-            self.plot_parameters.clear()
-            for n in range(len(ckeys)): 
-                self.plot_parameters[ckeys[n]] = [row[n]]
-
-            # Clear the figure and set up the histogram axes
+            # Generate a plot script
+            s = 'x = [None]\ny = [d[0],d[1]'
+            for n in range(len(p)):
+                s = s+',d['+str(2*n+2)+']'
+            
+            s = s+']\n\nxlabels = "Iteration"\nylabels = [ d.ckeys[0], d.ckeys[1]'
+            for n in range(len(p)):
+                s = s+',d.ckeys['+str(2*n+2)+']'
+            s = s+']'
+            
+            # Set to manual script and update the text
+            self.plot_parameters.combo_autoscript.set_value(0, block_events=True)
+            self.plot_parameters.script.set_text(s)
+            
+            # HISTOGRAMS: Clear the figure and set up the histogram axes
             self.axes_histograms = []
             self.figure_stats.clear()
-            
+        
             # Calculate how many rows of plots are needed
             rows = int(_n.ceil(len(p)*0.5)+1)
-            
+        
             # Reduced chi^2 histogram
             self.axes_histograms.append(self.figure_stats.add_subplot(rows, 2, 1))
             self.axes_histograms.append(self.figure_stats.add_subplot(rows, 2, 2))
-            
+        
             # Parameter histograms
             for n in range(len(p)):
                 self.axes_histograms.append(self.figure_stats.add_subplot(rows, 2, n+3))
-                
-              
-        # Update the script
-        s = 'x = [None]\ny = [d[0],d[1]'
-        for n in range(len(p)):
-            s = s+',d['+str(2*n+2)+']'
-        
-        s = s+']\n\nxlabels = "Iteration"\nylabels = [ d.ckeys[0], d.ckeys[1]'
-        for n in range(len(p)):
-            s = s+',d.ckeys['+str(2*n+2)+']'
-        s = s+']'
-        
-        # Set to manual script and update the text
-        self.plot_parameters.combo_autoscript.set_value(0)
-        self.plot_parameters.script.set_text(s)
-        
+                    
         # Update the parameters plot!
         self.plot_parameters.plot()
         
@@ -382,4 +378,12 @@ class fitting_statistics_demo():
         Quits acquisition when the window closes.
         """
         self.button_loop.set_checked(False)
-            
+        
+        
+if __name__ == '__main__':
+    import os as _os
+    import shutil as _sh
+    if _os.path.exists('egg_settings'): _sh.rmtree('egg_settings')
+
+    
+    self = fitting_statistics_demo()
