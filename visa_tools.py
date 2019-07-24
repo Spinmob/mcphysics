@@ -206,6 +206,9 @@ class visa_gui_base(_g.BaseObject):
         
         self.settings  = self.grid_bot.place_object(_g.TreeDictionary(name+'_settings.txt', name), alignment=0)
         
+        # Make sure the settings isn't the column that stretches
+        self.grid_bot.set_column_stretch(1,1)
+        
         # Create a resource management object
         self._pyvisa_py = pyvisa_py
         if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
