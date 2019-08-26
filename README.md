@@ -1,7 +1,7 @@
 # McPhysics
 This is a library of tools spefically aimed at the McGill undergraduate physics labs, namely PHYS 439/469 at the moment. It can be thought of as an augmentation of the [Spinmob](https://github.com/Spinmob/spinmob/wiki) library, which provides general-purpose, broadly applicable data handling, plotting, fitting, graphical interface, and other analysis tools. 
 
-If you have installed McPhysics (below), you do not need to also install Spinmob.
+If you have installed McPhysics as described below, you do not need to also install Spinmob. You should, however, read the [Spinmob](https://github.com/Spinmob/spinmob/wiki), which provides a lot of information about automated fitting and data handling.
 
 ## Recommended installation method
 
