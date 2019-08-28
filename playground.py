@@ -26,8 +26,14 @@ def plot_and_integrate_reduced_chi2(dof=10, xmin=1e-6, xmax=5, steps=1e5):
         the validity of the numerical integral.
     """
     
-    _s.plot.xy.function('f(x,dof)', xmin, xmax, steps, g=dict(f=_m.functions.reduced_chi2, dof=dof))
-    _s.tweaks.integrate_shown_data()
+    _s.pylab.figure(100)
+    a1 = _s.pylab.subplot(211)
+    a2 = _s.pylab.subplot(212, sharex=a1)
+    
+    _s.plot.xy.function('f(x,dof)', xmin, xmax, steps, g=dict(f=_m.functions.reduced_chi2, dof=dof), 
+                        axes=a1, ylabel='$P(\chi^2_r)$', xlabel='$\chi^2_r$', tall=True)
+    _s.tweaks.integrate_shown_data(output_axes=a2, tall=True)
+    _s.tweaks.ubertidy(window_size=[800,950])
 
 
 
@@ -62,23 +68,26 @@ class fitting_statistics_demo():
         self.grid_plotting = self.window.place_object(_g.GridLayout(False), alignment=0)
         
         # Add the acquire button & connect the signal
-        self.button_acquire = self.grid_controls.place_object(_g.Button('Acquire'),    alignment=1).set_width(70)
-        self.button_fit     = self.grid_controls.place_object(_g.Button('Fit')    ,    alignment=1).set_width(70)
-        self.button_loop    = self.grid_controls.place_object(_g.Button('Loop', True), alignment=1).set_width(70)
+        self.button_acquire = self.grid_controls.place_object(_g.Button('Acquire'),    alignment=0).set_width(55)
+        self.button_fit     = self.grid_controls.place_object(_g.Button('Fit')    ,    alignment=0).set_width(55)
+        self.button_loop    = self.grid_controls.place_object(_g.Button('Loop', True), alignment=0).set_width(55)
+        self.button_clear   = self.grid_controls.place_object(_g.Button('Clear'),      alignment=0).set_width(55)
         self.button_acquire.signal_clicked.connect(self.button_acquire_clicked)
         self.button_fit    .signal_clicked.connect(self.button_fit_clicked)
         self.button_loop   .signal_clicked.connect(self.button_loop_clicked)
+        self.button_clear  .signal_clicked.connect(self.button_clear_clicked)
+        
         # Create an populate the settings tree
         self.grid_controls.new_autorow()
-        self.tree_settings  = self.grid_controls.place_object(_g.TreeDictionary(), column_span=3)
+        self.tree_settings  = self.grid_controls.place_object(_g.TreeDictionary(), column_span=4)
         
-        self.tree_settings.add_parameter('Data/reality', '1.7*x+1.2')
-        self.tree_settings.add_parameter('Data/x_noise',        0)
-        self.tree_settings.add_parameter('Data/y_noise',      1.3)
+        self.tree_settings.add_parameter('Acquire/reality', '1.7*x+1.2')
+        self.tree_settings.add_parameter('Acquire/x_noise',        0)
+        self.tree_settings.add_parameter('Acquire/y_noise',      1.3)
         
-        self.tree_settings.add_parameter('Acquisition/xmin',    0)
-        self.tree_settings.add_parameter('Acquisition/xmax',   10)
-        self.tree_settings.add_parameter('Acquisition/steps', 100, dec=True)
+        self.tree_settings.add_parameter('Acquire/xmin',    0)
+        self.tree_settings.add_parameter('Acquire/xmax',   10)
+        self.tree_settings.add_parameter('Acquire/steps', 100, dec=True)
         
         self.tree_settings.add_parameter('Fit/function',   'a*x+b')
         self.tree_settings.add_parameter('Fit/parameters', 'a=0,b=0')
@@ -167,14 +176,14 @@ class fitting_statistics_demo():
         self.tree_settings.send_to_databox_header(self.plot_raw)
         
         # Generate the data
-        x = _n.linspace(self.tree_settings['Acquisition/xmin'], 
-                        self.tree_settings['Acquisition/xmax'],
-                        self.tree_settings['Acquisition/steps'])
+        x = _n.linspace(self.tree_settings['Acquire/xmin'], 
+                        self.tree_settings['Acquire/xmax'],
+                        self.tree_settings['Acquire/steps'])
         
         
-        d = _s.fun.generate_fake_data(self.tree_settings['Data/reality'], x,
-                                      self.tree_settings['Data/y_noise'],
-                                      self.tree_settings['Data/x_noise'])
+        d = _s.fun.generate_fake_data(self.tree_settings['Acquire/reality'], x,
+                                      self.tree_settings['Acquire/y_noise'],
+                                      self.tree_settings['Acquire/x_noise'])
         
         # Dump it to the plotter and plot
         self.plot_raw.copy_columns(d)
@@ -282,6 +291,13 @@ class fitting_statistics_demo():
             self.button_fit_clicked(True)
             self.window.process_events()
     
+    def button_clear_clicked(self, *a):
+        """
+        Someone clears the data.
+        """
+        self.plot_parameters.clear()
+        self.update_all_plots()
+    
     def update_fit_plot(self):
         """
         Update the fit plot.
@@ -316,6 +332,7 @@ class fitting_statistics_demo():
             
             # Plot the expected distribution.
             if self.tree_settings['Stats/plot_theory']:
+                
                 x2  = _n.linspace(min(0.5*(B[1]-B[0]),0.02), max(1.5,max(self.plot_parameters[0])), 400)
                 dof = self.plot_parameters[1][-1]
                 pdf = len(self.plot_parameters[1]) * dof * _stats.chi2.pdf(x2*dof,dof) * (B[1]-B[0])                
@@ -354,6 +371,7 @@ class fitting_statistics_demo():
                 # Plot the expected distribution, calculated from the mean
                 # and fit error bar.
                 if self.tree_settings['Stats/plot_theory']:
+                    
                     x0  = _n.average(self.plot_parameters[2*n+2]) 
                     ex  = self.plot_parameters[2*n+3][-1]
                     x   = _n.linspace(x0-4*ex, x0+4*ex, 400)
