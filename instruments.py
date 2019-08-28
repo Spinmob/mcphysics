@@ -1221,7 +1221,7 @@ class keithley_dmm(_g.BaseObject):
         self.settings  = self.grid_bot.place_object(_g.TreeDictionary(autosettings_path+'_settings.txt')).set_width(250)
         self.tabs_data = self.grid_bot.place_object(_g.TabArea(autosettings_path+'_tabs_data.txt'), alignment=0)
         self.tab_raw   = self.tabs_data.add_tab('Raw Data')
-        self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.txt', autosettings_path+'_plot_raw.txt', autoscript=2), alignment=0)
+        self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.csv', autosettings_path+'_plot_raw.txt', autoscript=2), alignment=0)
         
         # Create a resource management object to populate the list
         if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
