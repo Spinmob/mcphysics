@@ -893,10 +893,6 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
             _debug('  plotting done')
             self.window.process_events()
     
-            # Autosave if enabled.
-            _debug('  autosaving')
-            self.plot_raw.autosave()
-        
             # External analysis
             self.analyze_data()
         
