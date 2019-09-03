@@ -5,7 +5,7 @@ If you have installed McPhysics as described below, you do not need to also inst
 
 ## Recommended installation method
 
-1. Download and install [Anaconda Python 3](https://www.anaconda.com/distribution/) or [Miniconda Python 3](https://docs.conda.io/en/latest/miniconda.html).
+1. Download and install [Anaconda Python 3](https://www.anaconda.com/distribution/) or [Miniconda Python 3](https://docs.conda.io/en/latest/miniconda.html). See additional instructions below for OSX.
 
 2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the requisite packages available in the conda repository:
    ```
@@ -24,6 +24,9 @@ If you have installed McPhysics as described below, you do not need to also inst
    import mcphysics
    mcphysics.playground.fitting_statistics_demo()
    ```
+
+## OSX Notes
+You may need to tell your system where the `Anaconda3/bin` folder is located manually. A method that worked is to create a text file named `.bash_profile` in your home directory, and add the line `export PATH="/path/to/Anaconda3/bin:$PATH"`, replacing `/path/to` with the appropriate path. Log out and back in, and the terminal should now "know about" `conda` and `pip`.
 
 ## Upgrading
 To upgrade to the latest stable versions,
