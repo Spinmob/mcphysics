@@ -17,7 +17,7 @@ If you have installed McPhysics as described below, you do not need to also inst
    pip install spinmob mcphysics pyvisa
    ```
 
-4. Tell IPython NOT plot things "in line". In Spyder, select the menu "Tools -> Preferences" then select "IPython console" on the left. Under the "Graphics" tab, set the "Backend" to "Automatic" or "Qt5": ![](https://github.com/Spinmob/spinmob/wiki/Home/Images/IPython1.png) After doing this, you will need to close all open IPython consoles.
+4. Tell IPython NOT plot things "in line". In Spyder, select the menu "Tools -> Preferences" then select "IPython console" on the left. Under the "Graphics" tab, set the "Backend" to "Automatic" or "Qt5" (then close all open IPython consoles so it take effect): ![](https://github.com/Spinmob/spinmob/wiki/Home/Images/IPython1.png) 
 
 5. Open Spyder and start playing. Example script:
    ```
