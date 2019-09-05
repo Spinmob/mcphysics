@@ -68,7 +68,7 @@ class fitting_statistics_demo():
         self.grid_plotting = self.window.place_object(_g.GridLayout(False), alignment=0)
         
         # Add the acquire button & connect the signal
-        self.button_acquire = self.grid_controls.place_object(_g.Button('Acquire'),    alignment=0).set_width(55)
+        self.button_acquire = self.grid_controls.place_object(_g.Button('Acquire'),    alignment=0).set_width(70)
         self.button_fit     = self.grid_controls.place_object(_g.Button('Fit')    ,    alignment=0).set_width(55)
         self.button_loop    = self.grid_controls.place_object(_g.Button('Loop', True), alignment=0).set_width(55)
         self.button_clear   = self.grid_controls.place_object(_g.Button('Clear'),      alignment=0).set_width(55)
