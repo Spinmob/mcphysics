@@ -1224,7 +1224,10 @@ class keithley_dmm(_g.BaseObject):
         else:         self.resource_manager = _v.ResourceManager()
         names = []
         for x in self.resource_manager.list_resources(): 
-            names.append(str(self.resource_manager.resource_info(x).alias))
+            if self.resource_manager.resource_info(x).alias:
+                names.append(str(self.resource_manager.resource_info(x).alias))
+            else:
+                names.append(x)
             
         # VISA settings
         self.settings.add_parameter('VISA/Device', 0, type='list', values=['Simulation']+names)
