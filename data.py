@@ -152,4 +152,9 @@ try:
         return arrays
 
 except:
-    print("Note: Image loading is disabled. You may need to install imageio, which can be done with the command 'conda install imageio' from the system terminal or anaconda prompt. You can also find it in anaconda-navigator.")
+    _installimageio = "Note: Image loading is disabled. You may need to install imageio, which can be done with the command 'conda install imageio' from the system terminal or anaconda prompt. You can also find it in anaconda-navigator."
+    print(_installimageio)
+    def load_image (path =None): print(_installimageio)
+    def load_images(paths=None): print(_installimageio) 
+    
+    

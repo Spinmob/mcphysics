@@ -1265,8 +1265,14 @@ class keithley_dmm(_g.BaseObject):
             self.api = keithley_dmm_api(self.settings['VISA/Device'], self._pyvisa_py)
             
             # Tell the user what dmm is connected
-            if self.api.instrument == None: self.label_dmm_name.set_text('Simulation')
-            else:                           self.label_dmm_name.set_text(self.api.model)
+            if self.api.instrument == None: 
+                self.label_dmm_name.set_text('Simulation')
+                self.label_dmm_name.set_style('font-weight: bold; color: red; font-size: 12pt;')
+                self.button_connect.set_colors(background='red')
+            else:                           
+                self.label_dmm_name.set_text(self.api.model)
+                self.label_dmm_name.set_style('')
+                self.button_connect.set_colors(background='')
             
             # Enable the Acquire button
             self.button_acquire.enable()
@@ -1279,6 +1285,10 @@ class keithley_dmm(_g.BaseObject):
             self.api = None
             self.label_dmm_name.set_text('Disconnected')
             
+            # Make sure it's not still red.
+            self.label_dmm_name.set_style('')
+            self.button_connect.set_colors(background='')
+
             # Disable the acquire button
             self.button_acquire.disable()
             
@@ -1405,5 +1415,5 @@ class keithley_dmm(_g.BaseObject):
 
 if __name__ == '__main__':
          
-    self = sillyscope()
+    self = keithley_dmm()
     

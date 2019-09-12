@@ -260,6 +260,14 @@ class visa_gui_base(_g.BaseObject):
             
             # Tell the user what scope is connected
             self.label_instrument_name.set_text(self.api.idn)
+            
+            # If we're in simulation mode, make it very clear
+            if self.api.instrument == None:
+                self.label_instrument_name.set_style('font-weight: bold; color: red; font-size: 12pt;')
+                self.button_connect.set_colors(background='red')
+            else:
+                self.label_instrument_name.set_style('')
+                self.button_connect.set_colors(background='')
         
             # Connecting was successful!
             self._after_connect()
@@ -274,6 +282,10 @@ class visa_gui_base(_g.BaseObject):
             self.api = None
             self.label_instrument_name.set_text('Disconnected')
             self.button_connect.set_checked(False, block_events=True)
+
+            # Make sure it's not still red and bold.
+            self.label_instrument_name.set_style('')
+            self.button_connect.set_colors(background='')
             
             # Disconnection successful!
             self._after_disconnect()
