@@ -190,6 +190,9 @@ class fitting_statistics_demo():
         
         # Plot it.
         self.plot_raw.plot()
+        
+        # Autosave if checked
+        self.plot_raw.autosave()
     
     def button_fit_clicked(self,*a):
         """
