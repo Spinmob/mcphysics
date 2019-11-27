@@ -420,16 +420,17 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
             width = 1
             
             if "MDO" in self.idn:
+                # Get current settings for verbose/head
                 head = self.query(":HEADer?")[-2]
                 verb = self.query(":VERBose?")[-2]
-                # Get number of points in waveform data
                 # Turn on verbose header for consistency in returned data.
                 self.write(':HEADer 1')
                 self.write(':VERBose 1')
+                # Get number of points in waveform data
                 n_pts = int(self.query("WFMOutpre:WFID?").split(' ')[6])
                 # Set verbose/header settings to what they were previously.
                 self.write(':HEADer ' + head)
-                self.write('VERBose ' + verb)
+                self.write(':VERBose ' + verb)
                 # Set number of points to acquire to be the full waveform
                 self.write('DATA:STAR 1')
                 self.write('DATA:STOP %d' % n_pts)
