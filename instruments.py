@@ -267,6 +267,7 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
             
             # For duty cycle calculation
             t1 = _t.time()
+            d.h(seconds_pre_waveform_query=t1)
             
             # Transfer the waveform information
             v = self._query_and_decode_waveform()
@@ -274,7 +275,8 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
             _debug('_query_and_decode_waveform() done', len(v))
             
             # For duty cycle calculation
-            t2 = _t.time()            
+            t2 = _t.time()   
+            d.h(seconds_post_waveform_query=t2)
 
             # Get the waveform header
             
@@ -302,9 +304,12 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
         # For duty cycle calculation
         t3 = _t.time()
         self.t_get_waveform  = t3-t0
-        if t3-t0>0: self.t_duty_cycle = (t2-t1)/(t3-t0)
+        if t3-t0>0: self.transfer_duty_cycle = (t2-t1)/self.t_get_waveform
         else:       print("WARNING: get_waveform() total time == 0")
         
+        # Note the duty cycle.
+        d.h(transfer_duty_cycle=self.transfer_duty_cycle)
+
         _debug('get_waveform() complete')
         # End of getting arrays and header information
         return d
@@ -477,8 +482,8 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
             # Get the number of points
             N = int(s[2:2+n].decode())
             _debug(N)
-        
-            # Convert it to integers, based on empirically measuring.
+            
+            # Convert it to integers, this code is based on empirically measuring.
             return 99 - _n.float16(_n.frombuffer(s[2+n:2+n+N], _n.uint8))
                             
                             
@@ -877,8 +882,9 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
             self.number_count.increment()
             
             # Decrement if it's identical to the previous trace
+            is_identical=False
             if self.settings['Acquire/Discard_Identical']:
-                is_identical = self.plot_raw == self._previous_data
+                is_identical = self.plot_raw.is_same_as(self._previous_data, headers=False)
                 _debug('  Is identical to previous?', is_identical)
                 if is_identical: self.number_count.increment(-1)
             
@@ -888,7 +894,7 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
             # Update the plot
             _debug('  plotting', len(self.plot_raw[0]), len(self.plot_raw[1]))
             self.plot_raw.plot()
-            self.plot_raw.autosave()
+            if not is_identical: self.plot_raw.autosave()
             
             _debug('  plotting done')
             self.window.process_events()
@@ -1415,5 +1421,5 @@ class keithley_dmm(_g.BaseObject):
 
 if __name__ == '__main__':
          
-    self = keithley_dmm()
+    self = sillyscope()
     
