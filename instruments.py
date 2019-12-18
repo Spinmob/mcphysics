@@ -380,11 +380,17 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
             xinc = float(self.query(':WAV:XINC? CHAN'+c))
             yinc = float(self.query(':WAV:YINC? CHAN'+c))
             
+            # Also get whether we're in peak detect mode, since this messes up the x-scale!
+            d.insert_header('peak_detect', self.query(':ACQ:TYPE?').strip() == 'PEAK')
+            if d.h('peak_detect'): xrescale=0.5
+            else:                  xrescale=1.0
+            
             d.insert_header('xzero'+c,       0)#-float(self.query(':WAV:XOR? CHAN'+c)))
-            d.insert_header('xmultiplier'+c, xinc)
+            d.insert_header('xmultiplier'+c, xinc*xrescale)
             d.insert_header('yzero'+c,       -float(self.query(':WAV:YOR? CHAN'+c)))
             d.insert_header('ymultiplier'+c, yinc)
             
+               
 
         elif self.model in ['RIGOLZ']:
             _debug('  RIGOLZ')
