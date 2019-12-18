@@ -11,6 +11,9 @@
 #  * Find trigger time and define this to be zero.
 #  * Option to query full data set
 
+# ISSUES:
+# * Rigol B: switching from peak detect to normal in between runs causes acquire button to fail once.
+
 import numpy   as _n
 import time    as _t
 import spinmob as _s
