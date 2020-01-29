@@ -39,14 +39,24 @@ class visa_api_base():
         
     write_sleep=0
         How many seconds to sleep after each write.
+        
+    hello_query='*IDN?'
+        Initial query to send. Verifies the connection and the return value is used for self.idn.
     """
     
     
-    def __init__(self, name='VISA_Alias', pyvisa_py=False, simulation=False, timeout=2000, write_sleep=0.01):
+    def __init__(self, name='VISA_Alias', pyvisa_py=False, simulation=False, timeout=2000, write_sleep=0.01, **kwargs):
         _debug('api_base.__init__()')
         # Store it
         self._write_sleep = write_sleep
         self.idn         = None
+        
+        #Extract the hello query if there is one. 
+        if 'hello_query' in kwargs.keys():
+            #Remove the item for further use of kwargs.
+            self.hello_query = kwargs.pop('hello_query') #.pop also returns the value of the keys.
+        else:
+            self.hello_query = '*IDN?'
         
         # Create a resource management object
         if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
@@ -58,9 +68,28 @@ class visa_api_base():
             self.idn = 'Simulation Mode'
             return
         
+        # Connect
+        self._connect_to_instrument(name, timeout, **kwargs)
+        
+        
+    def _connect_to_instrument(self, name, timeout, **kwargs):
+        """
+        This is called by "__init__". It tries to open the specified resource 
+        name (e.g. "COM3" or "USB::..."), then sends a "*IDN?" query. If that 
+        fails, it defaults to simulation mode.
+        
+        **kwargs can contain anything parameters for resource_manager.open_resource()
+        
+        You can overwrite this function if your instrument doesn't know what
+        "*IDN?" means. 
+        """
+        _debug('api_base._connect_to_instrument', name, timeout)
+        
         # Try to open the instrument.
         try:
-            self.instrument = self.resource_manager.open_resource(name)
+            _debug('Opening instrument with name', name, 'If it failed, check the parameters in the function resource_manager.open_resource()')          
+            self.instrument = self.resource_manager.open_resource(name, **kwargs)
+            _debug('Done. Instrument = ', self.instrument)
             
             # Test that it's responding and is a Tektronix device.
             try:
@@ -68,16 +97,17 @@ class visa_api_base():
                 self.instrument.timeout = timeout
                 
                 # Get the ID of the instrument
-                self.idn = self.query('*IDN?').strip()
+                _debug('Getting the idn with the query ', self.hello_query)
+                self.idn = self.query(self.hello_query).strip()
                 
             except:
-                print("ERROR: Instrument did not reply to IDN query. Entering simulation mode.")
+                print("ERROR: Instrument did not reply to hello_query = ",self.hello_query, " . Entering simulation mode.")
                 self.instrument.close()
                 self.instrument = None
                 self.idn = "Simulation Mode"
         
         except:
-            print("ERROR: Could not open instrument. Entering simulation mode.")
+            print("ERROR: Could not open instrument.  Entering simulation mode. Note some instruments do not respond to '*IDN?' queries, in which case you can change the keyword argument hello_query. Actual hello_query = ", self.hello_query)
             self.instrument = None
             self.idn = "Simulation Mode"
             
@@ -107,8 +137,9 @@ class visa_api_base():
             _t.sleep(self._write_sleep)
             return
         else: 
-            self.write(message)
-            return self.read()
+            return self.instrument.query(message) #Maybe the instrument doesn't like read()
+#            self.write(message)
+#            return self.read()
     
     def write(self, message): 
         """
@@ -183,13 +214,14 @@ class visa_gui_base(_g.BaseObject):
         Default window size.
    
     """
-    def __init__(self, name='visa_gui', show=True, block=False, api=visa_api_base, timeout=2000, write_sleep=0.01, pyvisa_py=False, window_size=[1,1]):
+    def __init__(self, name='visa_gui', show=True, block=False, api=visa_api_base, timeout=2000, write_sleep=0.01, pyvisa_py=False, window_size=[1,1], **kwargs):
         _debug('gui_base.__init__()')
         
         # Remember the name
         self.name = name
         self._write_sleep = write_sleep
         self._timeout     = timeout
+        self.kwargs = kwargs #This will be used in other functions
         
         # No instrument selected yet
         self.api = None
@@ -236,7 +268,7 @@ class visa_gui_base(_g.BaseObject):
         # Run the base object stuff and autoload settings
         _g.BaseObject.__init__(self, autosettings_path=name)
         
-        # Show the window.
+        # Show the window. as
         if show: self.window.show(block)
 
     def _button_connect_clicked(self, *a):
@@ -249,14 +281,17 @@ class visa_gui_base(_g.BaseObject):
         if self.button_connect.get_value():
             
             # Close it if it exists for some reason
+            _debug('  Closing any open connection...')
             if not self.api == None: self.api.instrument.close()
             
             # Make the new one
+            _debug('  Creating self.api from the specified api_base...')
             self.api = self._api_base(name       = self.settings['VISA/Device'], 
                                       pyvisa_py  = self._pyvisa_py,
                                       simulation = self.settings['VISA/Device']=='Simulation',
                                       timeout    = self._timeout,
-                                      write_sleep= self._write_sleep)
+                                      write_sleep= self._write_sleep,
+                                      **self.kwargs)
             
             # Tell the user what scope is connected
             self.label_instrument_name.set_text(self.api.idn)
