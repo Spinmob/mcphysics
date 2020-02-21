@@ -9,7 +9,7 @@ If you have installed McPhysics as described below, you do not need to also inst
 
 2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the requisite packages available in the conda repository:
    ```
-   conda install numpy scipy imageio matplotlib pyqtgraph spyder
+   conda install numpy scipy imageio matplotlib pyqtgraph spyder pyopengl
    ```
 
 3. Install spinmob and mcphysics via pip:
