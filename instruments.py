@@ -13,12 +13,13 @@
 
 # ISSUES:
 # * Rigol B: switching from peak detect to normal in between runs causes acquire button to fail once.
+# * ADALM2000 Enabling channels doesn't seem to change the incoming data. Currently it just ignores the disabled ones.
 
 import numpy   as _n
 import time    as _t
 import spinmob as _s
 import spinmob.egg as _egg
-import mcphysics as _mp
+import mcphysics as _mp; _m2k = _mp._m2k
 import time    as _time
 _g = _egg.gui
 
@@ -37,10 +38,321 @@ def _debug(*a):
 
 
 
+class adalm2000_api():
+    """
+    Class for talking to an ADALM2000.
+    
+    Parameters
+    ----------
+    name : str
+        Short name ('uri') of the device to open, e.g., 'usb:2.11.5'.
+    """
+    def __init__(self, name):
+        
+        # Open the connection
+        print('Opening', name)
+        try:
+            self.m2k = _m2k.contextOpen(name).toM2k()
+        
+            # Get the adc
+            self.adc = self.m2k.getAllAnalogIn()[0]
+            
+            # Get the power supply
+            self.power = self.m2k.getPowerSupply()
+            
+            # Run the calibration
+            print('Calibrating...')
+            self.m2k.calibrate()
+            
+            # Not simulation mode
+            self.simulation_mode = False
+
+        # If anything goes wrong, simulation mode
+        except:
+            self.simulation_mode = True
+    
+    def get_sample_rate(self):
+        """
+        Returns the current sample rate.
+        """
+        if self.simulation_mode: return 1e7
+        else:                    return self.adc.getSampleRate()
+    
+    def set_sample_rate(self, sample_rate=100e6):
+        """
+        Sets the sample rate in Hz.
+        
+        Parameters
+        ----------
+        sample_rate=100e6 : float, optional
+            Sample rate in Hz.
+            
+        Returns
+        -------
+        self
+        """
+        if not self.simulation_mode: self.adc.setSampleRate(sample_rate)
+        return self
+        
+    def get_voltages(self, samples=8192):
+        """
+        Queries the analog-to-digital converter, returning an array of voltages
+        for each channel. If no channels are enabled, this enables both by 
+        default.
+
+        Parameters
+        ----------
+        samples : integer, optional
+            DESCRIPTION. The default is 8192.
+            Number of samples to ask for. If you ask for more than the 
+            onboard memory (8192), you may run into buffering issues, limited
+            by the usb transfer rate. That being said, I have been able to
+            get a million points at 100 MHz sampling rate before.
+
+        Returns
+        -------
+        List of voltage arrays, one for each channel.
+        """
+        if self.simulation_mode: return (_n.random.normal(size=samples), _n.random.normal(size=samples))
+        
+        # If neither are enabled, enable them both.
+        if not self.adc.isChannelEnabled(0) and not self.adc.isChannelEnabled(1):
+            self.adc.enableChannel(0, True)
+            self.adc.enableChannel(1, True)
+        
+        # Send it back
+        return self.adc.getSamples(int(samples))
+        
+    def set_range_big(self, channel1=None, channel2=None):
+        """
+        Set the channel ranges to "big" mode (+/-25V). Specifying None leaves
+        them unchanged.
+
+        Parameters
+        ----------
+        channel1 : bool, optional
+            If True, sets channel 1 (index 0) to +/-25V mode. If False,
+            sets it to +/-2.5V mode. The default is None.
+        channel2 : TYPE, optional
+            If True, sets channel 2 (index 1) to +/-25V mode. If False,
+            sets it to +/-2.5V mode. The default is None.
+
+        Returns
+        -------
+        self
+
+        """
+        if self.simulation_mode: return self
+        
+        if channel1 is not None: 
+            if channel1: self.adc.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_25V)
+            else:        self.adc.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_2_5V)
+        
+        if channel2 is not None:
+            if channel2: self.adc.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_25V)
+            else:        self.adc.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_2_5V)
+        
+        return self
+    
+    def set_range_small(self, channel1=None, channel2=None):
+        """
+        Set the channel ranges to "small" mode (+/-25V). Specifying None leaves
+        them unchanged.
+
+        Parameters
+        ----------
+        channel1 : bool, optional
+            If True, sets channel 1 (index 0) to +/-2.5V mode. If False,
+            sets it to +/-25V mode. The default is None.
+        channel2 : TYPE, optional
+            If True, sets channel 2 (index 1) to +/-2.5V mode. If False,
+            sets it to +/-25V mode. The default is None.
+
+        Returns
+        -------
+        self
+
+        """
+        if channel1 is not None: 
+            if channel1: self.adc.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_2_5V)
+            else:        self.adc.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_25V)
+        
+        if channel2 is not None:
+            if channel2: self.adc.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_2_5V)
+            else:        self.adc.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_25V)
+        
+        return self
+      
+class adalm2000():
+    """
+    Graphical interface for an ADALM2000.
+    
+    Parameters
+    ----------
+    name : str, optional
+        Optional identifier for this instance of adalm2000 (in case you build
+        a gui with many instances), used primarily for the remembering settings.
+        Could be "Carl" for example.
+    """
+    def __init__(self, name='adalm2000'):
+        
+        # Remember the name
+        self.name = name
+        
+        # Build the graphical user interface
+        self._build_gui()
 
 
+    def _build_gui(self):
+        """
+        Builds the graphical interface
+        """
+        
+        # Create the window
+        w = self.window = _g.Window('ADALM2000', autosettings_path=self.name+'_window')
+        
+        # Top row for connection interface, bottom row for data taking
+        gt = self._grid_top    = w.add(_g.GridLayout(margins=False), column=1, row=1, alignment=0)
+        gb = self._grid_bottom = w.add(_g.GridLayout(margins=False), column=1, row=2, alignment=0)
+        
+        # Add a combo box for all the available devices and a button to connect
+        self.combo_contexts = gt.add(_g.ComboBox(list(_m2k.getAllContexts())))
+        self.button_connect = gt.add(_g.Button('Connect', checkable=True))
+        self.label_status   = gt.add(_g.Label(''))
+        gt.set_column_stretch(3)
+        
+        # Add tabs for the different devices on the adalm2000
+        self.tabs    = gb.add(_g.TabArea(self.name+'_tabarea'), alignment=0)
+        
+        # ADC Tab
+        self.tab_adc = self.tabs.add_tab('ADC')
+        self.tab_adc.button_acquire = self.tab_adc.add(_g.Button('Acquire', checkable=True))
+        self.tab_adc.label_info     = self.tab_adc.add(_g.Label(''))
+        
+        # Add sub-tabs for adc plot & analysis
+        self.tab_adc.tabs     = self.tab_adc.add(_g.TabArea(autosettings_path=self.name+'_adc_tabs'), 4,0, alignment=0, row_span=2)
+        self.tab_adc.tab_raw  = self.tab_adc.tabs.add_tab('Raw Voltages')
+        self.tab_adc.plot_raw = self.tab_adc.tab_raw.add(_g.DataboxPlot('*.raw', autosettings_path=self.name+'_adc_plot_raw'), alignment=0)
+        self.tab_adc.tab_processor = self.tab_adc.tabs.add_tab('Processor')
+        self.tab_adc.processor  = self.tab_adc.tab_processor.add(_g.DataboxProcessor(self.name+'_processor1', self.tab_adc.plot_raw, '*.txt') , alignment=0)
+        self.tab_adc.new_autorow()
+        
+        # Power tab
+        self.tab_power = self.tabs.add_tab('Power Supplies')
+        
+        
+        # Settings for the acquisition
+        s = self.tab_adc.settings  = self.tab_adc.add(_g.TreeDictionary(self.name+'_adc_settings'), column_span=3)
+        s.add_parameter('Iterations', 0, tip='How many acquisitions to perform.')
+        s.add_parameter('Samples', 1000, limits=(2,None), siPrefix=True, suffix='S', dec=True, tip='How many samples to acquire. 1-8192 guaranteed. \nLarger values possible, depending on USB bandwidth.')
+        s.add_parameter('Rate(MHz)', [1e2, 1e1, 1e0, 1e-1, 1e-2, 1e-3], tip='How fast to acquire data (MHz)')
+        
+        # This does not have an effect for some reason, so I disabled it.
+        #s.add_parameter('Channel_1', True, tip='Enable Channel 1')
+        #s.add_parameter('Channel_2', True, tip='Enable Channel 2')
 
+        s.add_parameter('Channel_1/Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages')
+        s.add_parameter('Channel_2/Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages')
+        
+        self.tab_adc.set_row_stretch(1)
+        self.tab_adc.set_column_stretch(3)
+        
+        # Connect all the signals
+        self.button_connect        .signal_clicked.connect(self._button_connect_clicked)
+        self.tab_adc.button_acquire.signal_clicked.connect(self._adc_button_acquire_clicked)
+        
+        # Disable the tabs until we connect
+        self.tabs.disable()
+        
+        # If you found this, congrats, feel free to comment it out. But you 
+        # better make sure you know exactly what it does ;)
+        self.tab_adc.processor.settings.hide_parameter('Average/Error')
+        
+        # Let's see it!
+        self.window.show()
+    
+    def _button_connect_clicked(self, *a):
+        """
+        Called when someone clicks the "connect" button.
+        """
 
+        # Get the adalm2000's URI
+        uri = self.combo_contexts.get_text()
+        
+        # Connect!
+        self.api = adalm2000_api(uri)
+        
+        # If simulation mode, make this clear
+        if self.api.simulation_mode:
+            self.label_status.set_text('*** SIMULATION MODE ***')
+            self.label_status.set_colors('red')
+        
+        # Otherwise, give some information
+        else:
+            self.label_status.set_text('')
+        
+        # For now, just disable these
+        self.button_connect.disable()
+        self.combo_contexts.disable()
+        self.tabs.enable()
+        
+    def _adc_button_acquire_clicked(self, *a):
+        """
+        Called when someone clicks the "acquire" button on the ADC tab.
+        """
+        
+        # Easy coding
+        s  = self.tab_adc.settings
+        p  = self.tab_adc.plot_raw
+        p1 = self.tab_adc.processor
+        
+        # Iteration number
+        n = 0; self.tab_adc.label_info.set_text('Iteration: '+str(n))
+        
+        # Loop until we've finishe our iterations, someone pushed the button, or forever (iterations=0)
+        while self.tab_adc.button_acquire.is_checked() and \
+            (n < s['Iterations'] or s['Iterations'] < 1):
+            
+            # Enable channels (THIS DOESN'T HAVE AN EFFECT!)
+            # self.api.adc.enableChannel(0, s['Channel_1'])
+            # self.api.adc.enableChannel(1, s['Channel_2'])
+        
+            # Set the sampling rate
+            rate = float(s['Rate(MHz)'])*1e6
+            self.api.set_sample_rate(rate)
+            
+            # Set the ranges
+            self.api.set_range_big(s['Channel_1/Range']=='+/-25V',
+                                   s['Channel_2/Range']=='+/-25V')        
+            
+            # Get the time array
+            ts = _n.linspace(0, (s['Samples']-1)/rate, s['Samples'])
+            
+            # Get the data
+            vs = self.api.get_voltages(s['Samples'])
+            
+            # Send to plotter
+            p.clear()
+            p['Time(s)'] = ts
+            for i in range(len(vs)): p['V'+str(i+1)] = vs[i]
+    
+            # Update the plot and autosave if that's enabled
+            p.plot()
+            p.autosave()
+            
+            # Send it to the processor
+            p1.run()
+            
+            # Increment, update move on.
+            n += 1
+            self.tab_adc.label_info.set_text('Iteration: '+str(n))
+            self.window.process_events()
+        
+        # Pop the button when we're done.
+        self.tab_adc.button_acquire.set_checked(False)
+        
+        
+        
 class sillyscope_api(_mp.visa_tools.visa_api_base):
     """
     Class for talking to a Tektronix TDS/TBS 1000 series and Rigol 1000 B/D/E/Z
@@ -1446,5 +1758,5 @@ class keithley_dmm(_g.BaseObject):
 
 if __name__ == '__main__':
          
-    self = sillyscope()
+    self = adalm2000()
     
