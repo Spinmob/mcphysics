@@ -6,7 +6,7 @@ import traceback as _traceback
 _p = _traceback.print_last
 
 try:    import visa as _v
-except: print('Visa driver and / or pyvisa not installed. On Windows, consider Rhode & Schwartz VISA or NI-VISA, then pip install pyvisa. On Linux, pip install pyvisa and pyvisa-py')
+except: pass
 
 _debug_enabled = False
 def _debug(*a):

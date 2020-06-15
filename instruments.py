@@ -26,9 +26,6 @@ _g = _egg.gui
 import traceback as _traceback
 _p = _traceback.print_last
 
-try:    import visa as _v
-except: print('Visa driver and / or pyvisa not installed. On Windows, consider Rhode & Schwartz VISA or NI-VISA, then pip install pyvisa. On Linux, pip install pyvisa and pyvisa-py')
-
 _debug_enabled = False
 def _debug(*a):
     if _debug_enabled: 
@@ -49,27 +46,34 @@ class adalm2000_api():
     """
     def __init__(self, name):
         
-        # Open the connection
-        print('Opening', name)
-        try:
-            self.m2k = _m2k.contextOpen(name).toM2k()
-        
-            # Get the adc
-            self.adc = self.m2k.getAllAnalogIn()[0]
-            
-            # Get the power supply
-            self.power = self.m2k.getPowerSupply()
-            
-            # Run the calibration
-            print('Calibrating...')
-            self.m2k.calibrate()
-            
-            # Not simulation mode
-            self.simulation_mode = False
-
-        # If anything goes wrong, simulation mode
-        except:
+        # If the import failed, _m2k = None
+        if _m2k == None: 
+            print('You need to install libiio for ADALM2000 to work.')
             self.simulation_mode = True
+        
+        # Assume it's working.
+        else:
+            # Open the connection
+            print('Opening', name)
+            try:
+                self.m2k = _m2k.contextOpen(name).toM2k()
+            
+                # Get the adc
+                self.adc = self.m2k.getAllAnalogIn()[0]
+                
+                # Get the power supply
+                self.power = self.m2k.getPowerSupply()
+                
+                # Run the calibration
+                print('Calibrating...')
+                self.m2k.calibrate()
+                
+                # Not simulation mode
+                self.simulation_mode = False
+    
+            # If anything goes wrong, simulation mode
+            except:
+                self.simulation_mode = True
     
     def get_sample_rate(self):
         """
@@ -94,7 +98,7 @@ class adalm2000_api():
         if not self.simulation_mode: self.adc.setSampleRate(sample_rate)
         return self
         
-    def get_voltages(self, samples=8192):
+    def get_adc_voltages(self, samples=8192):
         """
         Queries the analog-to-digital converter, returning an array of voltages
         for each channel. If no channels are enabled, this enables both by 
@@ -122,6 +126,40 @@ class adalm2000_api():
         
         # Send it back
         return self.adc.getSamples(int(samples))
+    
+    def get_infostring(self):
+        """
+        Returns an info string for this device.
+        """
+        return 'ADALM2000 Firmware '+self.m2k.getFirmwareVersion()+', S/N '+self.m2k.getSerialNumber() + ' <-- Memorize this.'
+    
+    def get_Vp(self):
+        """
+        Returns the current value of V+ on the power supply.
+        """
+        return self.power.readChannel(0)
+    
+    def get_Vm(self):
+        """
+        Returns the current value of V- on the power supply.
+        """
+        return self.power.readChannel(1)
+    
+    def set_Vp(self, Vp):
+        """
+        Sets V+.
+        """
+        self.power.enableChannel(0, True)
+        self.power.pushChannel  (0, Vp)
+        return self
+    
+    def set_Vm(self, Vm):
+        """
+        Sets V-.
+        """
+        self.power.enableChannel(1, True)
+        self.power.pushChannel  (1, Vm)
+        return self
         
     def set_range_big(self, channel1=None, channel2=None):
         """
@@ -196,6 +234,9 @@ class adalm2000():
     """
     def __init__(self, name='adalm2000'):
         
+        # If the import failed, _m2k = None
+        if _m2k == None: print('You need to install libiio and libm2k to use an ADALM2000.')
+        
         # Remember the name
         self.name = name
         
@@ -216,13 +257,16 @@ class adalm2000():
         gb = self._grid_bottom = w.add(_g.GridLayout(margins=False), column=1, row=2, alignment=0)
         
         # Add a combo box for all the available devices and a button to connect
-        self.combo_contexts = gt.add(_g.ComboBox(list(_m2k.getAllContexts())))
+        contexts = list(_m2k.getAllContexts())
+        #else:    contexts = []
+        contexts.append('Simulation')
+        self.combo_contexts = gt.add(_g.ComboBox(contexts))
         self.button_connect = gt.add(_g.Button('Connect', checkable=True))
         self.label_status   = gt.add(_g.Label(''))
-        gt.set_column_stretch(3)
+        gt.set_column_stretch(2)
         
         # Add tabs for the different devices on the adalm2000
-        self.tabs    = gb.add(_g.TabArea(self.name+'_tabarea'), alignment=0)
+        self.tabs = gb.add(_g.TabArea(self.name+'_tabarea'), alignment=0)
         
         # ADC Tab
         self.tab_adc = self.tabs.add_tab('ADC')
@@ -230,16 +274,12 @@ class adalm2000():
         self.tab_adc.label_info     = self.tab_adc.add(_g.Label(''))
         
         # Add sub-tabs for adc plot & analysis
-        self.tab_adc.tabs     = self.tab_adc.add(_g.TabArea(autosettings_path=self.name+'_adc_tabs'), 4,0, alignment=0, row_span=2)
+        self.tab_adc.tabs     = self.tab_adc.add(_g.TabArea(autosettings_path=self.name+'_adc_tabs'), 3,0, alignment=0, row_span=2)
         self.tab_adc.tab_raw  = self.tab_adc.tabs.add_tab('Raw Voltages')
         self.tab_adc.plot_raw = self.tab_adc.tab_raw.add(_g.DataboxPlot('*.raw', autosettings_path=self.name+'_adc_plot_raw'), alignment=0)
         self.tab_adc.tab_processor = self.tab_adc.tabs.add_tab('Processor')
         self.tab_adc.processor  = self.tab_adc.tab_processor.add(_g.DataboxProcessor(self.name+'_processor1', self.tab_adc.plot_raw, '*.txt') , alignment=0)
         self.tab_adc.new_autorow()
-        
-        # Power tab
-        self.tab_power = self.tabs.add_tab('Power Supplies')
-        
         
         # Settings for the acquisition
         s = self.tab_adc.settings  = self.tab_adc.add(_g.TreeDictionary(self.name+'_adc_settings'), column_span=3)
@@ -248,18 +288,49 @@ class adalm2000():
         s.add_parameter('Rate(MHz)', [1e2, 1e1, 1e0, 1e-1, 1e-2, 1e-3], tip='How fast to acquire data (MHz)')
         
         # This does not have an effect for some reason, so I disabled it.
+        # I notice one cannot disable channels in Scopy either.
         #s.add_parameter('Channel_1', True, tip='Enable Channel 1')
         #s.add_parameter('Channel_2', True, tip='Enable Channel 2')
 
         s.add_parameter('Channel_1/Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages')
         s.add_parameter('Channel_2/Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages')
         
+        # Formatting
         self.tab_adc.set_row_stretch(1)
         self.tab_adc.set_column_stretch(3)
         
+        
+        
+        # Power tab
+        self.tab_power = self.tabs.add_tab('Power Supply')
+        self.tab_power.number_set_Vp    = self.tab_power.add(_g.NumberBox(5, 1, (0,5), suffix='V', siPrefix=True))
+        self.tab_power.button_enable_Vp = self.tab_power.add(_g.Button('Enable V+', checkable=True))
+        self.tab_power.button_monitor_Vp= self.tab_power.add(_g.Button('Monitor',   checkable=True, checked=True))
+        self.tab_power.label_Vp         = self.tab_power.add(_g.Label(''))
+        
+        self.tab_power.new_autorow()
+        self.tab_power.number_set_Vm    = self.tab_power.add(_g.NumberBox(-5, 1, (-5,0), suffix='V', siPrefix=True))
+        self.tab_power.button_enable_Vm = self.tab_power.add(_g.Button('Enable V-', checkable=True))
+        self.tab_power.button_monitor_Vm= self.tab_power.add(_g.Button('Monitor',   checkable=True, checked=True))
+        self.tab_power.label_Vm         = self.tab_power.add(_g.Label(''))
+        
+        self.tab_power.new_autorow()
+        self.tab_power.plot = self.tab_power.add(_g.DataboxPlot("*.txt", autosettings_path=self.name+'_tab_power.plot'), alignment=0, column_span=4)
+        
+        self.tab_power.set_column_stretch(3)
+        self.tab_power.set_row_stretch(2)
+        
         # Connect all the signals
-        self.button_connect        .signal_clicked.connect(self._button_connect_clicked)
-        self.tab_adc.button_acquire.signal_clicked.connect(self._adc_button_acquire_clicked)
+        self.button_connect             .signal_clicked.connect(self._button_connect_clicked)
+        self.tab_adc.button_acquire     .signal_clicked.connect(self._adc_button_acquire_clicked)
+        self.tab_power.number_set_Vp    .signal_changed.connect(self._power_settings_changed)
+        self.tab_power.number_set_Vm    .signal_changed.connect(self._power_settings_changed)
+        self.tab_power.button_enable_Vp .signal_clicked.connect(self._power_settings_changed)
+        self.tab_power.button_enable_Vm .signal_clicked.connect(self._power_settings_changed)
+        
+        # Timer for power update
+        self.tab_power.timer = _g.Timer(500)
+        self.tab_power.timer.signal_tick.connect(self._power_timer_tick)
         
         # Disable the tabs until we connect
         self.tabs.disable()
@@ -271,6 +342,51 @@ class adalm2000():
         # Let's see it!
         self.window.show()
     
+    def _power_timer_tick(self, *a):
+        """
+        Called whenever the power timer ticks (for updating readings).
+        """
+        Vp = Vm = None
+        
+        # Read if we're supposed to
+        if self.tab_power.button_monitor_Vp.is_checked(): Vp = self.api.get_Vp()
+        if self.tab_power.button_monitor_Vm.is_checked(): Vm = self.api.get_Vm()
+        
+        data_point = [_t.time()-self.t0]
+        
+        # Update the labels and plot
+        if Vp == None: 
+            self.tab_power.label_Vp.set_text('(not measured)').set_colors('red')
+        else: 
+            self.tab_power.label_Vp.set_text('%.3f V' % Vp).set_colors('black')
+            data_point.append(Vp)
+            
+        if Vm == None: 
+            self.tab_power.label_Vm.set_text('(not measured)').set_colors('red')            
+        else:          
+            self.tab_power.label_Vm.set_text('%.3f V' % Vm).set_colors('black')
+            data_point.append(Vm)
+        
+        # Add it to the history
+        self.tab_power.plot.append_data_point(data_point, ['t-t0', 'V+', 'V-'])
+        self.tab_power.plot.plot()
+        
+    
+    def _power_settings_changed(self, *a):
+        """
+        Called whenever someone changes a setting in the power tab.
+        """
+        if self.tab_power.button_enable_Vp.is_checked(): Vp = self.tab_power.number_set_Vp.get_value()
+        else: Vp = 0
+        
+        if self.tab_power.button_enable_Vm.is_checked(): Vm = self.tab_power.number_set_Vm.get_value()
+        else: Vm = 0
+        
+        self.api.set_Vp(Vp)
+        self.api.set_Vm(Vm)
+        
+        return
+        
     def _button_connect_clicked(self, *a):
         """
         Called when someone clicks the "connect" button.
@@ -289,17 +405,28 @@ class adalm2000():
         
         # Otherwise, give some information
         else:
-            self.label_status.set_text('')
+            self.label_status.set_text(self.api.get_infostring())
+            self.label_status.set_colors('blue')
         
         # For now, just disable these
         self.button_connect.disable()
         self.combo_contexts.disable()
         self.tabs.enable()
         
+        # Reset the power supply
+        self._power_settings_changed()
+        
+        # Start the timer
+        self.tab_power.timer.start()
+        self.t0 = _t.time()
+        
+        
     def _adc_button_acquire_clicked(self, *a):
         """
         Called when someone clicks the "acquire" button on the ADC tab.
         """
+        # If we just turned it off, poop out instead of starting another loop.
+        if not self.tab_adc.button_acquire.is_checked(): return
         
         # Easy coding
         s  = self.tab_adc.settings
@@ -329,10 +456,14 @@ class adalm2000():
             ts = _n.linspace(0, (s['Samples']-1)/rate, s['Samples'])
             
             # Get the data
-            vs = self.api.get_voltages(s['Samples'])
+            vs = self.api.get_adc_voltages(s['Samples'])
             
-            # Send to plotter
+            # Clear and send the current settings to plotter
             p.clear()
+            s.send_to_databox_header(p)
+            p.h(t=_t.time()-self.t0, t0=self.t0)
+            
+            # Add columns
             p['Time(s)'] = ts
             for i in range(len(vs)): p['V'+str(i+1)] = vs[i]
     
