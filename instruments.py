@@ -124,6 +124,9 @@ class adalm2000_api():
             self.adc.enableChannel(0, True)
             self.adc.enableChannel(1, True)
         
+        # Stop acquisition ("Destroy the buffer and stop acquisition.")
+        self.adc.stopAcquisition()
+        
         # Send it back
         return self.adc.getSamples(int(samples))
     
