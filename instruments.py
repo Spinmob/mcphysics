@@ -33,54 +33,28 @@ def _debug(*a):
         for x in a: s.append(str(x))
         print(', '.join(s))
 
-
-
-class adalm2000_api():
+class _adalm2000_object():
     """
-    Class for talking to an ADALM2000.
+    Base class for higher-level apis.
     
     Parameters
     ----------
-    name : str
-        Short name ('uri') of the device to open, e.g., 'usb:2.11.5'.
+    api
+        Instance of api returned by, e.g., m2k.getPowerSupply(). If None,
+        simulation mode.
     """
-    def __init__(self, name):
-        
-        # If the import failed, _m2k = None
-        if _m2k == None: 
-            print('You need to install libiio for ADALM2000 to work.')
-            self.simulation_mode = True
-        
-        # Assume it's working.
-        else:
-            # Open the connection
-            print('Opening', name)
-            try:
-                self.m2k = _m2k.contextOpen(name).toM2k()
-            
-                # Get the adc
-                self.adc = self.m2k.getAllAnalogIn()[0]
-                
-                # Get the power supply
-                self.power = self.m2k.getPowerSupply()
-                
-                # Run the calibration
-                print('Calibrating...')
-                self.m2k.calibrate()
-                
-                # Not simulation mode
-                self.simulation_mode = False
-    
-            # If anything goes wrong, simulation mode
-            except:
-                self.simulation_mode = True
-    
+    def __init__(self, api):
+        self.more = api
+        self.simulation_mode = api == None
+
+class _adalm2000_adc(_adalm2000_object):
+
     def get_sample_rate(self):
         """
         Returns the current sample rate.
         """
         if self.simulation_mode: return 1e7
-        else:                    return self.adc.getSampleRate()
+        else:                    return self.more.getSampleRate()
     
     def set_sample_rate(self, sample_rate=100e6):
         """
@@ -95,10 +69,10 @@ class adalm2000_api():
         -------
         self
         """
-        if not self.simulation_mode: self.adc.setSampleRate(sample_rate)
+        if not self.simulation_mode: self.more.setSampleRate(sample_rate)
         return self
         
-    def get_adc_voltages(self, samples=8192):
+    def get_samples(self, samples=8192):
         """
         Queries the analog-to-digital converter, returning an array of voltages
         for each channel. If no channels are enabled, this enables both by 
@@ -120,50 +94,16 @@ class adalm2000_api():
         if self.simulation_mode: return (_n.random.normal(size=samples), _n.random.normal(size=samples))
         
         # If neither are enabled, enable them both.
-        if not self.adc.isChannelEnabled(0) and not self.adc.isChannelEnabled(1):
-            self.adc.enableChannel(0, True)
-            self.adc.enableChannel(1, True)
+        if not self.more.isChannelEnabled(0) and not self.more.isChannelEnabled(1):
+            self.more.enableChannel(0, True)
+            self.more.enableChannel(1, True)
         
         # Stop acquisition ("Destroy the buffer and stop acquisition.")
-        self.adc.stopAcquisition()
+        self.more.stopAcquisition()
         
         # Send it back
-        return self.adc.getSamples(int(samples))
+        return self.more.getSamples(int(samples))
     
-    def get_infostring(self):
-        """
-        Returns an info string for this device.
-        """
-        return 'ADALM2000 Firmware '+self.m2k.getFirmwareVersion()+', S/N '+self.m2k.getSerialNumber() + ' <-- Memorize this.'
-    
-    def get_Vp(self):
-        """
-        Returns the current value of V+ on the power supply.
-        """
-        return self.power.readChannel(0)
-    
-    def get_Vm(self):
-        """
-        Returns the current value of V- on the power supply.
-        """
-        return self.power.readChannel(1)
-    
-    def set_Vp(self, Vp):
-        """
-        Sets V+.
-        """
-        self.power.enableChannel(0, True)
-        self.power.pushChannel  (0, Vp)
-        return self
-    
-    def set_Vm(self, Vm):
-        """
-        Sets V-.
-        """
-        self.power.enableChannel(1, True)
-        self.power.pushChannel  (1, Vm)
-        return self
-        
     def set_range_big(self, channel1=None, channel2=None):
         """
         Set the channel ranges to "big" mode (+/-25V). Specifying None leaves
@@ -186,12 +126,12 @@ class adalm2000_api():
         if self.simulation_mode: return self
         
         if channel1 is not None: 
-            if channel1: self.adc.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_25V)
-            else:        self.adc.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_2_5V)
+            if channel1: self.more.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_25V)
+            else:        self.more.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_2_5V)
         
         if channel2 is not None:
-            if channel2: self.adc.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_25V)
-            else:        self.adc.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_2_5V)
+            if channel2: self.more.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_25V)
+            else:        self.more.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_2_5V)
         
         return self
     
@@ -215,15 +155,104 @@ class adalm2000_api():
 
         """
         if channel1 is not None: 
-            if channel1: self.adc.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_2_5V)
-            else:        self.adc.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_25V)
+            if channel1: self.more.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_2_5V)
+            else:        self.more.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_25V)
         
         if channel2 is not None:
-            if channel2: self.adc.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_2_5V)
-            else:        self.adc.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_25V)
+            if channel2: self.more.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_2_5V)
+            else:        self.more.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_25V)
         
         return self
-      
+
+class _adalm2000_power(_adalm2000_object):
+    
+    def get_Vp(self):
+        """
+        Returns the current value of V+ on the power supply.
+        """
+        if self.simulation_mode: return _n.random.rand()-0.5
+        return self.more.readChannel(0)
+    
+    def get_Vm(self):
+        """
+        Returns the current value of V- on the power supply.
+        """
+        if self.simulation_mode: return _n.random.rand()-0.5
+        else:                    return self.more.readChannel(1)
+    
+    def set_Vp(self, Vp):
+        """
+        Sets V+.
+        """
+        if not self.simulation_mode:
+            self.more.enableChannel(0, True)
+            self.more.pushChannel  (0, Vp)
+        return self
+    
+    def set_Vm(self, Vm):
+        """
+        Sets V-.
+        """
+        if not self.simulation_mode:
+            self.more.enableChannel(1, True)
+            self.more.pushChannel  (1, Vm)
+        return self
+
+class adalm2000_api():
+    """
+    Class for talking to an ADALM2000.
+    
+    Parameters
+    ----------
+    name : str
+        Short name ('uri') of the device to open, e.g., 'usb:2.11.5'.
+    """
+    def __init__(self, name):
+        
+        # If the import failed, _m2k = None
+        if _m2k == None: 
+            print('You need to install libiio and libm2k for ADALM2000 to work.')
+            self.simulation_mode = True
+        
+        # Assume it's working.
+        else:
+            # Open the connection
+            print('Opening', name)
+            
+            # If we are trying to open a real object
+            if not name == "Simulation":
+
+                # Create the m2k handle
+                self.m2k = _m2k.contextOpen(name).toM2k()
+            
+                # Get the adc
+                self.adc = _adalm2000_adc(self.m2k.getAllAnalogIn()[0])
+                
+                # Get the power supply
+                self.power = _adalm2000_power(self.m2k.getPowerSupply())
+                
+                # Run the calibration
+                print('Calibrating...')
+                self.m2k.calibrate()
+                
+                # Not simulation mode
+                self.simulation_mode = False
+    
+            # If anything goes wrong, simulation mode
+            else:
+                self.adc   = _adalm2000_adc(None)   # Simulated adc
+                self.power = _adalm2000_power(None) # Simulated power supply
+                self.simulation_mode = True
+    
+    def get_infostring(self):
+        """
+        Returns an info string for this device.
+        """
+        return 'ADALM2000 Firmware '+self.m2k.getFirmwareVersion()+', S/N '+self.m2k.getSerialNumber() + ' <-- Memorize this.'
+    
+
+        
+    
 class adalm2000():
     """
     Graphical interface for an ADALM2000.
@@ -295,8 +324,36 @@ class adalm2000():
         #s.add_parameter('Channel_1', True, tip='Enable Channel 1')
         #s.add_parameter('Channel_2', True, tip='Enable Channel 2')
 
-        s.add_parameter('Channel_1/Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages')
-        s.add_parameter('Channel_2/Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages')
+        s.add_parameter('Trigger_Source', [
+            'Ch1',
+            'Ch2',
+            'Ch1 or Ch2',
+            'Ch1 and Ch2',
+            'Ch1 xor Ch2',
+            'Digital In',
+            'Ch1 or Logic',
+            'Ch2 or Logic',
+            'Ch1 or Ch2 or Logic'
+            ], tip='Which source to use for triggering an acquisition.')
+
+        s.add_parameter('Trigger_Out', [
+            'None',
+            'Same Channel',
+            'Trigger In',
+            'Analog In',
+            'Digital In'
+            ], tip='Which source to use for triggering an acquisition.')
+        
+        s.add_parameter('Channel_1/Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages.')
+        s.add_parameter('Channel_2/Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages.')
+        
+        s.add_parameter('Channel_1/Trigger/Condition', ['Rising', 'Falling', 'Low Level', 'High Level'], tip='Type of trigger for this channel')
+        s.add_parameter('Channel_2/Trigger/Condition', ['Rising', 'Falling', 'Low Level', 'High Level'], tip='Type of trigger for this channel')
+        
+        s.add_parameter('Channel_1/Trigger/Level', 0.0, limits=(-25, 25), step=0.1, suffix='V', siPrefix=True, tip='Trigger level (Volts).')
+        s.add_parameter('Channel_2/Trigger/Level', 0.0, limits=(-25, 25), step=0.1, suffix='V', siPrefix=True, tip='Trigger level (Volts).')
+        
+        
         
         # Formatting
         self.tab_adc.set_row_stretch(1)
@@ -352,8 +409,8 @@ class adalm2000():
         Vp = Vm = None
         
         # Read if we're supposed to
-        if self.tab_power.button_monitor_Vp.is_checked(): Vp = self.api.get_Vp()
-        if self.tab_power.button_monitor_Vm.is_checked(): Vm = self.api.get_Vm()
+        if self.tab_power.button_monitor_Vp.is_checked(): Vp = self.api.power.get_Vp()
+        if self.tab_power.button_monitor_Vm.is_checked(): Vm = self.api.power.get_Vm()
         
         data_point = [_t.time()-self.t0]
         
@@ -385,8 +442,8 @@ class adalm2000():
         if self.tab_power.button_enable_Vm.is_checked(): Vm = self.tab_power.number_set_Vm.get_value()
         else: Vm = 0
         
-        self.api.set_Vp(Vp)
-        self.api.set_Vm(Vm)
+        self.api.power.set_Vp(Vp)
+        self.api.power.set_Vm(Vm)
         
         return
         
@@ -394,12 +451,15 @@ class adalm2000():
         """
         Called when someone clicks the "connect" button.
         """
-
         # Get the adalm2000's URI
         uri = self.combo_contexts.get_text()
         
         # Connect!
         self.api = adalm2000_api(uri)
+        
+        # Easier coding
+        self.adc   = self.api.adc
+        self.power = self.api.power
         
         # If simulation mode, make this clear
         if self.api.simulation_mode:
@@ -449,17 +509,24 @@ class adalm2000():
         
             # Set the sampling rate
             rate = float(s['Rate(MHz)'])*1e6
-            self.api.set_sample_rate(rate)
+            self.adc.set_sample_rate(rate)
             
             # Set the ranges
-            self.api.set_range_big(s['Channel_1/Range']=='+/-25V',
+            self.adc.set_range_big(s['Channel_1/Range']=='+/-25V',
                                    s['Channel_2/Range']=='+/-25V')        
+            
+            # Set the trigger source, out, conditions, and levels
+            self.adc.set_trigger_source()
+            self.adc.set_trigger_out   ()
+            self.adc.set_trigger_conditions()
+            self.adc.set_trigger_levels()
+            
             
             # Get the time array
             ts = _n.linspace(0, (s['Samples']-1)/rate, s['Samples'])
             
             # Get the data
-            vs = self.api.get_adc_voltages(s['Samples'])
+            vs = self.adc.get_samples(s['Samples'])
             
             # Clear and send the current settings to plotter
             p.clear()
