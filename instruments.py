@@ -324,6 +324,8 @@ class adalm2000():
         #s.add_parameter('Channel_1', True, tip='Enable Channel 1')
         #s.add_parameter('Channel_2', True, tip='Enable Channel 2')
 
+        # Note these lists MUST be in this order; their indices are 
+        # constants defined by libm2k: https://analogdevicesinc.github.io/libm2k/enums_8hpp.html
         s.add_parameter('Trigger_Source', [
             'Ch1',
             'Ch2',
