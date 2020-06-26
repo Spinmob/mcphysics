@@ -2,7 +2,7 @@
 #  Install Rhode & Schwarz VISA or NI-VISA
 #  pip install pyvisa
 #  Name the scope something reasonable in OpenChoice Instrument Manager
-# 
+#
 # Linux
 #  pip install pyvisa pyvisa-py
 #  Let me know if you find out how to name the scope.
@@ -28,7 +28,7 @@ _p = _traceback.print_last
 
 _debug_enabled = False
 def _debug(*a):
-    if _debug_enabled: 
+    if _debug_enabled:
         s = []
         for x in a: s.append(str(x))
         print(', '.join(s))
@@ -36,7 +36,7 @@ def _debug(*a):
 class _adalm2000_object():
     """
     Base class for higher-level apis.
-    
+
     Parameters
     ----------
     api
@@ -47,7 +47,7 @@ class _adalm2000_object():
         self.more = api
         self.simulation_mode = api == None
 
-class _adalm2000_adc(_adalm2000_object):
+class _adalm2000_analog_in(_adalm2000_object):
 
     def get_sample_rate(self):
         """
@@ -55,55 +55,56 @@ class _adalm2000_adc(_adalm2000_object):
         """
         if self.simulation_mode: return 1e7
         else:                    return self.more.getSampleRate()
-    
+
     def set_sample_rate(self, sample_rate=100e6):
         """
         Sets the sample rate in Hz.
-        
+
         Parameters
         ----------
         sample_rate=100e6 : float, optional
             Sample rate in Hz.
-            
+
         Returns
         -------
-        self
+        Actual sample rate
         """
         if not self.simulation_mode: self.more.setSampleRate(sample_rate)
-        return self
-        
+        return self.more.getSampleRate()
+
     def get_samples(self, samples=8192):
         """
         Queries the analog-to-digital converter, returning an array of voltages
-        for each channel. If no channels are enabled, this enables both by 
+        for each channel. If no channels are enabled, this enables both by
         default.
 
         Parameters
         ----------
         samples : integer, optional
             DESCRIPTION. The default is 8192.
-            Number of samples to ask for. If you ask for more than the 
+            Number of samples to ask for. If you ask for more than the
             onboard memory (8192), you may run into buffering issues, limited
             by the usb transfer rate. That being said, I have been able to
             get a million points at 100 MHz sampling rate before.
 
         Returns
         -------
-        List of voltage arrays, one for each channel.
+        List of voltage arrays, one for each channel, or None if there is a timeout.`
         """
         if self.simulation_mode: return (_n.random.normal(size=samples), _n.random.normal(size=samples))
-        
+
         # If neither are enabled, enable them both.
         if not self.more.isChannelEnabled(0) and not self.more.isChannelEnabled(1):
             self.more.enableChannel(0, True)
             self.more.enableChannel(1, True)
-        
+
         # Stop acquisition ("Destroy the buffer and stop acquisition.")
         self.more.stopAcquisition()
-        
+
         # Send it back
-        return self.more.getSamples(int(samples))
-    
+        try:    return self.more.getSamples(int(samples))
+        except: return None
+
     def set_range_big(self, channel1=None, channel2=None):
         """
         Set the channel ranges to "big" mode (+/-25V). Specifying None leaves
@@ -124,17 +125,17 @@ class _adalm2000_adc(_adalm2000_object):
 
         """
         if self.simulation_mode: return self
-        
-        if channel1 is not None: 
+
+        if channel1 is not None:
             if channel1: self.more.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_25V)
             else:        self.more.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_2_5V)
-        
+
         if channel2 is not None:
             if channel2: self.more.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_25V)
             else:        self.more.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_2_5V)
-        
+
         return self
-    
+
     def set_range_small(self, channel1=None, channel2=None):
         """
         Set the channel ranges to "small" mode (+/-25V). Specifying None leaves
@@ -154,32 +155,294 @@ class _adalm2000_adc(_adalm2000_object):
         self
 
         """
-        if channel1 is not None: 
+        if channel1 is not None:
             if channel1: self.more.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_2_5V)
             else:        self.more.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_25V)
-        
+
         if channel2 is not None:
             if channel2: self.more.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_2_5V)
             else:        self.more.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_25V)
-        
+
+        return self
+
+
+    def set_trigger_modes(self, mode1, mode2):
+        """
+        Set the trigger mode. Trigger modes for channels 1 and 2 (mode1 and mode2)
+        are integers corresponding to the following:
+
+            0: Immediate trigger (always)
+            1: Analog Condition
+            2: External
+            3: Digital or Analog
+            4: Digital and Analog
+            5: Digital xor Analog
+            6: N Digital or Analog
+            7: N Digital and Analog
+            8: N Digital xor Analog
+
+        Parameters
+        ----------
+        mode1 : int
+            Trigger mode for channel 1
+        mode2 : int
+            Trigger mode for channel 2
+
+
+        Returns
+        -------
+        self
+        """
+        if not self.simulation_mode:
+            self.more.getTrigger().setAnalogMode(0,mode1)
+            self.more.getTrigger().setAnalogMode(1,mode2)
+        return self
+
+    def set_trigger_in(self, source):
+        """
+        Sets the hardware trigger source.
+
+        Parameters
+        ----------
+        source : int
+            Integer value indicating the trigger source.
+            0: 'Ch1',
+            1: 'Ch2',
+            2: 'Ch1 or Ch2',
+            3: 'Ch1 and Ch2',
+            4: 'Ch1 xor Ch2',
+            5: 'Digital In',
+            6: 'Ch1 or Logic',
+            7: 'Ch2 or Logic',
+            8: 'Ch1 or Ch2 or Logic'
+
+        Returns
+        -------
+        self
+        """
+        if not self.simulation_mode: self.more.getTrigger().setAnalogSource(source)
+        return self
+
+    def set_trigger_out(self, source):
+        """
+        Selects which trigger event will be forwarded to the TO pin.
+
+        Parameters
+        ----------
+        source : int
+            Integer value indicating the trigger out terminal.
+            0: 'None',
+            1: 'Same Channel',
+            2: 'Trigger In',
+            3: 'Analog In',
+            4: 'Digital In',
+
+        Returns
+        -------
+        self
+        """
+        if not self.simulation_mode: self.more.getTrigger().setAnalogExternalOutSelect(source)
+        return self
+
+    def set_trigger_conditions(self, condition1, condition2):
+        """
+        Sets the trigger conditions for the two channels. Each integer
+        specifier (condition1 and condition2) can take values from 0 to 3, with this meaning:
+            0: Rising edge
+            1: Falling edge
+            2: Low level
+            3: High level
+
+        Parameters
+        ----------
+        condition1 : int
+            Integer specifying the trigger condition for channel 1.
+        condition2 : int
+            Integer specifying the trigger condition for channel 2.
+
+        Returns
+        -------
+        self
+
+        """
+        if not self.simulation_mode:
+            t = self.more.getTrigger()
+            t.setAnalogCondition(0, condition1)
+            t.setAnalogCondition(1, condition2)
+
+        return self
+
+    def get_trigger_levels(self):
+        """
+        Returns the trigger levels (Volts) in a tuple.
+        """
+        if self.simulation_mode: return 0,0
+        else:
+            t = self.more.getTrigger()
+            return t.getAnalogLevel(0), t.getAnalogLevel(1)
+
+
+    def set_trigger_levels(self, V1, V2):
+        """
+        Sets the trigger levels for the two channels.
+
+        Parameters
+        ----------
+        V1 : float
+            Trigger voltage level for channel 1
+        V2 : float
+            Trigger voltage level for channel 2
+
+        Returns
+        -------
+        self
+
+        """
+        if not self.simulation_mode:
+            t = self.more.getTrigger()
+            t.setAnalogLevel(0, V1)
+            t.setAnalogLevel(1, V2)
+
+        return self
+
+    def set_trigger_hystereses(self, V1, V2):
+        """
+        Set the voltage hysteresis for the two channels.
+
+        Parameters
+        ----------
+        V1 : float
+            Voltage hysteresis for channel 1's trigger.
+        V2 : float
+            Voltage hysteresis for channel 2's trigger.
+
+        Returns
+        -------
+        self
+        """
+        if not self.simulation_mode:
+            t = self.more.getTrigger()
+            t.setAnalogHysteresis(0, V1)
+            t.setAnalogHysteresis(1, V1)
+        return self
+
+class _adalm2000_analog_out(_adalm2000_object):
+
+    def get_sample_rates(self):
+        """
+        Returns the sample rates for each channel as tuple.
+        """
+        if not self.simulation_mode: return self.more.getSampleRate(0), self.more.getSampleRate(1)
+        else: return 100.0, 100.0
+
+    def set_sample_rates(self, sample_rate1, sample_rate2):
+        """
+        Sets the analog out sample rate.
+
+        Parameters
+        ----------
+        sample_rate1 : float
+            Rate (Hz) for analog out 1.
+        sample_rate2 : float
+            Rate (Hz) for analog out 2.
+
+        Returns
+        -------
+        Actual sample rate
+        """
+        if not self.simulation_mode:
+            self.more.setSampleRate(0, sample_rate1)
+            self.more.setSampleRate(1, sample_rate2)
+        return self.get_sample_rates()
+
+    def get_enabled(self):
+        """
+        Returns the enabled state of each channel.
+        """
+        if self.simulation_mode: return True, True
+        return self.more.isChannelEnabled(0), self.more.isChannelEnabled(1)
+
+    def set_enabled(self, enable1, enable2):
+        """
+        Sets which channels are enabled.
+
+        Parameters
+        ----------
+        enable1 : bool
+            Whether channel 1 is enabled.
+        enable2 : bool
+            Whether channel 2 is enabled.
+
+        Returns
+        -------
+        The enabled states (self.get_enabled())
+        """
+        if not self.simulation_mode:
+            self.more.enableChannel(0, enable1)
+            self.more.enableChannel(1, enable2)
+        return self.get_enabled()
+
+    def get_cyclic(self):
+        """
+        Returns the cyclic state of both channels as tuple.
+        """
+        if self.simulation_mode: return True, True
+        return self.more.getCyclic(0), self.more.getCyclic(1)
+
+    def set_cyclic(self, cyclic1, cyclic2):
+        """
+        Sets the cyclic mode for each channel.
+
+        Parameters
+        ----------
+        cyclic1 : bool
+            Whether channel 1 is cyclic.
+        cyclic2 : bool
+            Whether channel 2 is cyclic.
+
+        Returns
+        -------
+        The cyclic state of each.
+        """
+        if not self.simulation_mode:
+            self.more.setCyclic(0, cyclic1)
+            self.more.setCyclic(1, cyclic2)
+        return self.get_cyclic()
+
+    def send_samples(self, channel, samples):
+        """
+        Sends the samples to a given output channel.
+
+        Parameters
+        ----------
+        channel : int
+            Output channel number (1 or 2) to send the samples to.
+        samples : 1D array
+            Voltages for this output channel.
+
+        Returns
+        -------
+        self
+        """
+        if not self.simulation_mode: self.more.push(channel-1, samples)
         return self
 
 class _adalm2000_power(_adalm2000_object):
-    
+
     def get_Vp(self):
         """
         Returns the current value of V+ on the power supply.
         """
         if self.simulation_mode: return _n.random.rand()-0.5
         return self.more.readChannel(0)
-    
+
     def get_Vm(self):
         """
         Returns the current value of V- on the power supply.
         """
         if self.simulation_mode: return _n.random.rand()-0.5
         else:                    return self.more.readChannel(1)
-    
+
     def set_Vp(self, Vp):
         """
         Sets V+.
@@ -188,7 +451,7 @@ class _adalm2000_power(_adalm2000_object):
             self.more.enableChannel(0, True)
             self.more.pushChannel  (0, Vp)
         return self
-    
+
     def set_Vm(self, Vm):
         """
         Sets V-.
@@ -201,62 +464,74 @@ class _adalm2000_power(_adalm2000_object):
 class adalm2000_api():
     """
     Class for talking to an ADALM2000.
-    
+
     Parameters
     ----------
     name : str
         Short name ('uri') of the device to open, e.g., 'usb:2.11.5'.
     """
     def __init__(self, name):
-        
+
         # If the import failed, _m2k = None
-        if _m2k == None: 
+        if _m2k == None:
             print('You need to install libiio and libm2k for ADALM2000 to work.')
             self.simulation_mode = True
-        
+
         # Assume it's working.
         else:
             # Open the connection
             print('Opening', name)
-            
+
             # If we are trying to open a real object
             if not name == "Simulation":
 
                 # Create the m2k handle
                 self.m2k = _m2k.contextOpen(name).toM2k()
-            
-                # Get the adc
-                self.adc = _adalm2000_adc(self.m2k.getAllAnalogIn()[0])
-                
-                # Get the power supply
-                self.power = _adalm2000_power(self.m2k.getPowerSupply())
-                
+
+                # Get the ai, ao, and power.
+                self.ai    = _adalm2000_analog_in (self.m2k.getAnalogIn())
+                self.ao    = _adalm2000_analog_out(self.m2k.getAnalogOut())
+                self.power = _adalm2000_power     (self.m2k.getPowerSupply())
+
                 # Run the calibration
                 print('Calibrating...')
                 self.m2k.calibrate()
-                
+
                 # Not simulation mode
                 self.simulation_mode = False
-    
+
             # If anything goes wrong, simulation mode
             else:
-                self.adc   = _adalm2000_adc(None)   # Simulated adc
+                self.ai   = _adalm2000_analog_in(None)   # Simulated ai
                 self.power = _adalm2000_power(None) # Simulated power supply
                 self.simulation_mode = True
-    
+
     def get_infostring(self):
         """
         Returns an info string for this device.
         """
         return 'ADALM2000 Firmware '+self.m2k.getFirmwareVersion()+', S/N '+self.m2k.getSerialNumber() + ' <-- Memorize this.'
-    
 
-        
-    
+    def set_timeout(self, timeout_ms):
+        """
+        Set's the timeout for input/output operations.
+
+        Parameters
+        ----------
+        timeout_ms : int
+            Integer number of milliseconds before it gives up.
+
+        Returns
+        -------
+        self
+        """
+        self.m2k.setTimeout(timeout_ms)
+
+
 class adalm2000():
     """
     Graphical interface for an ADALM2000.
-    
+
     Parameters
     ----------
     name : str, optional
@@ -265,13 +540,13 @@ class adalm2000():
         Could be "Carl" for example.
     """
     def __init__(self, name='adalm2000'):
-        
+
         # If the import failed, _m2k = None
         if _m2k == None: print('You need to install libiio and libm2k to use an ADALM2000.')
-        
+
         # Remember the name
         self.name = name
-        
+
         # Build the graphical user interface
         self._build_gui()
 
@@ -280,53 +555,124 @@ class adalm2000():
         """
         Builds the graphical interface
         """
-        
+
         # Create the window
         w = self.window = _g.Window('ADALM2000', autosettings_path=self.name+'_window')
-        
+
         # Top row for connection interface, bottom row for data taking
         gt = self._grid_top    = w.add(_g.GridLayout(margins=False), column=1, row=1, alignment=0)
         gb = self._grid_bottom = w.add(_g.GridLayout(margins=False), column=1, row=2, alignment=0)
-        
+
         # Add a combo box for all the available devices and a button to connect
         contexts = list(_m2k.getAllContexts())
-        #else:    contexts = []
         contexts.append('Simulation')
         self.combo_contexts = gt.add(_g.ComboBox(contexts))
         self.button_connect = gt.add(_g.Button('Connect', checkable=True))
         self.label_status   = gt.add(_g.Label(''))
         gt.set_column_stretch(2)
-        
+
         # Add tabs for the different devices on the adalm2000
         self.tabs = gb.add(_g.TabArea(self.name+'_tabarea'), alignment=0)
-        
+
+        # Add the tabs for the different functionalities
+        self._build_tab_analog_in()
+        self._build_tab_analog_out()
+        self._build_tab_power()
+
+        # Disable the tabs until we connect
+        self.tabs.disable()
+
+        # Let's see it!
+        self.window.show()
+
+    def _build_tab_power(self):
+        """
+        Populates the power tab.
+        """
+        # Power tab
+        self.tab_power = self.tabs.add_tab('Power Supply')
+        self.tab_power.number_set_Vp    = self.tab_power.add(_g.NumberBox(5, 1, (0,5), suffix='V', siPrefix=True))
+        self.tab_power.button_enable_Vp = self.tab_power.add(_g.Button('Enable V+', checkable=True))
+        self.tab_power.button_monitor_Vp= self.tab_power.add(_g.Button('Monitor',   checkable=True, checked=True))
+        self.tab_power.label_Vp         = self.tab_power.add(_g.Label(''))
+
+        self.tab_power.new_autorow()
+        self.tab_power.number_set_Vm    = self.tab_power.add(_g.NumberBox(-5, 1, (-5,0), suffix='V', siPrefix=True))
+        self.tab_power.button_enable_Vm = self.tab_power.add(_g.Button('Enable V-', checkable=True))
+        self.tab_power.button_monitor_Vm= self.tab_power.add(_g.Button('Monitor',   checkable=True, checked=True))
+        self.tab_power.label_Vm         = self.tab_power.add(_g.Label(''))
+
+        self.tab_power.new_autorow()
+        self.tab_power.plot = self.tab_power.add(_g.DataboxPlot("*.txt", autosettings_path=self.name+'_tab_power.plot'), alignment=0, column_span=4)
+
+        # Formatting
+        self.tab_power.set_column_stretch(3)
+        self.tab_power.set_row_stretch(2)
+
+        # Connect all the signals
+        self.button_connect              .signal_clicked.connect(self._button_connect_clicked)
+        self.tab_power.number_set_Vp     .signal_changed.connect(self._power_settings_changed)
+        self.tab_power.number_set_Vm     .signal_changed.connect(self._power_settings_changed)
+        self.tab_power.button_enable_Vp  .signal_clicked.connect(self._power_settings_changed)
+        self.tab_power.button_enable_Vm  .signal_clicked.connect(self._power_settings_changed)
+
+        # Timer for power update
+        self.tab_power.timer = _g.Timer(500)
+        self.tab_power.timer.signal_tick.connect(self._power_timer_tick)
+
+    def _build_tab_analog_out(self):
+        """
+        Assembles the analog out tab.
+        """
+        self.tab_analog_out =self.tabs.add_tab('Analog Out')
+
+    def _build_tab_analog_in(self):
+        """
+        Builds the innards of the analog in tab.
+        """
         # ADC Tab
-        self.tab_adc = self.tabs.add_tab('ADC')
-        self.tab_adc.button_acquire = self.tab_adc.add(_g.Button('Acquire', checkable=True))
-        self.tab_adc.label_info     = self.tab_adc.add(_g.Label(''))
-        
-        # Add sub-tabs for adc plot & analysis
-        self.tab_adc.tabs     = self.tab_adc.add(_g.TabArea(autosettings_path=self.name+'_adc_tabs'), 3,0, alignment=0, row_span=2)
-        self.tab_adc.tab_raw  = self.tab_adc.tabs.add_tab('Raw Voltages')
-        self.tab_adc.plot_raw = self.tab_adc.tab_raw.add(_g.DataboxPlot('*.raw', autosettings_path=self.name+'_adc_plot_raw'), alignment=0)
-        self.tab_adc.tab_processor = self.tab_adc.tabs.add_tab('Processor')
-        self.tab_adc.processor  = self.tab_adc.tab_processor.add(_g.DataboxProcessor(self.name+'_processor1', self.tab_adc.plot_raw, '*.txt') , alignment=0)
-        self.tab_adc.new_autorow()
-        
+        self.tab_analog_in = self.tabs.add_tab('Analog In')
+        self.tab_analog_in.button_acquire = self.tab_analog_in.add(_g.Button('Acquire', checkable=True))
+        self.tab_analog_in.button_onair   = self.tab_analog_in.add(_g.Button('On Air',  checkable=True))
+        self.tab_analog_in.label_info     = self.tab_analog_in.add(_g.Label(''))
+
+        # Add sub-tabs for ai plot & analysis
+        self.tab_analog_in.tabs     = self.tab_analog_in.add(_g.TabArea(autosettings_path=self.name+'_adc_tabs'), 3,0, alignment=0, row_span=2)
+
+        self.tab_analog_in.tab_raw  = self.tab_analog_in.tabs.add_tab('Raw Voltages')
+        self.tab_analog_in.plot_raw = self.tab_analog_in.tab_raw.add(_g.DataboxPlot('*.raw', autosettings_path=self.name+'_adc_plot_raw'), alignment=0)
+        self.tab_analog_in.plot_raw.ROIs = [_egg.pyqtgraph.InfiniteLine(angle=0, movable=True, pen=(0,2)),
+                                            _egg.pyqtgraph.InfiniteLine(angle=0, movable=True, pen=(1,2))]
+
+        # Some initial data.
+        self.tab_analog_in.plot_raw['t'] = []
+        self.tab_analog_in.plot_raw['V1'] = []
+        self.tab_analog_in.plot_raw['V2'] = []
+        self.tab_analog_in.plot_raw.plot()
+
+
+        self.tab_analog_in.tab_processor = self.tab_analog_in.tabs.add_tab('Processor')
+        self.tab_analog_in.processor  = self.tab_analog_in.tab_processor.add(_g.DataboxProcessor(self.name+'_processor1', self.tab_analog_in.plot_raw, '*.txt') , alignment=0)
+        self.tab_analog_in.new_autorow()
+
         # Settings for the acquisition
-        s = self.tab_adc.settings  = self.tab_adc.add(_g.TreeDictionary(self.name+'_adc_settings'), column_span=3)
+        s = self.tab_analog_in.settings  = self.tab_analog_in.add(_g.TreeDictionary(self.name+'_adc_settings'), column_span=3)
         s.add_parameter('Iterations', 0, tip='How many acquisitions to perform.')
         s.add_parameter('Samples', 1000, limits=(2,None), siPrefix=True, suffix='S', dec=True, tip='How many samples to acquire. 1-8192 guaranteed. \nLarger values possible, depending on USB bandwidth.')
         s.add_parameter('Rate(MHz)', [1e2, 1e1, 1e0, 1e-1, 1e-2, 1e-3], tip='How fast to acquire data (MHz)')
-        
+        s.add_parameter('Timeout', 0.2, limits=(0,None), suffix='s', siPrefix=True, dec=True, tip='How long to wait for a trigger before giving up. 0 means "forever"; be careful with that setting ;).')
+
         # This does not have an effect for some reason, so I disabled it.
         # I notice one cannot disable channels in Scopy either.
-        #s.add_parameter('Channel_1', True, tip='Enable Channel 1')
-        #s.add_parameter('Channel_2', True, tip='Enable Channel 2')
+        #s.add_parameter('Ch1', True, tip='Enable Channel 1')
+        #s.add_parameter('Ch2', True, tip='Enable Channel 2')
 
-        # Note these lists MUST be in this order; their indices are 
+        s.add_parameter('Ch1_Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages.')
+        s.add_parameter('Ch2_Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages.')
+
+        # Note these lists MUST be in this order; their indices are
         # constants defined by libm2k: https://analogdevicesinc.github.io/libm2k/enums_8hpp.html
-        s.add_parameter('Trigger_Source', [
+        s.add_parameter('Trigger/In', [
             'Ch1',
             'Ch2',
             'Ch1 or Ch2',
@@ -338,258 +684,295 @@ class adalm2000():
             'Ch1 or Ch2 or Logic'
             ], tip='Which source to use for triggering an acquisition.')
 
-        s.add_parameter('Trigger_Out', [
+        s.add_parameter('Trigger/Out', [
             'None',
             'Same Channel',
             'Trigger In',
             'Analog In',
             'Digital In'
             ], tip='Which source to use for triggering an acquisition.')
-        
-        s.add_parameter('Channel_1/Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages.')
-        s.add_parameter('Channel_2/Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages.')
-        
-        s.add_parameter('Channel_1/Trigger/Condition', ['Rising', 'Falling', 'Low Level', 'High Level'], tip='Type of trigger for this channel')
-        s.add_parameter('Channel_2/Trigger/Condition', ['Rising', 'Falling', 'Low Level', 'High Level'], tip='Type of trigger for this channel')
-        
-        s.add_parameter('Channel_1/Trigger/Level', 0.0, limits=(-25, 25), step=0.1, suffix='V', siPrefix=True, tip='Trigger level (Volts).')
-        s.add_parameter('Channel_2/Trigger/Level', 0.0, limits=(-25, 25), step=0.1, suffix='V', siPrefix=True, tip='Trigger level (Volts).')
-        
-        
-        
+
+        s.add_parameter('Trigger/Ch1', [
+            'Immediate',
+            'Analog',
+            'External',
+            'Digital or Analog',
+            'Digital and Analog',
+            'Digital xor Analog',
+            'N Digital or Analog',
+            'N Digital and Analog',
+            'N Digital xor Analog'
+            ], tip='Trigger mode.')
+
+        s.add_parameter('Trigger/Ch2', [
+            'Immediate',
+            'Analog',
+            'External',
+            'Digital or Analog',
+            'Digital and Analog',
+            'Digital xor Analog',
+            'N Digital or Analog',
+            'N Digital and Analog',
+            'N Digital xor Analog'
+            ], tip='Trigger mode.')
+
+        s.add_parameter('Trigger/Ch1/Condition', ['Rising', 'Falling', 'Low Level', 'High Level'], tip='Type of trigger for this channel')
+        s.add_parameter('Trigger/Ch2/Condition', ['Rising', 'Falling', 'Low Level', 'High Level'], tip='Type of trigger for this channel')
+
+        s.add_parameter('Trigger/Ch1/Level', 0.0, step=0.01, suffix='V', siPrefix=True, tip='Trigger level (Volts).')
+        s.add_parameter('Trigger/Ch2/Level', 0.0, step=0.01, suffix='V', siPrefix=True, tip='Trigger level (Volts).')
+
+        s.add_parameter('Trigger/Ch1/Hysteresis', 0.0, limits=(0, 2.5), dec=True, suffix='V', siPrefix=True)
+        s.add_parameter('Trigger/Ch2/Hysteresis', 0.0, limits=(0, 2.5), dec=True, suffix='V', siPrefix=True)
+
         # Formatting
-        self.tab_adc.set_row_stretch(1)
-        self.tab_adc.set_column_stretch(3)
-        
-        
-        
-        # Power tab
-        self.tab_power = self.tabs.add_tab('Power Supply')
-        self.tab_power.number_set_Vp    = self.tab_power.add(_g.NumberBox(5, 1, (0,5), suffix='V', siPrefix=True))
-        self.tab_power.button_enable_Vp = self.tab_power.add(_g.Button('Enable V+', checkable=True))
-        self.tab_power.button_monitor_Vp= self.tab_power.add(_g.Button('Monitor',   checkable=True, checked=True))
-        self.tab_power.label_Vp         = self.tab_power.add(_g.Label(''))
-        
-        self.tab_power.new_autorow()
-        self.tab_power.number_set_Vm    = self.tab_power.add(_g.NumberBox(-5, 1, (-5,0), suffix='V', siPrefix=True))
-        self.tab_power.button_enable_Vm = self.tab_power.add(_g.Button('Enable V-', checkable=True))
-        self.tab_power.button_monitor_Vm= self.tab_power.add(_g.Button('Monitor',   checkable=True, checked=True))
-        self.tab_power.label_Vm         = self.tab_power.add(_g.Label(''))
-        
-        self.tab_power.new_autorow()
-        self.tab_power.plot = self.tab_power.add(_g.DataboxPlot("*.txt", autosettings_path=self.name+'_tab_power.plot'), alignment=0, column_span=4)
-        
-        self.tab_power.set_column_stretch(3)
-        self.tab_power.set_row_stretch(2)
-        
-        # Connect all the signals
-        self.button_connect             .signal_clicked.connect(self._button_connect_clicked)
-        self.tab_adc.button_acquire     .signal_clicked.connect(self._adc_button_acquire_clicked)
-        self.tab_power.number_set_Vp    .signal_changed.connect(self._power_settings_changed)
-        self.tab_power.number_set_Vm    .signal_changed.connect(self._power_settings_changed)
-        self.tab_power.button_enable_Vp .signal_clicked.connect(self._power_settings_changed)
-        self.tab_power.button_enable_Vm .signal_clicked.connect(self._power_settings_changed)
-        
-        # Timer for power update
-        self.tab_power.timer = _g.Timer(500)
-        self.tab_power.timer.signal_tick.connect(self._power_timer_tick)
-        
-        # Disable the tabs until we connect
-        self.tabs.disable()
-        
-        # If you found this, congrats, feel free to comment it out. But you 
+        self.tab_analog_in.set_row_stretch(1)
+        self.tab_analog_in.set_column_stretch(3)
+
+        # Transfer settings to plots etc
+        self._analog_in_settings_changed()
+
+        # Connect all the signals.
+        self.tab_analog_in.button_acquire.signal_clicked.connect(self._analog_in_button_acquire_clicked)
+        self.tab_analog_in.settings.connect_signal_changed('Trigger/Ch1/Level', self._analog_in_settings_changed)
+        self.tab_analog_in.settings.connect_signal_changed('Trigger/Ch2/Level', self._analog_in_settings_changed)
+
+        # Trigger cursors
+        self.tab_analog_in.plot_raw.ROIs[0].sigPositionChangeFinished.connect(self._analog_in_cursor_drag_end)
+        self.tab_analog_in.plot_raw.ROIs[1].sigPositionChangeFinished.connect(self._analog_in_cursor_drag_end)
+
+        # If you found this, congrats, feel free to comment it out. But you'd
         # better make sure you know exactly what it does ;)
-        self.tab_adc.processor.settings.hide_parameter('Average/Error')
-        
-        # Let's see it!
-        self.window.show()
-    
-    def _power_timer_tick(self, *a):
-        """
-        Called whenever the power timer ticks (for updating readings).
-        """
-        Vp = Vm = None
-        
-        # Read if we're supposed to
-        if self.tab_power.button_monitor_Vp.is_checked(): Vp = self.api.power.get_Vp()
-        if self.tab_power.button_monitor_Vm.is_checked(): Vm = self.api.power.get_Vm()
-        
-        data_point = [_t.time()-self.t0]
-        
-        # Update the labels and plot
-        if Vp == None: 
-            self.tab_power.label_Vp.set_text('(not measured)').set_colors('red')
-        else: 
-            self.tab_power.label_Vp.set_text('%.3f V' % Vp).set_colors('black')
-            data_point.append(Vp)
-            
-        if Vm == None: 
-            self.tab_power.label_Vm.set_text('(not measured)').set_colors('red')            
-        else:          
-            self.tab_power.label_Vm.set_text('%.3f V' % Vm).set_colors('black')
-            data_point.append(Vm)
-        
-        # Add it to the history
-        self.tab_power.plot.append_data_point(data_point, ['t-t0', 'V+', 'V-'])
-        self.tab_power.plot.plot()
-        
-    
-    def _power_settings_changed(self, *a):
-        """
-        Called whenever someone changes a setting in the power tab.
-        """
-        if self.tab_power.button_enable_Vp.is_checked(): Vp = self.tab_power.number_set_Vp.get_value()
-        else: Vp = 0
-        
-        if self.tab_power.button_enable_Vm.is_checked(): Vm = self.tab_power.number_set_Vm.get_value()
-        else: Vm = 0
-        
-        self.api.power.set_Vp(Vp)
-        self.api.power.set_Vm(Vm)
-        
-        return
-        
+        self.tab_analog_in.processor.settings.hide_parameter('Average/Error')
+
     def _button_connect_clicked(self, *a):
         """
         Called when someone clicks the "connect" button.
         """
         # Get the adalm2000's URI
         uri = self.combo_contexts.get_text()
-        
+
         # Connect!
         self.api = adalm2000_api(uri)
-        
+
         # Easier coding
-        self.adc   = self.api.adc
-        self.power = self.api.power
-        
+        self.ai  = self.api.ai
+        self.ao = self.api.ao
+        self.power      = self.api.power
+
         # If simulation mode, make this clear
         if self.api.simulation_mode:
             self.label_status.set_text('*** SIMULATION MODE ***')
             self.label_status.set_colors('red')
-        
+
         # Otherwise, give some information
         else:
             self.label_status.set_text(self.api.get_infostring())
             self.label_status.set_colors('blue')
-        
+
         # For now, just disable these
         self.button_connect.disable()
         self.combo_contexts.disable()
         self.tabs.enable()
-        
+
         # Reset the power supply
         self._power_settings_changed()
-        
+
         # Start the timer
         self.tab_power.timer.start()
         self.t0 = _t.time()
-        
-        
-    def _adc_button_acquire_clicked(self, *a):
+
+    def _power_timer_tick(self, *a):
+        """
+        Called whenever the power timer ticks (for updating readings).
+        """
+        Vp = Vm = None
+
+        # Read if we're supposed to
+        if self.tab_power.button_monitor_Vp.is_checked(): Vp = self.api.power.get_Vp()
+        if self.tab_power.button_monitor_Vm.is_checked(): Vm = self.api.power.get_Vm()
+
+        data_point = [_t.time()-self.t0]
+
+        # Update the labels and plot
+        if Vp == None:
+            self.tab_power.label_Vp.set_text('(not measured)').set_colors('red')
+        else:
+            self.tab_power.label_Vp.set_text('%.3f V' % Vp).set_colors('black')
+            data_point.append(Vp)
+
+        if Vm == None:
+            self.tab_power.label_Vm.set_text('(not measured)').set_colors('red')
+        else:
+            self.tab_power.label_Vm.set_text('%.3f V' % Vm).set_colors('black')
+            data_point.append(Vm)
+
+        # Add it to the history
+        self.tab_power.plot.append_data_point(data_point, ['t-t0', 'V+', 'V-'])
+        self.tab_power.plot.plot()
+
+
+    def _power_settings_changed(self, *a):
+        """
+        Called whenever someone changes a setting in the power tab.
+        """
+        if self.tab_power.button_enable_Vp.is_checked(): Vp = self.tab_power.number_set_Vp.get_value()
+        else: Vp = 0
+
+        if self.tab_power.button_enable_Vm.is_checked(): Vm = self.tab_power.number_set_Vm.get_value()
+        else: Vm = 0
+
+        self.api.power.set_Vp(Vp)
+        self.api.power.set_Vm(Vm)
+
+        return
+
+    def _analog_in_settings_changed(self, *a):
+        """
+        Called when specific settings change.
+        """
+        self.tab_analog_in.plot_raw.ROIs[0].setPos((0, self.tab_analog_in.settings['Trigger/Ch1/Level']))
+        self.tab_analog_in.plot_raw.ROIs[1].setPos((0, self.tab_analog_in.settings['Trigger/Ch2/Level']))
+        if(self.button_connect.is_checked()): self._analog_in_cursor_drag_end()
+
+    def _analog_in_cursor_drag_end(self, *a):
+        """
+        Called whenever someone moves a cursor in the analog in tab.
+        """
+        V1 = self.tab_analog_in.plot_raw.ROIs[0].getPos()[1]
+        V2 = self.tab_analog_in.plot_raw.ROIs[1].getPos()[1]
+
+        # Set them on the hardware
+        self.ai.set_trigger_levels(V1, V2)
+        V1, V2 = self.ai.get_trigger_levels()
+
+        # Update the cursor to the actual value
+        self.tab_analog_in.plot_raw.ROIs[0].setPos((0,V1))
+        self.tab_analog_in.plot_raw.ROIs[1].setPos((0,V2))
+
+        # Trigger levels
+        self.tab_analog_in.settings.set_value('Trigger/Ch1/Level', V1, block_user_signals=True)
+        self.tab_analog_in.settings.set_value('Trigger/Ch2/Level', V2, block_user_signals=True)
+
+    def _analog_in_button_acquire_clicked(self, *a):
         """
         Called when someone clicks the "acquire" button on the ADC tab.
         """
         # If we just turned it off, poop out instead of starting another loop.
-        if not self.tab_adc.button_acquire.is_checked(): return
-        
+        if not self.tab_analog_in.button_acquire.is_checked(): return
+
         # Easy coding
-        s  = self.tab_adc.settings
-        p  = self.tab_adc.plot_raw
-        p1 = self.tab_adc.processor
-        
+        s  = self.tab_analog_in.settings
+        p  = self.tab_analog_in.plot_raw
+        p1 = self.tab_analog_in.processor
+
         # Iteration number
-        n = 0; self.tab_adc.label_info.set_text('Iteration: '+str(n))
-        
+        n = 0; self.tab_analog_in.label_info.set_text('Iteration: '+str(n))
+
         # Loop until we've finishe our iterations, someone pushed the button, or forever (iterations=0)
-        while self.tab_adc.button_acquire.is_checked() and \
+        while self.tab_analog_in.button_acquire.is_checked() and \
             (n < s['Iterations'] or s['Iterations'] < 1):
-            
+
             # Enable channels (THIS DOESN'T HAVE AN EFFECT!)
-            # self.api.adc.enableChannel(0, s['Channel_1'])
-            # self.api.adc.enableChannel(1, s['Channel_2'])
-        
+            # self.api.ai.enableChannel(0, s['Ch1'])
+            # self.api.ai.enableChannel(1, s['Ch2'])
+
+            # Set the timeout
+            self.api.set_timeout(int(s['Timeout']*1000));
+
             # Set the sampling rate
             rate = float(s['Rate(MHz)'])*1e6
-            self.adc.set_sample_rate(rate)
-            
+            self.ai.set_sample_rate(rate)
+
             # Set the ranges
-            self.adc.set_range_big(s['Channel_1/Range']=='+/-25V',
-                                   s['Channel_2/Range']=='+/-25V')        
-            
+            self.ai.set_range_big(s['Ch1_Range']=='+/-25V',
+                                  s['Ch2_Range']=='+/-25V')
+
             # Set the trigger source, out, conditions, and levels
-            self.adc.set_trigger_source()
-            self.adc.set_trigger_out   ()
-            self.adc.set_trigger_conditions()
-            self.adc.set_trigger_levels()
-            
-            
+            self.ai.set_trigger_modes(s.get_list_index('Trigger/Ch1'),
+                                      s.get_list_index('Trigger/Ch2'))
+
+            self.ai.set_trigger_in  (s.get_list_index('Trigger/In'))
+            self.ai.set_trigger_out (s.get_list_index('Trigger/Out'))
+            self.ai.set_trigger_conditions(s.get_list_index('Trigger/Ch1/Condition'),
+                                           s.get_list_index('Trigger/Ch2/Condition'))
+            self.ai.set_trigger_levels(s['Trigger/Ch1/Level'],
+                                       s['Trigger/Ch2/Level'])
+            self.ai.set_trigger_hystereses(s['Trigger/Ch1/Hysteresis'],
+                                           s['Trigger/Ch2/Hysteresis'])
+
             # Get the time array
             ts = _n.linspace(0, (s['Samples']-1)/rate, s['Samples'])
-            
+
             # Get the data
-            vs = self.adc.get_samples(s['Samples'])
-            
-            # Clear and send the current settings to plotter
-            p.clear()
-            s.send_to_databox_header(p)
-            p.h(t=_t.time()-self.t0, t0=self.t0)
-            
-            # Add columns
-            p['Time(s)'] = ts
-            for i in range(len(vs)): p['V'+str(i+1)] = vs[i]
-    
-            # Update the plot and autosave if that's enabled
-            p.plot()
-            p.autosave()
-            
-            # Send it to the processor
-            p1.run()
-            
-            # Increment, update move on.
-            n += 1
-            self.tab_adc.label_info.set_text('Iteration: '+str(n))
+            self.tab_analog_in.button_onair.set_checked(True).set_colors('red', 'pink'); self.window.process_events();
+            vs = self.ai.get_samples(s['Samples'])
+            self.tab_analog_in.button_onair.set_checked(False).set_colors('black', None); self.window.process_events();
+
+            # If vs==None it's a timeout
+            if vs:
+                # Clear and send the current settings to plotter
+                p.clear()
+                s.send_to_databox_header(p)
+                p.h(t=_t.time()-self.t0, t0=self.t0)
+
+                # Add columns
+                p['Time(s)'] = ts
+                for i in range(len(vs)): p['V'+str(i+1)] = vs[i]
+
+                # Update the plot and autosave if that's enabled
+                p.plot()
+                p.autosave()
+
+                # Send it to the processor
+                p1.run()
+
+                # Increment, update move on.
+                n += 1
+                self.tab_analog_in.label_info.set_text('Iteration: '+str(n))
+
+            # Let the user interact
             self.window.process_events()
-        
+
         # Pop the button when we're done.
-        self.tab_adc.button_acquire.set_checked(False)
-        
-        
-        
+        self.tab_analog_in.button_acquire.set_checked(False)
+
+
+
 class sillyscope_api(_mp.visa_tools.visa_api_base):
     """
     Class for talking to a Tektronix TDS/TBS 1000 series and Rigol 1000 B/D/E/Z
     sillyscopes.
-    
+
     Parameters
     ----------
     name='TDS1012B'
         Name of the scope, as it appears in the VISA resource manager.
-    
+
     pyvisa_py=False
         Set to True if using pyvisa-py instead of, e.g., R&S VISA or NI-VISA.
-    
+
     simulation=False
         Set to True to enable simulation mode.
-    
+
     timeout=3e3
         Command timeout (ms)
-        
+
     write_sleep=0.01
         How long to sleep after a write operation (sec)
-        
+
     """
-    
-    
+
+
     def __init__(self, name='TDS1012B', pyvisa_py=False, simulation=False, timeout=3e3, write_sleep=0.0):
-        
+
         # Run the basic stuff
         _mp.visa_tools.visa_api_base.__init__(self, name=name, pyvisa_py=pyvisa_py, simulation=simulation, timeout=timeout, write_sleep=write_sleep)
-        
+
         # Simulation settings
         self._simulation_sleep  = 0.01
         self._simulation_points = 1200
-        
+
         # Set up the info
         self.t_duty_cycle = 0
         self.t_get_waveform  = 0
@@ -600,31 +983,31 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
         self.previous_header[4] = dict(xzero4=0, xmultiplier4=1, yzero4=0, ymultiplier4=1)
         self.model = None
         self._channel = 1
-        
-        
+
+
         # Remember if it's a Tektronix scope
         if self.idn[0:9] == 'TEKTRONIX': self.model='TEKTRONIX'
-        
+
         # Need to distinguish 'Rigol Technologies,DS1052E,DS1ET161453620,00.04.01.00.02'
         # Which is janky and not working. (What is the GD data format??)
-        elif self.idn[0:5].upper() == 'RIGOL': 
-            
+        elif self.idn[0:5].upper() == 'RIGOL':
+
             # Get the model string
             m = self.idn.split(',')[1]
-            
+
             # Find out if it's a d/e or a z:
             if   m[-1] in ['Z']: self.model='RIGOLZ'
             elif m[-1] in ['B']: self.model='RIGOLB'
             else:                self.model='RIGOLDE'
-        
+
         # Poop out.
         else: self.model=None
-        
+
         # Set the type of encoding for the binary data returned
         self.set_binary_encoding()
-            
-       
-        
+
+
+
     # These can be modified later to make them safe, add delays, etc.
     def command(self, message='*IDN?'):
         """
@@ -632,41 +1015,41 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
         """
         if message.find('?') >= 0: return self.query(message)
         else:                      return self.write(message)
-    
+
     def query(self, message='*IDN?'):
         """
         Sends the supplied message and returns the response.
         """
         _debug('query('+"'"+message+"'"+')')
-        
+
         if self.instrument == None: return
         else:                       return self.instrument.query(message)
-    
-    def write(self, message): 
+
+    def write(self, message):
         """
         Writes the supplied message.
         """
         _debug('write('+"'"+message+"'"+')')
-        
+
         if self.instrument == None: return
         else:                       return self.instrument.write(message)
-    
-    def read (self):          
+
+    def read (self):
         """
         Reads a message and returns it.
         """
         _debug('read()')
-        
+
         if self.instrument == None: return
         else:                       return self.instrument.read()
-    
-    def read_raw(self):       
+
+    def read_raw(self):
         """
         Reads a raw message (e.g. a binary stream) and returns it.
         """
         _debug('read_raw()')
-        
-        if self.instrument == None: return 
+
+        if self.instrument == None: return
         else:                       return self.instrument.read_raw()
 
     def clear(self):
@@ -675,156 +1058,156 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
         """
         if   self.model in ['RIGOLZ']:           self.write(':CLE')
         elif self.model in ['RIGOLB','RIGOLDE']: self.write(':DISP:CLE')
-        
+
     def get_waveform(self, channel=1, convert_to_float=True, include_x=True, use_previous_header=False, binary=None):
         """
         Queries the device for the currently shown data from the specified channel,
         returning a databox with all the information.
-        
-        The databox header contains all the information required to convert 
+
+        The databox header contains all the information required to convert
         from integer steps in x and y to time (or frequency) and voltage. If the
         databox is 'd', then the x-values are generated as
-        
+
              d['x'] = d.h('xmultiplierN')*(n)
-             
-        where 'n' is the step number and N is the channel number, while 
+
+        where 'n' is the step number and N is the channel number, while
         the y-values are generated as
-            
+
              d['yN'] = d.h('yzeroN') + d.h('ymultiplierN')*(v)
-        
+
         where 'v' is the 'voltage' in 8-bit integer units (spanning -127 to 128
         over the full range).
-        
+
         This function also times these calls and sets self.t_get_waveform to the
         total time of the function call in seconds, and self.t_duty_cycle to the
         ratio of time spent on the CURV query vs the total time.
-            
+
         Parameters
         ----------
         channel=1
             Which channel to query. Must be an integer and channel 1 corresponds
             to the first channel.
-        
+
         convert_to_float=True
-            If True, convert the returned integers to floating point based on the 
+            If True, convert the returned integers to floating point based on the
             scope range. If False, just return the integers. Note the conversion
             factors will be in the returned databox header either way.
-        
+
         include_x=True
-            Whether to also generate a column of data for the x-values. 
-        
+            Whether to also generate a column of data for the x-values.
+
         use_previous_header=False
             If True, this will not query the waveform preamble / header information,
-            which is actually several times longer than the data query. The 
-            header information from the previous query is stored in the 
+            which is actually several times longer than the data query. The
+            header information from the previous query is stored in the
             dictionary self.previous_header[channel].
-        
+
         binary=None
             Can be set to any of the allowed databox (numpy), e.g. binary='float32',
             which will set the databox to this binary mode.
         """
         _debug('get_waveform()')
-        
+
         # For duty cycle calculation
         t0 = _t.time()
-        
+
         # For easy coding
         c = str(channel)
-        
+
         # Simulation mode
         if self.instrument == None:
-            
+
             # For duty cycle calculation
             t1 = _t.time()
-            
+
             # Create the fake data
-            d = _s.fun.generate_fake_data('5*sin(20*(1+random.normal(0,0.04,len(x)))*x + random.normal(0,4))', _n.linspace(-5,5,self._simulation_points), 
+            d = _s.fun.generate_fake_data('5*sin(20*(1+random.normal(0,0.04,len(x)))*x + random.normal(0,4))', _n.linspace(-5,5,self._simulation_points),
                                           ey=20, include_errors=False)
-            
+
             # Fake the acquisition time
             _t.sleep(self._simulation_sleep)
-            
+
             # For duty cycle calculation
             t2 = _t.time()
-            
+
             # Rename the columns to simulate the scope output
             d.rename_column(0, 'x')
             d.rename_column(1, 'y'+c)
-            
+
             # Shorten the bitdepth
             d[1] = _n.float16(_n.int8(d[1]))
-            
-            # Get the fake header info. 
+
+            # Get the fake header info.
             d.insert_header('xzero'+c, 1)
             d.insert_header('xoffset'+c, 0)
             d.insert_header('xmultiplier'+c, 0.1)
             d.insert_header('yzero'+c, 1)
             d.insert_header('yoffset'+c, 0)
             d.insert_header('ymultiplier'+c, 0.1)
-            
+
             # Remember this for next time.
             self.previous_header[channel].update(d.headers)
-            
+
             # If we're converting to float voltages
             if convert_to_float:
                 d['y'+c] = d.h('yzero'+c) + d.h('ymultiplier'+c)*(d['y'+c])
-                
+
             # Pop the time column if necessary
             if not include_x: d.pop(0)
-            
-            
-            
+
+
+
         # Real deal
-        else:    
-            
+        else:
+
             # Databox to fill
             d = _s.data.databox()
-            
+
             # Set the source channel
             self.set_channel(channel)
-            
+
             # For duty cycle calculation
             t1 = _t.time()
             d.h(seconds_pre_waveform_query=t1)
-            
+
             # Transfer the waveform information
             v = self._query_and_decode_waveform()
-            
+
             _debug('_query_and_decode_waveform() done', len(v))
-            
+
             # For duty cycle calculation
-            t2 = _t.time()   
+            t2 = _t.time()
             d.h(seconds_post_waveform_query=t2)
 
             # Get the waveform header
-            
+
             # If we're using the previous header, just load in the values
             if use_previous_header:
                 d.update_headers(self.previous_header[channel])
-            
+
             # Otherwise, get a new header from the instrument.
             else: self.get_header(d)
-            
+
             # If we're supposed to include time, add the time column
-            if include_x: 
+            if include_x:
                 d['x'] = _n.arange(0, len(v), 1)
                 d['x'] = d.h('xmultiplier'+c)*(d['x'])
-            
+
             # If we're converting to float voltages
             if convert_to_float:
                 d['y'+c] = d.h('yzero'+c) + d.h('ymultiplier'+c)*(v)
             else:
                 d['y'+c] = v
-          
+
         # Set the binary mode
         if not binary == None: d.h(SPINMOB_BINARY=binary)
-    
+
         # For duty cycle calculation
         t3 = _t.time()
         self.t_get_waveform  = t3-t0
         if t3-t0>0: self.transfer_duty_cycle = (t2-t1)/self.t_get_waveform
         else:       print("WARNING: get_waveform() total time == 0")
-        
+
         # Note the duty cycle.
         d.h(transfer_duty_cycle=self.transfer_duty_cycle)
 
@@ -835,16 +1218,16 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
     def trigger_single(self):
         """
         After calling self.set_mode_single_trigger(), you can call this to
-        tell it to wait for the next trigger. It's up to you to check if 
+        tell it to wait for the next trigger. It's up to you to check if
         the trigger is complete.
         """
         _debug('trigger_single()')
-        
+
         if   self.model=='TEKTRONIX': self.write('ACQ:STATE 1')
         elif self.model=='RIGOLDE':   self.write(':RUN')
         elif self.model=='RIGOLZ':    self.write(':SING')
         elif self.model=='RIGOLB':    self.write(':KEY:SING')
-        
+
         _debug('trigger_single() complete')
 
 
@@ -854,100 +1237,100 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
         ymultiplier, yzero. If d=None, creates a databox.
         """
         _debug('get_header()', str(d))
-        
+
         if d==None: d = _s.data.databox()
-        
+
         # For easier coding later
         c = str(self._channel)
-            
-        _debug('  Checking model...', 
-              self.model, 
-              self.model in ['TEKTRONIX'], 
+
+        _debug('  Checking model...',
+              self.model,
+              self.model in ['TEKTRONIX'],
               self.model in ['RIGOLDE'],
               self.model in ['RIGOLZ','RIGOLB'])
-        
+
         if self.model in ['TEKTRONIX']:
             _debug('  TEKTRONIX')
-            
+
             yinc = float(self.query('WFMP:YMUL?'))
-            
+
             d.insert_header('xzero'+c,       0)#float(self.query('WFMP:XZE?')))
             d.insert_header('xmultiplier'+c, float(self.query('WFMP:XIN?')))
             d.insert_header('yzero'+c,       -float(self.query('WFMP:YOF?'))*yinc)
             d.insert_header('ymultiplier'+c, yinc)
-            
-        
+
+
         elif self.model in ['RIGOLDE']:
             _debug('  RIGOLDE')
-            
+
             # Get the increments (empirically determined f***ing manual)
             xinc = float(self.query(':TIM:SCAL?'))       * 0.02
             yinc = float(self.query(':CHAN'+c+':SCAL?')) * 0.04
-            
+
             d.insert_header('xzero'+c,       0)#float(self.query(':TIM:OFFS?')))
             d.insert_header('xmultiplier'+c, xinc)
             d.insert_header('yzero'+c,       -float(self.query(':CHAN'+c+':OFFS?')))
             d.insert_header('ymultiplier'+c, yinc)
-            
-            
+
+
 
         elif self.model in ['RIGOLB']:
             _debug('  RIGOLB')
-            
+
             # Convert the yoffset to the Tek format
             xinc = float(self.query(':WAV:XINC? CHAN'+c))
             yinc = float(self.query(':WAV:YINC? CHAN'+c))
-            
+
             # Also get whether we're in peak detect mode, since this messes up the x-scale!
             d.insert_header('peak_detect', self.query(':ACQ:TYPE?').strip() == 'PEAK')
             if d.h('peak_detect'): xrescale=0.5
             else:                  xrescale=1.0
-            
+
             d.insert_header('xzero'+c,       0)#-float(self.query(':WAV:XOR? CHAN'+c)))
             d.insert_header('xmultiplier'+c, xinc*xrescale)
             d.insert_header('yzero'+c,       -float(self.query(':WAV:YOR? CHAN'+c)))
             d.insert_header('ymultiplier'+c, yinc)
-            
-               
+
+
 
         elif self.model in ['RIGOLZ']:
             _debug('  RIGOLZ')
-            
+
             # Convert the yoffset to the Tek format
             xinc = float(self.query(':WAV:XINC?'))
             yinc = float(self.query(':WAV:YINC?'))
-            
+
             d.insert_header('xzero'+c,       0)#-float(self.query(':WAV:XOR?')))
             d.insert_header('xmultiplier'+c, xinc)
             d.insert_header('yzero'+c,       -float(self.query(':WAV:YOR?'))*yinc)
             d.insert_header('ymultiplier'+c, yinc)
-        
-        else: 
+
+        else:
             print('ERROR: get_header() unhandled model '+str(self.model))
-        
+
         _debug('  Done with model-specifics.')
-        
+
         # Remember these settings for later.
         self.previous_header[self._channel].update(d.headers)
-        
+
         return d
 
-        
+
     def _query_and_decode_waveform(self):
         """
         Queries and then parses the waveform, returning the array of (int8)
-        voltages. Prior to calling this, make sure the scope is ready to 
+        voltages. Prior to calling this, make sure the scope is ready to
         transfer and you've run self.set_channel().
         """
         _debug('_query_and_decode_waveform()')
-        
+
         empty = _n.array([], dtype=_n.float16)
-        
+
         if self.model in ['TEKTRONIX']:
-            
+
             # May be an option to change later
             width = 1
-            
+
             if "MDO" in self.idn:
                 # Get current settings for verbose/head
                 head = self.query(":HEADer?")[-2]
@@ -963,27 +1346,27 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
                 # Set number of points to acquire to be the full waveform
                 self.write('DATA:STAR 1')
                 self.write('DATA:STOP %d' % n_pts)
-            
+
             # Ask for the waveform and read the response
             try:
                 # Get the curve raw data
                 self.write('CURV?')
                 s = self.read_raw()
-                
+
             except:
                 print('ERROR: Timeout getting curve.')
                 return empty
-        
+
             # Get the length of the thing specifying the data length :)
             n = int(s[1:3].decode()[0])
-            
+
             # Get the length of the data set
             N = int(int(s[2:2+n].decode())/width)
-            
+
             # Convert to an array of integers
             return _n.float16(_n.frombuffer(s[2+n:2+n+N*width],_n.int8))
-        
-        
+
+
         elif self.model in ['RIGOLDE']:
             # Ask for the data
             try:
@@ -993,20 +1376,20 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
             except:
                 print('ERROR: Timeout getting curve.')
                 return empty
-            
+
             # Get the number of characters describing the number of points
             n = int(s[1:2].decode())
-            
+
             # Get the number of points
             N = int(s[2:2+n].decode())
             _debug(N)
-            
+
             # Determined from measured results
-            return 125 - _n.float16(_n.frombuffer(s[2+n:2+n+N], _n.uint8)) 
-            
-            
+            return 125 - _n.float16(_n.frombuffer(s[2+n:2+n+N], _n.uint8))
+
+
         elif self.model in ['RIGOLB']:
-            
+
             # Ask for the data
             try:
                 self.write(':WAV:DATA?')
@@ -1015,20 +1398,20 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
             except:
                 print('ERROR: Timeout getting curve.')
                 return empty
-            
+
             # Get the number of characters describing the number of points
             n = int(s[1:2].decode())
-            
+
             # Get the number of points
             N = int(s[2:2+n].decode())
             _debug(N)
-            
+
             # Convert it to integers, this code is based on empirically measuring.
             return 99 - _n.float16(_n.frombuffer(s[2+n:2+n+N], _n.uint8))
-                            
-                            
+
+
         elif self.model in ['RIGOLZ']:
-            
+
             # Ask for the data
             try:
                 self.write(':WAV:DATA?')
@@ -1037,37 +1420,37 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
             except:
                 print('ERROR: Timeout getting curve.')
                 return empty
-            
+
             # Get the number of characters describing the number of points
             n = int(s[1:2].decode())
-            
+
             # Get the number of points
             N = int(s[2:2+n].decode())
             _debug(N)
-        
-            # Convert it to an array of integers. 
-            # This hits the rails properly on the DS1074Z, but is one step off from 
+
+            # Convert it to an array of integers.
+            # This hits the rails properly on the DS1074Z, but is one step off from
             # The values reported on the main screen.
             return _n.float16(_n.frombuffer(s[2+n:2+n+N], _n.uint8)) - 127
-        
-        
+
+
     def set_binary_encoding(self):
         """
         Sets up the binary encoding mode for curve transfer.
         """
         _debug('set_binary_encoding()')
-        
+
         if self.model in ['TEKTRONIX']:
             self.write('DATA:ENC SRI')
             self.write('DATA:WIDTH 1') # Use 2 for two bytes per point.
-        
+
         elif self.model in ['RIGOLDE']:
             self.write(':WAV:POIN:MODE NORM')
-        
+
         elif self.model in ['RIGOLZ', 'RIGOLB']:
             self.write(':WAV:MODE NORM') # Just get the screen. Use RAW to access the full memory.
             self.write(':WAV:FORM BYTE') # Use WORD to have two bytes per point.
-            
+
         else:
             _debug('  ERROR: unhandled model '+str(self.model))
 
@@ -1076,26 +1459,26 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
         Select the channel to get the waveform data.
         """
         _debug('set_channel()')
-        
+
         if self.model == 'TEKTRONIX':
             self.write('DATA:SOURCE CH%d' % channel)
-        
+
         elif self.model in ['RIGOLDE']:
             # DE Relies on a channel specified with the data query
             pass
-        
-        elif self.model in ['RIGOLB', 'RIGOLZ']: 
+
+        elif self.model in ['RIGOLB', 'RIGOLZ']:
             self.write(':WAV:SOUR CHAN%d' % channel)
-        
+
         else:
             _debug('  ERROR: unhandled model '+str(self.model))
-        
+
         # Keep this for future use.
         self._channel = channel
-        
+
     def set_mode_single_trigger(self):
         """
-        Stops acquisition and sets it up to take a single trace upon the 
+        Stops acquisition and sets it up to take a single trace upon the
         next self.acquire() command.
         """
         _debug('set_mode_single_trigger()', self.model)
@@ -1103,71 +1486,71 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
         if self.model == 'TEKTRONIX':
             self.write('ACQ:STATE STOP')
             self.write('ACQ:STOPA SEQ')
-        
-        elif self.model in ['RIGOLZ', 'RIGOLDE', 'RIGOLB']: 
+
+        elif self.model in ['RIGOLZ', 'RIGOLDE', 'RIGOLB']:
             self.write(':STOP')
             self.write(':TRIG:EDGE:SWE SINGLE')
 
 
-            
+
 
 
 class sillyscope(_mp.visa_tools.visa_gui_base):
     """
     Graphical front-end for RIGOL 1000 B/D/E/Z and Tektronix TBS/TDS 1000.
-    
+
     Parameters
     ----------
     name='sillyscope'
         Which file to use for saving the gui stuff. This will also be the first
         part of the filename for the other settings files.
-   
+
     show=True
         Whether to show the window immediately.
-         
+
     block=False
         Whether to block the command line while showing the window.
-    
+
     pyvisa_py=False
         Whether to use pyvisa_py or not.
-   
+
     """
     def __init__(self, name='sillyscope', show=True, block=False, pyvisa_py=False):
-        
+
         # Run the baseline stuff
         _mp.visa_tools.visa_gui_base.__init__(self, name=name, show=False, block=False, api=sillyscope_api, pyvisa_py=pyvisa_py, window_size=[1000,500])
-        
+
         # Build the GUI
         self.window.event_close = self._event_close
-        
+
         self.button_1         = self.grid_top.place_object(_g.Button('1',True).set_width(25).set_checked(True))
         self.button_2         = self.grid_top.place_object(_g.Button('2',True).set_width(25))
         self.button_3         = self.grid_top.place_object(_g.Button('3',True).set_width(25))
         self.button_4         = self.grid_top.place_object(_g.Button('4',True).set_width(25))
         self.button_acquire   = self.grid_top.place_object(_g.Button('Acquire',True).disable())
         self.number_count     = self.grid_top.place_object(_g.NumberBox(0).disable())
-        self.button_waiting   = self.grid_top.place_object(_g.Button('Waiting', True).set_width(70))
+        self.button_onair   = self.grid_top.place_object(_g.Button('Waiting', True).set_width(70))
         self.button_transfer  = self.grid_top.place_object(_g.Button('Transfer',True).set_width(70))
-        
+
         self.tabs_data = self.grid_bot.place_object(_g.TabArea(name+'_tabs_data.txt'), alignment=0)
         self.tab_raw   = self.tabs_data.add_tab('Raw')
         self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.txt', name+'_plot_raw.txt'), alignment=0)
-        
+
         # Keep track of previous plot
         self._previous_data = _s.data.databox()
-        
+
         # Acquisition settings
         self.settings.add_parameter('Acquire/Iterations',       1,     tip='How many iterations to perform. Set to 0 to keep looping.')
         self.settings.add_parameter('Acquire/Trigger',          False, tip='Halt acquisition and arm / wait for a single trigger.')
         self.settings.add_parameter('Acquire/Get_First_Header', True,  tip='Get the header (calibration) information the first time. Disabling this will return uncalibrated data.')
         self.settings.add_parameter('Acquire/Get_All_Headers',  True,  tip='Get the header (calibration) information EVERY time. Disabling this will use the first header repeatedly.')
         self.settings.add_parameter('Acquire/Discard_Identical',False, tip='Do not continue until the data is different.')
-        
+
         # Device-specific settings
         self.settings.add_parameter('Acquire/RIGOL1000BDE/Trigger_Delay', 0.05, bounds=(1e-3,10), siPrefix=True, suffix='s', dec=True, tip='How long after "trigger" command to wait before checking status. Some scopes appear to be done for a moment between the trigger command and arming.')
         self.settings.add_parameter('Acquire/RIGOL1000BDE/Unlock',        True, tip='Unlock the device\'s frong panel after acquisition.')
         self.settings.add_parameter('Acquire/RIGOL1000Z/Always_Clear',    True, tip='Clear the scope prior to acquisition even in untriggered mode (prevents duplicates but may slow acquisition).')
-        
+
         # Connect all the signals
         self.settings.connect_signal_changed('Acquire/Trigger', self._settings_trigger_changed)
         self.button_acquire.signal_toggled.connect(self._button_acquire_clicked)
@@ -1175,20 +1558,20 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
         self.button_2.signal_toggled.connect(self.save_gui_settings)
         self.button_3.signal_toggled.connect(self.save_gui_settings)
         self.button_4.signal_toggled.connect(self.save_gui_settings)
-        
+
         # Run the base object stuff and autoload settings
         self._autosettings_controls = ['self.button_1', 'self.button_2', 'self.button_3', 'self.button_4']
-        self.load_gui_settings() 
-        
+        self.load_gui_settings()
+
         # Show it
         if show: self.window.show(block_command_line=block)
-    
+
     def _after_connect(self):
         """
         Called after a successful connection.
         """
         self.button_acquire.enable()
-            
+
     def _after_disconnect(self):
         """
         Called after a successful disconnect.
@@ -1201,43 +1584,43 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
         """
         Called when someone clicks the Trigger checkbox.
         """
-        if self.settings['Acquire/Trigger']: 
+        if self.settings['Acquire/Trigger']:
             self.api.set_mode_single_trigger()
             self.unlock()
 
-    
+
     def acquisition_is_finished(self):
         """
         Returns True if the acquisition is complete.
-        
-        For RIGOL scopes, this uses get_waveforms(), which also updates 
+
+        For RIGOL scopes, this uses get_waveforms(), which also updates
         self.plot_raw(), which is the best way to get the status. This avoids
         the issue of the single trigger taking time to get moving.
         """
         _debug('acquisition_is_finished()')
-        
+
         if self.api.model == 'TEKTRONIX':
             _debug('  TEK')
             return not bool(int(self.api.query('ACQ:STATE?')))
-        
+
         elif self.api.model == 'RIGOLZ':
             _debug('  RIGOLZ')
-            
+
             # If the waveforms are empty (we cleared it!)
             self.get_waveforms(plot=False)
             if len(self.plot_raw[0]) > 0: return True
             else:                         return False
-       
+
         elif self.api.model in ['RIGOLDE', 'RIGOLB']:
             _debug('  RIGOLDE/B')
-                        
+
             self.window.sleep(self.settings['Acquire/RIGOL1000BDE/Trigger_Delay'])
             s = self.api.query(':TRIG:STAT?').strip()
             return s == 'STOP'
-        
+
     def analyze_data(self):
         """
-        Overwrite this function to insert your own customized analysis, to 
+        Overwrite this function to insert your own customized analysis, to
         be performed after each raw data acquisition.
         """
         return self
@@ -1247,86 +1630,86 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
         Queries all the waveforms that are enabled, overwriting self.plot_raw
         """
         _debug('get_waveforms()')
-        
-        
+
+
         # Find out if we should get the header
         get_header = self.settings['Acquire/Get_All_Headers']  \
                   or self.settings['Acquire/Get_First_Header'] \
                  and self.number_count.get_value() == 0
-        
+
         # Tell the user we're getting data
         self.button_transfer.set_checked(True)
         self.window.process_events()
-        
+
         # If we're not getting data.
         if not self.button_1.get_value() and \
            not self.button_2.get_value() and \
            not self.button_3.get_value() and \
-           not self.button_4.get_value(): 
+           not self.button_4.get_value():
                self.button_transfer.set_checked(False)
                return
-        
-        
+
+
         # Clear the raw plot
         self.plot_raw.clear()
-        
+
         # If we're supposed to get curve 1
         if self.button_1.get_value():
-            
+
             # Actually get it.
             d = self.api.get_waveform(1, use_previous_header=not get_header)
-            
+
             # Update the main plot
             self.plot_raw['x']  = d['x']
             self.plot_raw['y1'] = d['y1']
             self.plot_raw.copy_headers(d)
             self.window.process_events()
-        
+
         # If we're supposed to get curve 2
         if self.button_2.get_value():
-            
+
             # Actually get it
             d = self.api.get_waveform(2, use_previous_header=not get_header)
-            
+
             # Update the main plot
             self.plot_raw['x']  = d['x']
             self.plot_raw['y2'] = d['y2']
             self.plot_raw.copy_headers(d)
             self.window.process_events()
-        
+
         # If we're supposed to get curve 2
         if self.button_3.get_value():
-            
+
             # Actually get it
             d = self.api.get_waveform(3, use_previous_header=not get_header)
-            
+
             # Update the main plot
             self.plot_raw['x']  = d['x']
             self.plot_raw['y3'] = d['y3']
             self.plot_raw.copy_headers(d)
             self.window.process_events()
-          
+
         # If we're supposed to get curve 2
         if self.button_4.get_value():
-            
+
             # Actually get it
             d = self.api.get_waveform(4, use_previous_header=not get_header)
-            
+
             # Update the main plot
             self.plot_raw['x']  = d['x']
             self.plot_raw['y4'] = d['y4']
             self.plot_raw.copy_headers(d)
             self.window.process_events()
-        
+
         # Tell the user we're done transferring data
         self.button_transfer.set_checked(False)
-        
+
         # Plot.
         if plot:
             self.plot_raw.plot()
             self.plot_raw.autosave()
             self.window.process_events()
-        
+
         _debug('get_waveforms() complete')
 
     def unlock(self):
@@ -1335,204 +1718,204 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
         """
         if self.settings['Acquire/RIGOL1000BDE/Unlock']:
             if self.api.model in ['RIGOLDE']:
-                self.api.write(':KEY:FORC')   
+                self.api.write(':KEY:FORC')
             elif self.api.model in ['RIGOLB']:
-                self.api.write(':KEY:LOCK DIS')        
-    
+                self.api.write(':KEY:LOCK DIS')
+
     def _setup_acquisition(self):
         """
         Sets up the GUI and scope for the acquisition loop.
         """
-        
+
         # Disable the connection button
         self.button_connect.disable()
-        
+
         # Reset the counter
         self.number_count.set_value(0)
-        
+
         # If we're triggering, set to single sequence mode
         if self.settings['Acquire/Trigger']: self.api.set_mode_single_trigger()
-    
+
     def _acquire_and_plot(self):
         """
         Acquires the data and plots it (one iteration of the loop).
         """
         # Update the user
-        self.button_waiting.set_checked(True)
-        
+        self.button_onair.set_checked(True)
+
         # Transfer the current data to the previous
         self._previous_data.clear()
         self._previous_data.copy_all(self.plot_raw)
-        
+
         # Trigger
         if self.settings['Acquire/Trigger']:
-            
+
             _debug('  TRIGGERING')
-            
+
             # Set it to acquire the sequence.
             self.api.trigger_single() # For RigolZ, this clears the trace
-            
+
             # Simulation mode: "wait" for it to finish
             _debug('  WAITING')
             if self.api.instrument == None: self.window.sleep(self.api._simulation_sleep)
-            
+
             # Actual scope: wait for it to finish
             else:
-                while not self.acquisition_is_finished() and self.button_acquire.is_checked(): 
+                while not self.acquisition_is_finished() and self.button_acquire.is_checked():
                     self.window.sleep(0.02)
-            
+
             # Tell the user it's done acquiring.
             _debug('  TRIGGERING DONE')
-        
+
         # For RIGOL scopes, the most reliable / fast way to wait for a trace
         # is to clear it and keep asking for the waveform.
-        
+
         # Not triggering but RIGOLZ mode: clear the data first and then wait for data
         elif self.api.model in ['RIGOLZ']:
-            
+
             # Clear the scope if we're not in free running mode
             if self.settings['Acquire/RIGOL1000Z/Always_Clear']:
                 self.api.write(':CLE')
-                
+
             # Wait for it to complete
-            while not self.acquisition_is_finished() and self.button_acquire.is_checked(): 
+            while not self.acquisition_is_finished() and self.button_acquire.is_checked():
                 self.window.sleep(0.005)
-        
-        self.button_waiting.set_checked(False)
-            
+
+        self.button_onair.set_checked(False)
+
         # If the user hasn't canceled yet
         if self.button_acquire.is_checked():
-            
+
             _debug('  getting data')
-    
+
             # The Z RIGOL models best check the status by getting the waveforms
             # after clearing the scope and seeing if there is data returned.
-            
+
             # Triggered RIGOLZ scopes already have the data
             if self.api.model in [None, 'TEKTRONIX', 'RIGOLDE', 'RIGOLB'] or \
-               not self.settings['Acquire/Trigger']: 
-                   
+               not self.settings['Acquire/Trigger']:
+
                    # Query the scope for the data and stuff it into the plotter
                    self.get_waveforms(plot=False)
                    _debug('  got '+str(self.plot_raw))
-            
+
             _debug('  processing')
-        
+
             # Increment the counter, but only if the data is new
             self.number_count.increment()
-            
+
             # Decrement if it's identical to the previous trace
             is_identical=False
             if self.settings['Acquire/Discard_Identical']:
                 is_identical = self.plot_raw.is_same_as(self._previous_data, headers=False)
                 _debug('  Is identical to previous?', is_identical)
                 if is_identical: self.number_count.increment(-1)
-            
+
             # Transfer all the header info
             self.settings.send_to_databox_header(self.plot_raw)
-            
+
             # Update the plot
             _debug('  plotting', len(self.plot_raw[0]), len(self.plot_raw[1]))
             self.plot_raw.plot()
             if not is_identical: self.plot_raw.autosave()
-            
+
             _debug('  plotting done')
             self.window.process_events()
-    
+
             # External analysis
             self.analyze_data()
-        
+
             # End condition
             _debug('  checking end condition')
             N = self.settings['Acquire/Iterations']
-            if self.number_count.get_value() >= N and not N <= 0: 
+            if self.number_count.get_value() >= N and not N <= 0:
                 self.button_acquire.set_checked(False)
-        
+
     def _post_acquisition(self):
         """
         Fixes up the GUI and scope after the acquisition loop.
         """
         # Enable the connect button
         self.button_connect.enable()
-        
+
         # Unlock the RIGOL1000E front panel
         self.unlock()
-    
+
     def _button_acquire_clicked(self, *a):
         """
         Get the enabled curves, storing them in plot_raw.
         """
         _debug('_button_acquire_clicked()')
-        
+
         # Don't double-loop!
         if not self.button_acquire.is_checked(): return
 
         # Don't proceed if we have no connection
-        if self.api == None: 
+        if self.api == None:
             self.button_acquire.set_checked(False)
             self.button_acquire.disable()
             return
 
         # Set up the GUI and scope for acquisition.
         self._setup_acquisition()
-            
+
         _debug('  beginning loop')
 
-        # Continue until unchecked        
+        # Continue until unchecked
         while self.button_acquire.is_checked(): self._acquire_and_plot()
-        
+
         _debug('  loop done')
-        
+
         # Fixes up the GUI and unlocks the scope
         self._post_acquisition()
-    
+
     def _event_close(self, *a):
         """
         Quits acquisition loop when the window closes.
         """
         self.button_acquire.set_checked(False)
-            
+
 #     TO DO: Automate the continuous mode triggering on init.
-#     TO DO: Import data file monitor.           
+#     TO DO: Import data file monitor.
 class keithley_dmm_api():
     """
     This object lets you query the Keithley 199 or 2700 for voltages on any of its
     channels. It is based on old code from those before us.
-    
+
     FAQ: Use shift + scan setup on the front panel to choose a channel, and
-    shift + trig setup to set the trigger mode to "continuous". Finally, 
+    shift + trig setup to set the trigger mode to "continuous". Finally,
     make sure the range is appropriate, such that the voltage does not overload.
-    Basically, if you see a fluctuating number on the front panel, it's 
+    Basically, if you see a fluctuating number on the front panel, it's
     all set to take data via self.get_voltage() (see below).
-    
+
     Parameters
     ----------
     name='ASRL3::INSTR'
         Visa resource name. Use R&S Tester 64-bit or NI-MAX to find this.
-    
+
     pyvisa_py=False
         If True, use the all-python VISA implementation. On Windows, the simplest
         Visa implementation seems to be Rhode & Schwarz (streamlined) or NI-VISA (bloaty),
         with pyvisa_py=False.
-    
+
     NOTE
     ----
     At some point we should inherit the common functionality of these visa
     objects with those found in visa_tools.py. All new instruments should be
     written this way, for sure! This instrument might be too low-level though...
     """
-    
-    
-    
+
+
+
     def __init__(self, name='ASRL3::INSTR', pyvisa_py=False):
-        
+
         # Create a resource management object
         if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
         else:         self.resource_manager = _v.ResourceManager()
-        
+
         # Get time t=t0
         self._t0 = _time.time()
-        
+
         # Try to open the instrument.
         try:
             self.instrument = self.resource_manager.open_resource(name)
@@ -1542,80 +1925,80 @@ class keithley_dmm_api():
                 # Clear out the buffer, in case the instrument was
                 # Just turned on.
                 self.read()
-                
+
                 # Ask for the model identifier
                 s = self.query('U0X')
-                
+
                 # DMM model 199
                 if s[0:3] in ['100', '199']: self.model = 'KEITHLEY199'
-                else: 
+                else:
                     print("ERROR: Currently we only handle Keithley 199 DMMs")
                     self.instrument.close()
                     self.instrument = None
-                    
+
             except:
                 print("ERROR: Instrument did not reply to ID query. Entering simulation mode.")
                 self.instrument.close()
                 self.instrument = None
-                
+
         except:
             print("ERROR: Could not open instrument. Entering simulation mode.")
             self.instrument = None
-            
+
             # Now list all available resources
             print("Available Instruments:")
             for name in self.resource_manager.list_resources(): print("  "+name)
-            
-    def write(self, message, process_events=False): 
+
+    def write(self, message, process_events=False):
         """
         Writes the supplied message.
-        
+
         Parameters
         ----------
         message
             String message to send to the DMM.
-            
+
         process_events=False
-            Optional function to be called in between communications, e.g., to 
+            Optional function to be called in between communications, e.g., to
             update a gui.
         """
         _debug('write('+"'"+message+"'"+')')
-        
+
         if self.instrument == None: s = None
         else:                       s = self.instrument.write(message)
-        
+
         if process_events: process_events()
         return s
-    
-    def read(self, process_events=False):          
+
+    def read(self, process_events=False):
         """
         Reads a message and returns it.
-        
+
         Parameters
         ----------
         process_events=False
-            Optional function to be called in between communications, e.g., to 
+            Optional function to be called in between communications, e.g., to
             update a gui.
         """
         _debug('read()')
         self.write('++read 10')
-        
+
         if process_events: process_events()
-    
+
         if self.instrument == None: response = ''
         else:                       response = self.instrument.read()
-        
+
         if process_events: process_events()
-    
+
         _debug('  '+repr(response))
         return response.strip()
-    
+
     def query(self, message='U0X', process_events=False):
         """
         Writes the supplied message and reads the response.
         """
         _debug("query('"+message+"')")
-        
+
         self.write(message, process_events)
         return self.read(process_events)
 
@@ -1643,56 +2026,56 @@ class keithley_dmm_api():
 
     def get_voltage(self, channel=1, process_events=False):
         """
-        Returns the time just after reading the voltage and voltage value 
+        Returns the time just after reading the voltage and voltage value
         for the supplied channel.
-        
+
         Parameters
         ----------
         channel=0:
             Channel number to read (integer).
         process_events=False:
-            Optional function that will run whenever possible 
+            Optional function that will run whenever possible
             (e.g., to update a gui).
         """
         # Simulation mode
         if self.instrument == None:
             _t.sleep(0.4)
             return _time.time() - self._t0, _n.random.rand()
-        
+
         # Real deal
         elif self.model == 'KEITHLEY199':
-            
+
             # Select the channel
             self.write("F0R0N%dX" % channel, process_events)
-            
+
             # Ask for the voltage & get rid of the garbage
             try:
                 s = self.read(process_events)
             except:
                 print("ERROR: Timeout on channel "+str(channel))
                 return _time.time() - self._t0, _n.nan
-            
+
             # Return the voltage
             try:
                 return _time.time() - self._t0, float(s[4:].strip())
             except:
                 print("ERROR: Bad format "+repr(s))
                 return _time.time() - self._t0, _n.nan
-            
+
 #            # Tell it to trigger
 #            self.write("++trg")
-#            
-#            # Apparently we poll and see if it switched from 0 to 16. 
+#
+#            # Apparently we poll and see if it switched from 0 to 16.
 #            # When it switched to 16, the measurement is done.
 #            result = 0 # Indicator that measurement is done
 #            n      = 0 # Timeout integer
 #            while not result == 16 and n < 500:
-#                
+#
 #                # Don't overload the buffer.
 #                _time.sleep(0.01)
 #                self.write("++spoll")
 #                result = int(self.read().strip())
-#               
+#
 #            # This waiting part made an infinite loop at 16.
 #            for n in range(10):
 #                self.write("++spoll")
@@ -1709,8 +2092,8 @@ class keithley_dmm_api():
 #            if "VDC" != words[0][-3:]:
 #                raise RuntimeError
 #            return float(words[0][0:-3])
-            
-    def close(self): 
+
+    def close(self):
         """
         Closes the connection to the device.
         """
@@ -1721,24 +2104,24 @@ class keithley_dmm_api():
 class keithley_dmm(_g.BaseObject):
     """
     Graphical front-end for the Keithley 199 DMM.
-    
+
     Parameters
     ----------
     autosettings_path='keithley_dmm'
         Which file to use for saving the gui stuff. This will also be the first
         part of the filename for the other settings files.
-    
+
     pyvisa_py=False
         Whether to use pyvisa_py or not.
-        
+
     block=False
         Whether to block the command line while showing the window.
     """
     def __init__(self, autosettings_path='keithley_dmm', pyvisa_py=False, block=False):
-        
+
         # No scope selected yet
         self.api = None
-        
+
         # Internal parameters
         self._pyvisa_py = pyvisa_py
 
@@ -1748,43 +2131,43 @@ class keithley_dmm(_g.BaseObject):
         self.grid_top  = self.window.place_object(_g.GridLayout(False))
         self.window.new_autorow()
         self.grid_bot  = self.window.place_object(_g.GridLayout(False), alignment=0)
-        
+
         self.button_connect   = self.grid_top.place_object(_g.Button('Connect', True, False))
-        
+
         # Button list for channels
         self.buttons = []
-        for n in range(8): 
+        for n in range(8):
             self.buttons.append(self.grid_top.place_object(_g.Button(str(n+1),True, True).set_width(25)))
             self.buttons[n].signal_toggled.connect(self.save_gui_settings)
-        
+
         self.button_acquire   = self.grid_top.place_object(_g.Button('Acquire',True).disable())
         self.label_dmm_name   = self.grid_top.place_object(_g.Label('Disconnected'))
-        
+
         self.settings  = self.grid_bot.place_object(_g.TreeDictionary(autosettings_path+'_settings.txt')).set_width(250)
         self.tabs_data = self.grid_bot.place_object(_g.TabArea(autosettings_path+'_tabs_data.txt'), alignment=0)
         self.tab_raw   = self.tabs_data.add_tab('Raw Data')
         self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.csv', autosettings_path+'_plot_raw.txt', autoscript=2), alignment=0)
-        
+
         # Create a resource management object to populate the list
         if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
         else:         self.resource_manager = _v.ResourceManager()
         names = []
-        for x in self.resource_manager.list_resources(): 
+        for x in self.resource_manager.list_resources():
             if self.resource_manager.resource_info(x).alias:
                 names.append(str(self.resource_manager.resource_info(x).alias))
             else:
                 names.append(x)
-            
+
         # VISA settings
         self.settings.add_parameter('VISA/Device', 0, type='list', values=['Simulation']+names)
 
         # Acquisition settings
         self.settings.add_parameter('Acquire/Unlock', True, tip='Unlock the device\'s front panel after acquisition.')
-        
+
         # Connect all the signals
         self.button_connect.signal_clicked.connect(self._button_connect_clicked)
         self.button_acquire.signal_clicked.connect(self._button_acquire_clicked)
-        
+
         # Run the base object stuff and autoload settings
         _g.BaseObject.__init__(self, autosettings_path=autosettings_path)
         self._autosettings_controls = ['self.buttons[0]', 'self.buttons[1]',
@@ -1792,7 +2175,7 @@ class keithley_dmm(_g.BaseObject):
                                        'self.buttons[4]', 'self.buttons[5]',
                                        'self.buttons[6]', 'self.buttons[7]']
         self.load_gui_settings()
-        
+
         # Show the window.
         self.window.show(block)
 
@@ -1800,70 +2183,70 @@ class keithley_dmm(_g.BaseObject):
         """
         Connects or disconnects the VISA resource.
         """
-        
+
         # If we're supposed to connect
         if self.button_connect.get_value():
-            
+
             # Close it if it exists for some reason
             if not self.api == None: self.api.close()
-            
+
             # Make the new one
             self.api = keithley_dmm_api(self.settings['VISA/Device'], self._pyvisa_py)
-            
+
             # Tell the user what dmm is connected
-            if self.api.instrument == None: 
+            if self.api.instrument == None:
                 self.label_dmm_name.set_text('Simulation')
                 self.label_dmm_name.set_style('font-weight: bold; color: red; font-size: 12pt;')
                 self.button_connect.set_colors(background='red')
-            else:                           
+            else:
                 self.label_dmm_name.set_text(self.api.model)
                 self.label_dmm_name.set_style('')
                 self.button_connect.set_colors(background='')
-            
+
             # Enable the Acquire button
             self.button_acquire.enable()
-            
+
         elif not self.api == None:
-            
+
             # Close down the instrument
             if not self.api.instrument == None:
                 self.api.close()
             self.api = None
             self.label_dmm_name.set_text('Disconnected')
-            
+
             # Make sure it's not still red.
             self.label_dmm_name.set_style('')
             self.button_connect.set_colors(background='')
 
             # Disable the acquire button
             self.button_acquire.disable()
-            
+
     def _button_acquire_clicked(self, *a):
         """
         Get the enabled curves, storing them in plot_raw.
         """
         _debug('_button_acquire_clicked()')
-        
+
         # Don't double-loop!
         if not self.button_acquire.is_checked(): return
 
         # Don't proceed if we have no connection
-        if self.api == None: 
+        if self.api == None:
             self.button_acquire.set_checked(False)
             return
 
         # Ask the user for the dump file
         self.path = _s.dialogs.save('*.csv', 'Select an output file.', force_extension='*.csv')
         if self.path == None: return
-    
+
         _debug('  path='+repr(self.path))
-    
+
         # Disable the connection button
         self._set_acquisition_mode(True)
-    
+
         # For easy coding
         d = self.plot_raw
-    
+
         # Set up the databox columns
         _debug('  setting up databox')
         d.clear()
@@ -1871,52 +2254,52 @@ class keithley_dmm(_g.BaseObject):
             if self.buttons[n].is_checked():
                 d['t'+str(n+1)] = []
                 d['v'+str(n+1)] = []
-        
+
         # Reset the clock and record it as header
         self.api._t0 = _t.time()
         self._dump(['Date:', _t.ctime()], 'w')
         self._dump(['Time:', self.api._t0])
-        
+
         # And the column labels!
         self._dump(self.plot_raw.ckeys)
-        
+
         # Loop until the user quits
         _debug('  starting the loop')
         while self.button_acquire.is_checked():
-    
+
             # Next line of data
             data = []
-            
+
             # Get all the voltages we're supposed to
             for n in range(len(self.buttons)):
-                
+
                 # If the button is enabled, get the time and voltage
                 if self.buttons[n].is_checked():
-                    
+
                     _debug('    getting the voltage')
-                    
+
                     # Get the time and voltage, updating the window in between commands
                     t, v = self.api.get_voltage(n+1, self.window.process_events)
-                    
+
                     # Append the new data points
                     d['t'+str(n+1)] = _n.append(d['t'+str(n+1)], t)
                     d['v'+str(n+1)] = _n.append(d['v'+str(n+1)], v)
-                    
+
                     # Update the plot
                     self.plot_raw.plot()
                     self.window.process_events()
-                    
+
                     # Append this to the list
                     data = data + [t,v]
-                
+
             # Write the line to the dump file
             self._dump(data)
-         
+
         _debug('  Loop complete!')
-        
+
         # Unlock the front panel if we're supposed to
         if self.settings['Acquire/Unlock']: self.api.unlock()
-        
+
         # Re-enable the connect button
         self._set_acquisition_mode(False)
 
@@ -1926,7 +2309,7 @@ class keithley_dmm(_g.BaseObject):
         open mode.
         """
         _debug('_dump('+str(a)+', '+ repr(mode)+')')
-        
+
         # Make sure everything is a string
         for n in range(len(a)): a[n] = str(a[n])
         self.a = a
@@ -1942,14 +2325,14 @@ class keithley_dmm(_g.BaseObject):
         _debug('_set_acquisition_mode('+repr(mode)+')')
         self.button_connect.disable(mode)
         for b in self.buttons: b.disable(mode)
-        
+
     def event_close(self, *a):
         """
         Quits acquisition loop when the window closes.
         """
         self.button_acquire.set_checked(False)
 
-    
+
 
 
 
@@ -1960,6 +2343,6 @@ class keithley_dmm(_g.BaseObject):
 ############################
 
 if __name__ == '__main__':
-         
+
     self = adalm2000()
-    
+    self.button_connect.click()
