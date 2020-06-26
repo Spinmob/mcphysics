@@ -1,0 +1,20 @@
+Jack: 
+
+In order for me to generate these files on a given operating system, I had to install the agreed upon versions of libiio and libm2k on my system (v0.21 and v0.2.1 at the time I wrote this), then follow the compile instructions here:
+
+https://wiki.analog.com/university/tools/m2k/libm2k/libm2k
+
+For Linux, the commands I used were:
+
+  sudo apt-get install git cmake swig g++ python3-dev python3-setuptools
+  git clone https://github.com/analogdevicesinc/libm2k.git
+  cd libm2k
+  mkdir build
+  cd build
+  cmake ../
+  make
+
+The last step took the longest had some mild warnings, and generated the libm2k.py and _libm2k.so files. Note I did not do a "sudo make install", but that should not change anything, since it will just overwrite the binaries we already installed with the same versions. 
+
+The goal of this is to have a solution where students install two "drivers" of a specific version, and then mcphysics just works.
+
