@@ -4931,16 +4931,30 @@ class GenericAnalogIn(_object):
         return _libm2k.GenericAnalogIn_setSampleRate(self, *args)
 
 
-    def getAvailableSampleRates(self):
+    def getAvailableSampleRates(self, *args):
         """
         getAvailableSampleRates(GenericAnalogIn self) -> VectorD
+        getAvailableSampleRates(GenericAnalogIn self, unsigned int chn_idx) -> VectorD
 
         Parameters
         ----------
-        self: libm2k::analog::GenericAnalogIn *
+        chn_idx: unsigned int
 
         """
-        return _libm2k.GenericAnalogIn_getAvailableSampleRates(self)
+        return _libm2k.GenericAnalogIn_getAvailableSampleRates(self, *args)
+
+
+    def getMaximumSamplerate(self, *args):
+        """
+        getMaximumSamplerate(GenericAnalogIn self) -> double
+        getMaximumSamplerate(GenericAnalogIn self, unsigned int chn_idx) -> double
+
+        Parameters
+        ----------
+        chn_idx: unsigned int
+
+        """
+        return _libm2k.GenericAnalogIn_getMaximumSamplerate(self, *args)
 
 
     def enableChannel(self, index, enable):
@@ -4990,6 +5004,18 @@ class GenericAnalogIn(_object):
 
         """
         return _libm2k.GenericAnalogIn_getIioObjects(self)
+
+
+    def getNbChannels(self):
+        """
+        getNbChannels(GenericAnalogIn self) -> unsigned int
+
+        Parameters
+        ----------
+        self: libm2k::analog::GenericAnalogIn *
+
+        """
+        return _libm2k.GenericAnalogIn_getNbChannels(self)
 
 GenericAnalogIn_swigregister = _libm2k.GenericAnalogIn_swigregister
 GenericAnalogIn_swigregister(GenericAnalogIn)
@@ -6186,6 +6212,18 @@ class M2kAnalogIn(_object):
         """
         return _libm2k.M2kAnalogIn_getChannelName(self, channel)
 
+
+    def getMaximumSamplerate(self):
+        """
+        getMaximumSamplerate(M2kAnalogIn self) -> double
+
+        Parameters
+        ----------
+        self: libm2k::analog::M2kAnalogIn *
+
+        """
+        return _libm2k.M2kAnalogIn_getMaximumSamplerate(self)
+
 M2kAnalogIn_swigregister = _libm2k.M2kAnalogIn_swigregister
 M2kAnalogIn_swigregister(M2kAnalogIn)
 
@@ -6596,6 +6634,18 @@ class M2kAnalogOut(_object):
 
         """
         return _libm2k.M2kAnalogOut_getChannelName(self, channel)
+
+
+    def getMaximumSamplerate(self, chn_idx):
+        """
+        getMaximumSamplerate(M2kAnalogOut self, unsigned int chn_idx) -> double
+
+        Parameters
+        ----------
+        chn_idx: unsigned int
+
+        """
+        return _libm2k.M2kAnalogOut_getMaximumSamplerate(self, chn_idx)
 
 M2kAnalogOut_swigregister = _libm2k.M2kAnalogOut_swigregister
 M2kAnalogOut_swigregister(M2kAnalogOut)

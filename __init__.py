@@ -14,13 +14,16 @@ elif _sys.platform in ['darwin']:
 # Linux ADALM2000 Drivers
 else:                         
     _sys.path.append(_os.path.join(__path__[0], 'libm2k', 'linux'))
-    try:    import libm2k as _m2k
+    try: import libm2k as _m2k
     except: _m2k = None
+        
 
 # Test for VISA
 try:    import visa as _v
-except: print('Visa driver and / or pyvisa not installed. On Windows, consider Rhode & Schwartz VISA or NI-VISA, then pip install pyvisa. On Linux, pip install pyvisa and pyvisa-py')
-
+except: 
+    print('Visa driver and / or pyvisa not installed. On Windows, consider Rhode & Schwartz VISA or NI-VISA, then pip install pyvisa. On Linux, pip install pyvisa and pyvisa-py')
+    _v = None
+    
 from . import visa_tools
 from . import instruments
 from . import data

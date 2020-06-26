@@ -8,8 +8,8 @@
 #  Let me know if you find out how to name the scope.
 
 # Feature to implement
-#  * Find trigger time and define this to be zero.
-#  * Option to query full data set
+#  * Sillyscope: Find trigger time and define this to be zero.
+#  * Sillyscope: Option to query full data set
 
 # ISSUES:
 # * Rigol B: switching from peak detect to normal in between runs causes acquire button to fail once.
@@ -19,7 +19,7 @@ import numpy   as _n
 import time    as _t
 import spinmob as _s
 import spinmob.egg as _egg
-import mcphysics as _mp; _m2k = _mp._m2k
+import mcphysics as _mp; _m2k = _mp._m2k; _v = _mp._v
 import time    as _time
 _g = _egg.gui
 
@@ -69,8 +69,10 @@ class _adalm2000_analog_in(_adalm2000_object):
         -------
         Actual sample rate
         """
-        if not self.simulation_mode: self.more.setSampleRate(sample_rate)
-        return self.more.getSampleRate()
+        if not self.simulation_mode: 
+            self.more.setSampleRate(sample_rate)
+            return self.more.getSampleRate()
+        return sample_rate
 
     def get_samples(self, samples=8192):
         """
@@ -381,6 +383,8 @@ class _adalm2000_analog_out(_adalm2000_object):
             self.more.enableChannel(0, enable1)
             self.more.enableChannel(1, enable2)
         return self.get_enabled()
+    
+    enable = set_enabled
 
     def get_cyclic(self):
         """
@@ -424,7 +428,9 @@ class _adalm2000_analog_out(_adalm2000_object):
         -------
         self
         """
-        if not self.simulation_mode: self.more.push(channel-1, samples)
+        if not self.simulation_mode: 
+            if not channel in [1,2]: channel = 1
+            self.more.push(channel-1, samples)
         return self
 
 class _adalm2000_power(_adalm2000_object):
@@ -474,9 +480,11 @@ class adalm2000_api():
 
         # If the import failed, _m2k = None
         if _m2k == None:
-            print('You need to install libiio and libm2k for ADALM2000 to work.')
             self.simulation_mode = True
-
+            self.ai = _adalm2000_analog_in(None)
+            self.ao = _adalm2000_analog_out(None)
+            self.power = _adalm2000_power(None)
+            
         # Assume it's working.
         else:
             # Open the connection
@@ -525,8 +533,8 @@ class adalm2000_api():
         -------
         self
         """
-        self.m2k.setTimeout(timeout_ms)
-
+        if not self.simulation_mode: self.m2k.setTimeout(timeout_ms)
+        return self
 
 class adalm2000():
     """
@@ -564,7 +572,8 @@ class adalm2000():
         gb = self._grid_bottom = w.add(_g.GridLayout(margins=False), column=1, row=2, alignment=0)
 
         # Add a combo box for all the available devices and a button to connect
-        contexts = list(_m2k.getAllContexts())
+        if _m2k: contexts = list(_m2k.getAllContexts())
+        else:    contexts = [] 
         contexts.append('Simulation')
         self.combo_contexts = gt.add(_g.ComboBox(contexts))
         self.button_connect = gt.add(_g.Button('Connect', checkable=True))
@@ -641,8 +650,12 @@ class adalm2000():
 
         self.tab_analog_in.tab_raw  = self.tab_analog_in.tabs.add_tab('Raw Voltages')
         self.tab_analog_in.plot_raw = self.tab_analog_in.tab_raw.add(_g.DataboxPlot('*.raw', autosettings_path=self.name+'_adc_plot_raw'), alignment=0)
-        self.tab_analog_in.plot_raw.ROIs = [_egg.pyqtgraph.InfiniteLine(angle=0, movable=True, pen=(0,2)),
-                                            _egg.pyqtgraph.InfiniteLine(angle=0, movable=True, pen=(1,2))]
+        self.tab_analog_in.plot_raw.ROIs = [
+            [_egg.pyqtgraph.InfiniteLine(angle=0,  movable=True, pen=(0,2)),
+             _egg.pyqtgraph.InfiniteLine(angle=90, movable=True, pen=(0,2)),
+             ],
+            [_egg.pyqtgraph.InfiniteLine(angle=0,  movable=True, pen=(1,2)),
+             _egg.pyqtgraph.InfiniteLine(angle=90, movable=True, pen=(1,2))]]
 
         # Some initial data.
         self.tab_analog_in.plot_raw['t'] = []
@@ -738,8 +751,10 @@ class adalm2000():
         self.tab_analog_in.settings.connect_signal_changed('Trigger/Ch2/Level', self._analog_in_settings_changed)
 
         # Trigger cursors
-        self.tab_analog_in.plot_raw.ROIs[0].sigPositionChangeFinished.connect(self._analog_in_cursor_drag_end)
-        self.tab_analog_in.plot_raw.ROIs[1].sigPositionChangeFinished.connect(self._analog_in_cursor_drag_end)
+        self.tab_analog_in.plot_raw.ROIs[0][0].sigPositionChangeFinished.connect(self._analog_in_cursor_drag_end)
+        self.tab_analog_in.plot_raw.ROIs[1][0].sigPositionChangeFinished.connect(self._analog_in_cursor_drag_end)
+        self.tab_analog_in.plot_raw.ROIs[0][1].sigPositionChangeFinished.connect(self._analog_in_cursor_drag_end)
+        self.tab_analog_in.plot_raw.ROIs[1][1].sigPositionChangeFinished.connect(self._analog_in_cursor_drag_end)
 
         # If you found this, congrats, feel free to comment it out. But you'd
         # better make sure you know exactly what it does ;)
@@ -756,7 +771,7 @@ class adalm2000():
         self.api = adalm2000_api(uri)
 
         # Easier coding
-        self.ai  = self.api.ai
+        self.ai = self.api.ai
         self.ao = self.api.ao
         self.power      = self.api.power
 
@@ -831,24 +846,24 @@ class adalm2000():
         """
         Called when specific settings change.
         """
-        self.tab_analog_in.plot_raw.ROIs[0].setPos((0, self.tab_analog_in.settings['Trigger/Ch1/Level']))
-        self.tab_analog_in.plot_raw.ROIs[1].setPos((0, self.tab_analog_in.settings['Trigger/Ch2/Level']))
+        self.tab_analog_in.plot_raw.ROIs[0][0].setPos((0, self.tab_analog_in.settings['Trigger/Ch1/Level']))
+        self.tab_analog_in.plot_raw.ROIs[1][0].setPos((0, self.tab_analog_in.settings['Trigger/Ch2/Level']))
         if(self.button_connect.is_checked()): self._analog_in_cursor_drag_end()
 
     def _analog_in_cursor_drag_end(self, *a):
         """
         Called whenever someone moves a cursor in the analog in tab.
         """
-        V1 = self.tab_analog_in.plot_raw.ROIs[0].getPos()[1]
-        V2 = self.tab_analog_in.plot_raw.ROIs[1].getPos()[1]
+        V1 = self.tab_analog_in.plot_raw.ROIs[0][0].getPos()[1]
+        V2 = self.tab_analog_in.plot_raw.ROIs[1][0].getPos()[1]
 
         # Set them on the hardware
         self.ai.set_trigger_levels(V1, V2)
         V1, V2 = self.ai.get_trigger_levels()
 
         # Update the cursor to the actual value
-        self.tab_analog_in.plot_raw.ROIs[0].setPos((0,V1))
-        self.tab_analog_in.plot_raw.ROIs[1].setPos((0,V2))
+        self.tab_analog_in.plot_raw.ROIs[0][0].setPos((0,V1))
+        self.tab_analog_in.plot_raw.ROIs[1][0].setPos((0,V2))
 
         # Trigger levels
         self.tab_analog_in.settings.set_value('Trigger/Ch1/Level', V1, block_user_signals=True)
@@ -2346,3 +2361,6 @@ if __name__ == '__main__':
 
     self = adalm2000()
     self.button_connect.click()
+    self.ao.enable(True, False)
+    self.ao.send_samples(1, _n.linspace(-2,2,1000))
+    
