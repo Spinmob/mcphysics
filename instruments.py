@@ -51,7 +51,7 @@ class _adalm2000_analog_in(_adalm2000_object):
 
     def get_sample_rate(self):
         """
-        Returns the current sample rate.
+        Returns the current sample rate (Hz)
         """
         if self.simulation_mode: return 1e7
         else:                    return self.more.getSampleRate()
@@ -328,6 +328,41 @@ class _adalm2000_analog_in(_adalm2000_object):
             t.setAnalogHysteresis(1, V1)
         return self
 
+    def get_trigger_delay(self):
+        """
+        Returns the trigger delay in seconds.
+        """
+        
+        if not self.simulation_mode:
+            t = self.more.getTrigger()
+            return t.getAnalogDelay() / self.get_sample_rate()
+        return 0
+    
+    def set_trigger_delay(self, delay=0.0):
+        """
+        Sets the trigger delay in seconds.
+        
+        Parameters
+        ----------
+        delay : float
+            Trigger delay in seconds.
+        
+        Returns
+        -------
+        Actual trigger delay in seconds (self.get_trigger_delay()).
+        """
+        if not self.simulation_mode:
+            t = self.more.getTrigger()
+            
+            # Convert to samples and limit at -8192
+            N = int(delay*self.get_sample_rate())
+            if N < -8192: N = -8192
+            
+            # Set it and check it.
+            t.setAnalogDelay(N)
+            return self.get_trigger_delay()
+        return delay
+
 class _adalm2000_analog_out(_adalm2000_object):
 
     def get_sample_rates(self):
@@ -584,8 +619,8 @@ class adalm2000():
         self.tabs = gb.add(_g.TabArea(self.name+'_tabarea'), alignment=0)
 
         # Add the tabs for the different functionalities
-        self._build_tab_analog_in()
-        self._build_tab_analog_out()
+        self._build_tab_ai()
+        self._build_tab_ao()
         self._build_tab_power()
 
         # Disable the tabs until we connect
@@ -629,47 +664,46 @@ class adalm2000():
         self.tab_power.timer = _g.Timer(500)
         self.tab_power.timer.signal_tick.connect(self._power_timer_tick)
 
-    def _build_tab_analog_out(self):
+    def _build_tab_ao(self):
         """
         Assembles the analog out tab.
         """
-        self.tab_analog_out =self.tabs.add_tab('Analog Out')
+        self.tab_ao =self.tabs.add_tab('Analog Out')
 
-    def _build_tab_analog_in(self):
+    def _build_tab_ai(self):
         """
         Builds the innards of the analog in tab.
         """
         # ADC Tab
-        self.tab_analog_in = self.tabs.add_tab('Analog In')
-        self.tab_analog_in.button_acquire = self.tab_analog_in.add(_g.Button('Acquire', checkable=True))
-        self.tab_analog_in.button_onair   = self.tab_analog_in.add(_g.Button('On Air',  checkable=True))
-        self.tab_analog_in.label_info     = self.tab_analog_in.add(_g.Label(''))
+        self.tab_ai = self.tabs.add_tab('Analog In')
+        self.tab_ai.button_acquire = self.tab_ai.add(_g.Button('Acquire', checkable=True))
+        self.tab_ai.button_onair   = self.tab_ai.add(_g.Button('On Air',  checkable=True))
+        self.tab_ai.label_info     = self.tab_ai.add(_g.Label(''))
 
         # Add sub-tabs for ai plot & analysis
-        self.tab_analog_in.tabs     = self.tab_analog_in.add(_g.TabArea(autosettings_path=self.name+'_adc_tabs'), 3,0, alignment=0, row_span=2)
+        self.tab_ai.tabs     = self.tab_ai.add(_g.TabArea(autosettings_path=self.name+'_adc_tabs'), 3,0, alignment=0, row_span=2)
 
-        self.tab_analog_in.tab_raw  = self.tab_analog_in.tabs.add_tab('Raw Voltages')
-        self.tab_analog_in.plot_raw = self.tab_analog_in.tab_raw.add(_g.DataboxPlot('*.raw', autosettings_path=self.name+'_adc_plot_raw'), alignment=0)
-        self.tab_analog_in.plot_raw.ROIs = [
-            [_egg.pyqtgraph.InfiniteLine(angle=0,  movable=True, pen=(0,2)),
-             _egg.pyqtgraph.InfiniteLine(angle=90, movable=True, pen=(0,2)),
-             ],
-            [_egg.pyqtgraph.InfiniteLine(angle=0,  movable=True, pen=(1,2)),
-             _egg.pyqtgraph.InfiniteLine(angle=90, movable=True, pen=(1,2))]]
+        self.tab_ai.tab_raw  = self.tab_ai.tabs.add_tab('Raw Voltages')
+        self.tab_ai.plot_raw = self.tab_ai.tab_raw.add(_g.DataboxPlot('*.raw', autosettings_path=self.name+'_adc_plot_raw'), alignment=0)
+        self.tab_ai.plot_raw.ROIs = [
+            [_egg.pyqtgraph.InfiniteLine(angle=90, movable=True, pen=(0,2)),
+             _egg.pyqtgraph.InfiniteLine(angle=0,  movable=True, pen=(0,2))],
+            [_egg.pyqtgraph.InfiniteLine(angle=90, movable=True, pen=(1,2)),
+             _egg.pyqtgraph.InfiniteLine(angle=0,  movable=True, pen=(1,2))]]
 
         # Some initial data.
-        self.tab_analog_in.plot_raw['t'] = []
-        self.tab_analog_in.plot_raw['V1'] = []
-        self.tab_analog_in.plot_raw['V2'] = []
-        self.tab_analog_in.plot_raw.plot()
+        self.tab_ai.plot_raw['t'] = [0]
+        self.tab_ai.plot_raw['V1'] = [0]
+        self.tab_ai.plot_raw['V2'] = [0]
+        self.tab_ai.plot_raw.plot()
 
 
-        self.tab_analog_in.tab_processor = self.tab_analog_in.tabs.add_tab('Processor')
-        self.tab_analog_in.processor  = self.tab_analog_in.tab_processor.add(_g.DataboxProcessor(self.name+'_processor1', self.tab_analog_in.plot_raw, '*.txt') , alignment=0)
-        self.tab_analog_in.new_autorow()
+        self.tab_ai.tab_processor = self.tab_ai.tabs.add_tab('Processor')
+        self.tab_ai.processor  = self.tab_ai.tab_processor.add(_g.DataboxProcessor(self.name+'_processor1', self.tab_ai.plot_raw, '*.txt') , alignment=0)
+        self.tab_ai.new_autorow()
 
         # Settings for the acquisition
-        s = self.tab_analog_in.settings  = self.tab_analog_in.add(_g.TreeDictionary(self.name+'_adc_settings'), column_span=3)
+        s = self.tab_ai.settings  = self.tab_ai.add(_g.TreeDictionary(self.name+'_adc_settings'), column_span=3)
         s.add_parameter('Iterations', 0, tip='How many acquisitions to perform.')
         s.add_parameter('Samples', 1000, limits=(2,None), siPrefix=True, suffix='S', dec=True, tip='How many samples to acquire. 1-8192 guaranteed. \nLarger values possible, depending on USB bandwidth.')
         s.add_parameter('Rate(MHz)', [1e2, 1e1, 1e0, 1e-1, 1e-2, 1e-3], tip='How fast to acquire data (MHz)')
@@ -683,8 +717,10 @@ class adalm2000():
         s.add_parameter('Ch1_Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages.')
         s.add_parameter('Ch2_Range', ['+/-25V', '+/-2.5V'], tip='Range of accepted voltages.')
 
+
         # Note these lists MUST be in this order; their indices are
         # constants defined by libm2k: https://analogdevicesinc.github.io/libm2k/enums_8hpp.html
+        
         s.add_parameter('Trigger/In', [
             'Ch1',
             'Ch2',
@@ -704,6 +740,8 @@ class adalm2000():
             'Analog In',
             'Digital In'
             ], tip='Which source to use for triggering an acquisition.')
+
+        s.add_parameter('Trigger/Delay', 0.0, suffix='s', siPrefix=True, step=0.01, tip='Horizontal (time) offset relative to trigger point. The trigger point is always defined to be at time t=0.')
 
         s.add_parameter('Trigger/Ch1', [
             'Immediate',
@@ -735,30 +773,36 @@ class adalm2000():
         s.add_parameter('Trigger/Ch1/Level', 0.0, step=0.01, suffix='V', siPrefix=True, tip='Trigger level (Volts).')
         s.add_parameter('Trigger/Ch2/Level', 0.0, step=0.01, suffix='V', siPrefix=True, tip='Trigger level (Volts).')
 
-        s.add_parameter('Trigger/Ch1/Hysteresis', 0.0, limits=(0, 2.5), dec=True, suffix='V', siPrefix=True)
-        s.add_parameter('Trigger/Ch2/Hysteresis', 0.0, limits=(0, 2.5), dec=True, suffix='V', siPrefix=True)
+        s.add_parameter('Trigger/Ch1/Hysteresis', 0.0, limits=(0, 2.5), dec=True, suffix='V', siPrefix=True, tip='How far the signal must swing away from the trigger level before another trigger is accepted.')
+        s.add_parameter('Trigger/Ch2/Hysteresis', 0.0, limits=(0, 2.5), dec=True, suffix='V', siPrefix=True, tip='How far the signal must swing away from the trigger level before another trigger is accepted.')
 
+        self.tab_ai.button_auto = s.add_button('Trigger/Auto')
+        
+        
+        
         # Formatting
-        self.tab_analog_in.set_row_stretch(1)
-        self.tab_analog_in.set_column_stretch(3)
+        self.tab_ai.set_row_stretch(1)
+        self.tab_ai.set_column_stretch(3)
 
         # Transfer settings to plots etc
-        self._analog_in_settings_changed()
+        self._ai_settings_changed()
 
         # Connect all the signals.
-        self.tab_analog_in.button_acquire.signal_clicked.connect(self._analog_in_button_acquire_clicked)
-        self.tab_analog_in.settings.connect_signal_changed('Trigger/Ch1/Level', self._analog_in_settings_changed)
-        self.tab_analog_in.settings.connect_signal_changed('Trigger/Ch2/Level', self._analog_in_settings_changed)
-
+        self.tab_ai.button_acquire.signal_clicked.connect(self._ai_button_acquire_clicked)
+        self.tab_ai.settings.connect_signal_changed('Trigger/Ch1/Level', self._ai_settings_changed)
+        self.tab_ai.settings.connect_signal_changed('Trigger/Ch2/Level', self._ai_settings_changed)
+        self.tab_ai.settings.connect_signal_changed('Trigger/Delay', self._ai_settings_changed)
+        self.tab_ai.button_auto.signal_clicked.connect(self._ai_button_auto_clicked)
+        
         # Trigger cursors
-        self.tab_analog_in.plot_raw.ROIs[0][0].sigPositionChangeFinished.connect(self._analog_in_cursor_drag_end)
-        self.tab_analog_in.plot_raw.ROIs[1][0].sigPositionChangeFinished.connect(self._analog_in_cursor_drag_end)
-        self.tab_analog_in.plot_raw.ROIs[0][1].sigPositionChangeFinished.connect(self._analog_in_cursor_drag_end)
-        self.tab_analog_in.plot_raw.ROIs[1][1].sigPositionChangeFinished.connect(self._analog_in_cursor_drag_end)
+        self.tab_ai.plot_raw.ROIs[0][0].sigPositionChanged.connect(self._ai_cursor_drag)
+        self.tab_ai.plot_raw.ROIs[1][0].sigPositionChanged.connect(self._ai_cursor_drag)
+        self.tab_ai.plot_raw.ROIs[0][1].sigPositionChanged.connect(self._ai_cursor_drag)
+        self.tab_ai.plot_raw.ROIs[1][1].sigPositionChanged.connect(self._ai_cursor_drag)
 
         # If you found this, congrats, feel free to comment it out. But you'd
         # better make sure you know exactly what it does ;)
-        self.tab_analog_in.processor.settings.hide_parameter('Average/Error')
+        self.tab_ai.processor.settings.hide_parameter('Average/Error')
 
     def _button_connect_clicked(self, *a):
         """
@@ -842,50 +886,88 @@ class adalm2000():
 
         return
 
-    def _analog_in_settings_changed(self, *a):
+    def _ai_settings_changed(self, *a):
         """
         Called when specific settings change.
         """
-        self.tab_analog_in.plot_raw.ROIs[0][0].setPos((0, self.tab_analog_in.settings['Trigger/Ch1/Level']))
-        self.tab_analog_in.plot_raw.ROIs[1][0].setPos((0, self.tab_analog_in.settings['Trigger/Ch2/Level']))
-        if(self.button_connect.is_checked()): self._analog_in_cursor_drag_end()
+        self.tab_ai.plot_raw.ROIs[0][0].setPos((self.tab_ai.settings['Trigger/Delay'], 0))
+        self.tab_ai.plot_raw.ROIs[1][0].setPos((self.tab_ai.settings['Trigger/Delay'], 0))
+        self.tab_ai.plot_raw.ROIs[0][1].setPos((0, self.tab_ai.settings['Trigger/Ch1/Level']))
+        self.tab_ai.plot_raw.ROIs[1][1].setPos((0, self.tab_ai.settings['Trigger/Ch2/Level']))
+        
+        if(self.button_connect.is_checked()): self._ai_cursor_drag()
 
-    def _analog_in_cursor_drag_end(self, *a):
+    def _ai_cursor_drag(self, *a):
         """
         Called whenever someone moves a cursor in the analog in tab.
         """
-        V1 = self.tab_analog_in.plot_raw.ROIs[0][0].getPos()[1]
-        V2 = self.tab_analog_in.plot_raw.ROIs[1][0].getPos()[1]
+        # Time cursors should set each other.
+        if a[0] == self.tab_ai.plot_raw.ROIs[0][0]:
+            
+            # Get the x-position and update the other stuff
+            x = a[0].getPos()[0]
+            self.tab_ai.plot_raw.ROIs[1][0].setPos((x,0))
+            self.tab_ai.settings['Trigger/Delay'] = x
+        
+        elif a[0] == self.tab_ai.plot_raw.ROIs[1][0]:
+            
+            # Get the x-position and update the other stuff
+            x = a[0].getPos()[0]
+            self.tab_ai.plot_raw.ROIs[0][0].setPos((x,0))
+            self.tab_ai.settings['Trigger/Delay'] = x
+        
+        # Other cursors are simpler.
+        else:
+            
+            # Trigger level cursors
+            V1 = self.tab_ai.plot_raw.ROIs[0][1].getPos()[1]
+            V2 = self.tab_ai.plot_raw.ROIs[1][1].getPos()[1]
+    
+            # Set them on the hardware
+            self.ai.set_trigger_levels(V1, V2)
+            V1, V2 = self.ai.get_trigger_levels()
+    
+            # Update the cursor to the actual value
+            self.tab_ai.plot_raw.ROIs[0][1].setPos((0,V1))
+            self.tab_ai.plot_raw.ROIs[1][1].setPos((0,V2))
+    
+            # Trigger levels
+            self.tab_ai.settings.set_value('Trigger/Ch1/Level', V1, block_user_signals=True)
+            self.tab_ai.settings.set_value('Trigger/Ch2/Level', V2, block_user_signals=True)
 
-        # Set them on the hardware
-        self.ai.set_trigger_levels(V1, V2)
-        V1, V2 = self.ai.get_trigger_levels()
+    def _ai_button_auto_clicked(self, *a):
+        """
+        Homes the trigger.
+        """
+        p = self.tab_ai.plot_raw
+        s = self.tab_ai.settings
+        
+        # If there is data, use the midpoints for the level
+        if len(p.ckeys) > 1: s['Trigger/Ch1/Level'] = _n.average(p[1])
+        else:                s['Trigger/Ch1/Level'] = 0.0;
+        if len(p.ckeys) > 2: s['Trigger/Ch2/Level'] = _n.average(p[2])
+        else:                s['Trigger/Ch2/Level'] = 0.0;
+        
+        # Set the delay to zero
+        s['Trigger/Delay'] = 0
 
-        # Update the cursor to the actual value
-        self.tab_analog_in.plot_raw.ROIs[0][0].setPos((0,V1))
-        self.tab_analog_in.plot_raw.ROIs[1][0].setPos((0,V2))
-
-        # Trigger levels
-        self.tab_analog_in.settings.set_value('Trigger/Ch1/Level', V1, block_user_signals=True)
-        self.tab_analog_in.settings.set_value('Trigger/Ch2/Level', V2, block_user_signals=True)
-
-    def _analog_in_button_acquire_clicked(self, *a):
+    def _ai_button_acquire_clicked(self, *a):
         """
         Called when someone clicks the "acquire" button on the ADC tab.
         """
         # If we just turned it off, poop out instead of starting another loop.
-        if not self.tab_analog_in.button_acquire.is_checked(): return
+        if not self.tab_ai.button_acquire.is_checked(): return
 
         # Easy coding
-        s  = self.tab_analog_in.settings
-        p  = self.tab_analog_in.plot_raw
-        p1 = self.tab_analog_in.processor
+        s  = self.tab_ai.settings
+        p  = self.tab_ai.plot_raw
+        p1 = self.tab_ai.processor
 
         # Iteration number
-        n = 0; self.tab_analog_in.label_info.set_text('Iteration: '+str(n))
+        n = 0; self.tab_ai.label_info.set_text('Iteration: '+str(n))
 
         # Loop until we've finishe our iterations, someone pushed the button, or forever (iterations=0)
-        while self.tab_analog_in.button_acquire.is_checked() and \
+        while self.tab_ai.button_acquire.is_checked() and \
             (n < s['Iterations'] or s['Iterations'] < 1):
 
             # Enable channels (THIS DOESN'T HAVE AN EFFECT!)
@@ -904,25 +986,27 @@ class adalm2000():
                                   s['Ch2_Range']=='+/-25V')
 
             # Set the trigger source, out, conditions, and levels
-            self.ai.set_trigger_modes(s.get_list_index('Trigger/Ch1'),
-                                      s.get_list_index('Trigger/Ch2'))
-
+            
             self.ai.set_trigger_in  (s.get_list_index('Trigger/In'))
             self.ai.set_trigger_out (s.get_list_index('Trigger/Out'))
+            t_delay = self.ai.set_trigger_delay(s['Trigger/Delay'])
+
+            self.ai.set_trigger_modes(s.get_list_index('Trigger/Ch1'),
+                                      s.get_list_index('Trigger/Ch2'))
             self.ai.set_trigger_conditions(s.get_list_index('Trigger/Ch1/Condition'),
                                            s.get_list_index('Trigger/Ch2/Condition'))
             self.ai.set_trigger_levels(s['Trigger/Ch1/Level'],
                                        s['Trigger/Ch2/Level'])
             self.ai.set_trigger_hystereses(s['Trigger/Ch1/Hysteresis'],
                                            s['Trigger/Ch2/Hysteresis'])
-
+            
             # Get the time array
-            ts = _n.linspace(0, (s['Samples']-1)/rate, s['Samples'])
+            ts = _n.linspace(t_delay, t_delay + (s['Samples']-1)/rate, s['Samples'])
 
             # Get the data
-            self.tab_analog_in.button_onair.set_checked(True).set_colors('red', 'pink'); self.window.process_events();
+            self.tab_ai.button_onair.set_checked(True).set_colors('red', 'pink'); self.window.process_events();
             vs = self.ai.get_samples(s['Samples'])
-            self.tab_analog_in.button_onair.set_checked(False).set_colors('black', None); self.window.process_events();
+            self.tab_ai.button_onair.set_checked(False).set_colors('black', None); self.window.process_events();
 
             # If vs==None it's a timeout
             if vs:
@@ -944,13 +1028,13 @@ class adalm2000():
 
                 # Increment, update move on.
                 n += 1
-                self.tab_analog_in.label_info.set_text('Iteration: '+str(n))
+                self.tab_ai.label_info.set_text('Iteration: '+str(n))
 
             # Let the user interact
             self.window.process_events()
 
         # Pop the button when we're done.
-        self.tab_analog_in.button_acquire.set_checked(False)
+        self.tab_ai.button_acquire.set_checked(False)
 
 
 
