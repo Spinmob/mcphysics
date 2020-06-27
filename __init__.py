@@ -3,8 +3,8 @@ import os  as _os
 
 # Windows ADALM2000 Drivers
 if _sys.platform in ['win32']:  
-    print('No ADALM2000 on Windows yet.')
-    _m2k = None
+    try:    import libm2k as _m2k
+    except: print('To use an ADALM2000 on Windows, you need to install the m2k/ADALM2000 drivers, libiio, and libm2k with python bindings.')
 
 # OSX ADALM2000 Drivers
 elif _sys.platform in ['darwin']: 

@@ -325,7 +325,7 @@ class _adalm2000_analog_in(_adalm2000_object):
         if not self.simulation_mode:
             t = self.more.getTrigger()
             t.setAnalogHysteresis(0, V1)
-            t.setAnalogHysteresis(1, V1)
+            t.setAnalogHysteresis(1, V2)
         return self
 
     def get_trigger_delay(self):
@@ -516,8 +516,8 @@ class adalm2000_api():
         # If the import failed, _m2k = None
         if _m2k == None:
             self.simulation_mode = True
-            self.ai = _adalm2000_analog_in(None)
-            self.ao = _adalm2000_analog_out(None)
+            self.ai    = _adalm2000_analog_in(None)
+            self.ao    = _adalm2000_analog_out(None)
             self.power = _adalm2000_power(None)
             
         # Assume it's working.
@@ -815,9 +815,9 @@ class adalm2000():
         self.api = adalm2000_api(uri)
 
         # Easier coding
-        self.ai = self.api.ai
-        self.ao = self.api.ao
-        self.power      = self.api.power
+        self.ai    = self.api.ai
+        self.ao    = self.api.ao
+        self.power = self.api.power
 
         # If simulation mode, make this clear
         if self.api.simulation_mode:
