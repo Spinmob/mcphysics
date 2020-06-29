@@ -943,9 +943,9 @@ class adalm2000():
         s = self.tab_ai.settings
         
         # If there is data, use the midpoints for the level
-        if len(p.ckeys) > 1: s['Trigger/Ch1/Level'] = _n.average(p[1])
+        if len(p.ckeys) > 1: s['Trigger/Ch1/Level'] = 0.5*(max(p[1])+min(p[1]))
         else:                s['Trigger/Ch1/Level'] = 0.0;
-        if len(p.ckeys) > 2: s['Trigger/Ch2/Level'] = _n.average(p[2])
+        if len(p.ckeys) > 2: s['Trigger/Ch2/Level'] = 0.5*(max(p[2])+min(p[2]))
         else:                s['Trigger/Ch2/Level'] = 0.0;
         
         # Set the delay to zero
@@ -2450,7 +2450,7 @@ if __name__ == '__main__':
     
     # Trigger pulse
     trigger = _n.zeros(1000)
-    trigger[0:100] = 2;
-    self.ao.more.push([_n.linspace(-2,2,1000), trigger])
+    trigger[0:100] = 0.1;
+    self.ao.more.push([_n.linspace(-2,2,1000)*0, trigger])
     self.tab_ai.button_acquire.click()
     
