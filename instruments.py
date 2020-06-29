@@ -902,14 +902,14 @@ class adalm2000():
         Called whenever someone moves a cursor in the analog in tab.
         """
         # Time cursors should set each other.
-        if a[0] == self.tab_ai.plot_raw.ROIs[0][0]:
+        if len(a) and a[0] == self.tab_ai.plot_raw.ROIs[0][0]:
             
             # Get the x-position and update the other stuff
             x = a[0].getPos()[0]
             self.tab_ai.plot_raw.ROIs[1][0].setPos((x,0))
             self.tab_ai.settings['Trigger/Delay'] = x
         
-        elif a[0] == self.tab_ai.plot_raw.ROIs[1][0]:
+        elif len(a) and a[0] == self.tab_ai.plot_raw.ROIs[1][0]:
             
             # Get the x-position and update the other stuff
             x = a[0].getPos()[0]
@@ -2445,6 +2445,12 @@ if __name__ == '__main__':
 
     self = adalm2000()
     self.button_connect.click()
-    self.ao.enable(True, False)
-    self.ao.send_samples(1, _n.linspace(-2,2,1000))
+    self.ao.more.enableChannel(0, True)
+    self.ao.more.enableChannel(1, True)
+    
+    # Trigger pulse
+    trigger = _n.zeros(1000)
+    trigger[0:100] = 2;
+    self.ao.more.push([_n.linspace(-2,2,1000), trigger])
+    self.tab_ai.button_acquire.click()
     
