@@ -421,32 +421,40 @@ class _adalm2000_analog_out(_adalm2000_object):
     
     enable = set_enabled
 
-    def get_cyclic(self):
+    def get_repeat_modes(self):
         """
-        Returns the cyclic state of both channels as tuple.
+        Returns the repeat mode of both channels as tuple.
         """
         if self.simulation_mode: return True, True
         return self.more.getCyclic(0), self.more.getCyclic(1)
 
-    def set_cyclic(self, cyclic1, cyclic2):
+    def set_repeat_modes(self, repeat1, repeat2):
         """
-        Sets the cyclic mode for each channel.
+        Sets the repeat mode for each channel.
 
         Parameters
         ----------
-        cyclic1 : bool
-            Whether channel 1 is cyclic.
-        cyclic2 : bool
-            Whether channel 2 is cyclic.
+        repeat1 : bool
+            Whether channel 1 is repeat.
+        repeat2 : bool
+            Whether channel 2 is repeat.
 
         Returns
         -------
-        The cyclic state of each.
+        The repeat state of each.
         """
         if not self.simulation_mode:
-            self.more.setCyclic(0, cyclic1)
-            self.more.setCyclic(1, cyclic2)
-        return self.get_cyclic()
+            # This is a hack that made it work reliably.
+            # Without messing with the buffer, it would only do 
+            # one at a time.
+            self.zero()
+            self.more.setCyclic(0, repeat1)
+            self.more.setCyclic(1, repeat2)
+            self.zero()
+            self.more.setCyclic(0, repeat1)
+            self.more.setCyclic(1, repeat2)
+            
+        return self.get_repeat_modes()
 
     def send_samples(self, channel, samples):
         """
@@ -464,9 +472,36 @@ class _adalm2000_analog_out(_adalm2000_object):
         self
         """
         if not self.simulation_mode: 
-            if not channel in [1,2]: channel = 1
+            if not channel in [1,2]: 
+                print('WARNING: send_samples() requires channel == 1 or 2')
+                channel = 1 # Some dummy proofing
             self.more.push(channel-1, samples)
         return self
+    
+    def send_samples_dual(self, V1, V2):
+        """
+        Streams the supplied two voltage arrays in parallel (synchronized) 
+        to the two outputs.
+        
+        Parameters
+        ----------
+        V1 : array of floats
+            Voltages to stream to analog output 1.
+        V2 : array of floats
+            Voltages to stream to analog output 2.
+        
+        Returns
+        -------
+        self
+        """
+        if not self.simulation_mode: self.more.push([V1, V2])
+        return self
+
+    def zero(self):
+        """
+        Zero it. Stopping gives strange results. Disabling doesn't have an effect.
+        """
+        self.send_samples_dual(_n.zeros(1), _n.zeros(1))
 
 class _adalm2000_power(_adalm2000_object):
 
@@ -664,24 +699,20 @@ class adalm2000():
         self.tab_power.timer = _g.Timer(500)
         self.tab_power.timer.signal_tick.connect(self._power_timer_tick)
 
-    def _build_tab_ao(self):
-        """
-        Assembles the analog out tab.
-        """
-        self.tab_ao =self.tabs.add_tab('Analog Out')
-
     def _build_tab_ai(self):
         """
         Builds the innards of the analog in tab.
         """
+        self._ai_rates = [100e6, 100e5, 100e4, 100e3, 100e2, 100e1]
+        
         # ADC Tab
         self.tab_ai = self.tabs.add_tab('Analog In')
         self.tab_ai.button_acquire = self.tab_ai.add(_g.Button('Acquire', checkable=True))
-        self.tab_ai.button_onair   = self.tab_ai.add(_g.Button('On Air',  checkable=True))
+        self.tab_ai.button_onair   = self._grid_top.add(_g.Button('On Air',  checkable=True)).set_width(50)
         self.tab_ai.label_info     = self.tab_ai.add(_g.Label(''))
 
         # Add sub-tabs for ai plot & analysis
-        self.tab_ai.tabs     = self.tab_ai.add(_g.TabArea(autosettings_path=self.name+'_adc_tabs'), 3,0, alignment=0, row_span=2)
+        self.tab_ai.tabs     = self.tab_ai.add(_g.TabArea(autosettings_path=self.name+'_adc_tabs'), 4,0, alignment=0, row_span=2)
 
         self.tab_ai.tab_raw  = self.tab_ai.tabs.add_tab('Raw Voltages')
         self.tab_ai.plot_raw = self.tab_ai.tab_raw.add(_g.DataboxPlot('*.raw', autosettings_path=self.name+'_adc_plot_raw'), alignment=0)
@@ -703,10 +734,10 @@ class adalm2000():
         self.tab_ai.new_autorow()
 
         # Settings for the acquisition
-        s = self.tab_ai.settings  = self.tab_ai.add(_g.TreeDictionary(self.name+'_adc_settings'), column_span=3)
+        s = self.tab_ai.settings  = self.tab_ai.add(_g.TreeDictionary(self.name+'_adc_settings'), column_span=4)
         s.add_parameter('Iterations', 0, tip='How many acquisitions to perform.')
         s.add_parameter('Samples', 1000, limits=(2,None), siPrefix=True, suffix='S', dec=True, tip='How many samples to acquire. 1-8192 guaranteed. \nLarger values possible, depending on USB bandwidth.')
-        s.add_parameter('Rate(MHz)', [1e2, 1e1, 1e0, 1e-1, 1e-2, 1e-3], tip='How fast to acquire data (MHz)')
+        s.add_parameter('Rate', ['100 MHz', '10 MHz', '1 MHz', '100 kHz', '10 kHz', '1 kHz'], tip='How fast to sample voltages.')
         s.add_parameter('Timeout', 0.2, limits=(0,None), suffix='s', siPrefix=True, dec=True, tip='How long to wait for a trigger before giving up. 0 means "forever"; be careful with that setting ;).')
 
         # This does not have an effect for some reason, so I disabled it.
@@ -778,11 +809,9 @@ class adalm2000():
 
         self.tab_ai.button_auto = s.add_button('Trigger/Auto')
         
-        
-        
         # Formatting
         self.tab_ai.set_row_stretch(1)
-        self.tab_ai.set_column_stretch(3)
+        self.tab_ai.set_column_stretch(4, 10)
 
         # Transfer settings to plots etc
         self._ai_settings_changed()
@@ -803,6 +832,235 @@ class adalm2000():
         # If you found this, congrats, feel free to comment it out. But you'd
         # better make sure you know exactly what it does ;)
         self.tab_ai.processor.settings.hide_parameter('Average/Error')
+
+    def _build_tab_ao(self):
+        """
+        Assembles the analog out tab.
+        """
+        self._ao_rates = [75e6, 75e5, 75e4, 75e3, 75e2, 75e1]
+        
+        # DAC Tab
+        self.tab_ao =self.tabs.add_tab('Analog Out')
+        self.tab_ao.button_send = self.tab_ao.add(_g.Button('Send'))
+        self.tab_ao.button_stop = self.tab_ao.add(_g.Button('Zero'))
+        self.tab_ao.button_auto = self.tab_ao.add(_g.Button('Auto', checkable=True))
+                
+        # Waveform inspector
+        self.tab_ao.tabs_data   = self.tab_ao.add(_g.TabArea(autosettings_path=self.name+'_tab_ao_tabs_data'), row_span=2, alignment=0)
+        self.tab_ao.tab_design  = self.tab_ao.tabs_data.add_tab('Design')
+        self.tab_ao.tab_sent    = self.tab_ao.tabs_data.add_tab('Sent')
+        self.tab_ao.plot_design = p = self.tab_ao.tab_design.add(_g.DataboxPlot('*.ao', autosettings_path=self.name+'_ao_plot_design', autoscript=2), alignment=0)
+        self.tab_ao.plot_sent       = self.tab_ao.tab_sent  .add(_g.DataboxPlot('*.ao', autosettings_path=self.name+'_ao_plot_sent',   autoscript=2), alignment=0)
+
+        # Default column positions
+        p['t1'] = []
+        p['V1'] = []
+        p['t2'] = []
+        p['V2'] = []
+        
+        # Settings
+        self.tab_ao.new_autorow()
+        self.tab_ao.settings = self.tab_ao.add(_g.TreeDictionary(autosettings_path=self.name+'_dac_settings'), column_span=3)
+        self._ao_settings_add_channel('Ch1')
+        self._ao_settings_add_channel('Ch2')
+
+        # Update design
+        self._ao_settings_changed()
+       
+        # Link callbacks
+        self.tab_ao.settings.connect_any_signal_changed(self._ao_settings_changed)
+        self.tab_ao.button_send.signal_clicked.connect(self._ao_button_send_clicked)
+        self.tab_ao.button_stop.signal_clicked.connect(self._ao_button_stop_clicked)
+        
+        # Other stuff
+        self.tab_ao.plot_design.after_load_file = self._ao_after_plot_design_load
+        
+        # Formatting
+        self.tab_ao.set_column_stretch(3)       
+    
+    def _ao_button_stop_clicked(self, *a):
+        """
+        Stop the ao.
+        """
+        self.ao.zero()
+        
+    def _ao_button_send_clicked(self, *a):
+        """
+        Sends the current design waveform to 
+        """
+        s = self.tab_ao.settings
+        p = self.tab_ao.plot_design
+        
+        # Enable / disable outputs
+        self.ao.set_enabled(s['Ch1'], s['Ch2'])
+        
+        # Set the rates
+        self.ao.set_sample_rates(self._ao_get_rate('Ch1'), self._ao_get_rate('Ch2'))
+        
+        # Set Repeat mode (BUG: NEED TO DO THIS TWICE FOR IT TO STICK)
+        self.ao.set_repeat_modes(s['Ch1/Repeat'], s['Ch2/Repeat'])
+        self.ao.set_repeat_modes(s['Ch1/Repeat'], s['Ch2/Repeat'])
+        
+        # Dual sync'd mode
+        if s['Ch1'] and s['Ch2']: self.ao.send_samples_dual(p['V1'], p['V2'])
+    
+        # Individual channel basis
+        else:
+            if s['Ch1']: self.ao.send_samples(1, p['V1'])
+            if s['Ch2']: self.ao.send_samples(2, p['V2'])
+        
+        
+        
+        
+        # Clear and replace the send plot info
+        ps = self.tab_ao.plot_sent
+        ps.clear()
+        ps.copy_all(p)        
+        ps.plot(); self.window.process_events()
+        
+    
+    def _ao_after_plot_design_load(self):
+        """
+        Do stuff after the plot is loaded. Update sample rate, samples, switch
+        to custom mode, etc.
+        """
+        s = self.tab_ao.settings
+        p = self.tab_ao.plot_design
+        s.update(p)
+        
+    def _ao_get_rate(self, c):
+        """
+        Returns the rate for the specified channel ('Ch1', or 'Ch2').
+        """
+        return self._ao_rates[self.tab_ao.settings.get_list_index(c+'/Rate')]
+
+    def _ao_update_waveform_frequency(self, c, w):
+        """
+        Returns the frequency for the settings under the specified root (e.g. c='Ch1', w='Sine')
+        """
+        s = self.tab_ao.settings
+        s.set_value(c+'/'+w, self._ao_get_rate(c)/s[c+'/Samples']*s[c+'/'+w+'/Cycles'],
+            block_user_signals=True)
+
+    def _ao_settings_add_channel(self, c):
+        """
+        Adds everything for the specified channel ('Ch1' or 'Ch2') to the tab_ao.settings.
+        """
+        s = self.tab_ao.settings
+
+        s.add_parameter(c, True, tip='Enable analog output 1')
+        s.add_parameter(c+'/Rate', ['75 MHz', '7.5 MHz', '750 kHz', '75 kHz', '7.5 kHz', '750 Hz'], tip='How fast to output voltages.')
+        s.add_parameter(c+'/Samples',  8000, limits=(1,None), dec=True, suffix='S', siPrefix=True, tip='Number of samples in the waveform. Above 8192, this number depends on USB bandwidth, I think.')
+        s.add_parameter(c+'/Repeat', True, tip='Whether the waveform should repeat.')
+        s.add_parameter(c+'/Waveform', ['Sine', 'Square', 'Custom'], tip='Choose a waveform.')
+        
+        # Sine
+        s.add_parameter(c+'/Sine', 0, suffix='Hz', siPrefix=True, tip='Frequency (from settings below).', readonly=True)
+        s.add_parameter(c+'/Sine/Cycles',    1, dec=True, tip='How many times to repeat the waveform within the specified number of samples.' )
+        s.add_parameter(c+'/Sine/Amplitude', 0.1, suffix='V', siPrefix=True, tip='Amplitude (not peak-to-peak).')
+        s.add_parameter(c+'/Sine/Offset',    0.0, suffix='V', siPrefix=True, tip='Offset.')
+        s.add_parameter(c+'/Sine/Phase',     0.0, step=5, suffix=' deg', tip='Phase of sine (90 corresponds to cosine).')
+
+        # Square
+        s.add_parameter(c+'/Square', 0, suffix='Hz', siPrefix=True, tip='Frequency (from settings below).', readonly=True)
+        s.add_parameter(c+'/Square/Cycles',  1, dec=True, tip='How many times to repeat the waveform within the specified number of samples.' )
+        s.add_parameter(c+'/Square/High',  0.1, suffix='V', siPrefix=True, tip='High value.')
+        s.add_parameter(c+'/Square/Low',   0.0, suffix='V', siPrefix=True, tip='Low value.')
+        s.add_parameter(c+'/Square/Start', 0.0, step=0.01, limits=(0,1), tip='Fractional position within a cycle where the voltage goes high.')
+        s.add_parameter(c+'/Square/Width', 0.5, step=0.01, limits=(0,1), tip='Fractional width of square pulse within a cycle.')
+
+    def _ao_settings_changed(self, *a):
+        """
+        When someone changes the ao settings, update the waveform.
+        """
+        # Select the appropriate waveform
+        for c in ['Ch1', 'Ch2']: self._ao_settings_select_waveform(c)
+        
+        # Update the other parameters and generate waveforms
+        self._ao_update_design()
+        
+        # If we're autosending
+        if self.tab_ao.button_auto.is_checked(): self.tab_ao.button_send.click()
+ 
+    def _ao_settings_select_waveform(self, c):
+        """
+        Shows and hides the waveform menus based on the selected value.
+        c = 'Ch1' or 'Ch2'.
+        """
+        # Show and hide waveform designers
+        s = self.tab_ao.settings
+        for w in ['Sine', 'Square']: s.hide_parameter(c+'/'+w, w == s[c+'/Waveform'])
+
+    def _ao_update_design(self):
+        """
+        Updates the design waveform based on the current settings.
+        """
+        s = self.tab_ao.settings
+        
+        # Calculate the frequencies from the Repetitions etc
+        for w in ['Sine', 'Square']:
+            self._ao_update_waveform_frequency('Ch1', w)
+            self._ao_update_waveform_frequency('Ch2', w)
+        
+        # Overwrite what's in there.
+        p = self.tab_ao.plot_design
+        s.send_to_databox_header(p)
+        self._ao_generate_waveform('Ch1')
+        self._ao_generate_waveform('Ch2')
+        
+        # Plot it
+        p.plot(); self.window.process_events()
+    
+    def _ao_generate_waveform(self, c):
+        """
+        Generates the waveform in settings channel c (can be 'Ch1' or 'Ch2'), and 
+        sends this to the design plotter.
+        """
+        s = self.tab_ao.settings    # Shortcut to settings
+        p = self.tab_ao.plot_design # Shortcut to plotter
+        w = s[c+'/Waveform']        # Waveform string, e.g. 'Sine'
+        N = s[c+'/Samples']         # Number of samples
+        R = self._ao_get_rate(c)    # Sampling rate in Hz
+        
+        # Get the time array
+        t = p['t'+c[-1]] = _n.linspace(0,(N-1)/R,N)
+        
+        # Don't adjust the voltages if custom mode unless the lengths don't match
+        if w == 'Custom': 
+            if not len(t) == len(p['V'+c[-1]]): p['V'+c[-1]] = _n.zeros(len(t))
+            return
+        
+        # Get the frequency and period for the other modes
+        f = s[c+'/'+w]              # Frequency in Hz
+        T = 1.0/f                   # Period (sec)
+        
+        # Get the waveform
+        if   w == 'Sine': p['V'+c[-1]] = s[c+'/Sine/Amplitude']*_n.sin((2*_n.pi*f)*t + s[c+'/Sine/Phase']*_n.pi/180.0)
+        elif w == 'Square':
+            
+            # Start with the "low" values
+            v = _n.full(N, s[c+'/Square/Low'])
+            
+            # Get the pulse up and down times for one cycle
+            t1 = T*s[c+'/Square/Start']
+            t2 = T*s[c+'/Square/Width'] + t1
+            
+            # Loop over the segments adding "high" values
+            for n in range(s[c+'/Square/Cycles']):
+                
+                # Start of cycle
+                t0 = n*T
+                
+                # Set the high value for this cycle
+                v[_n.logical_and(t>=t0+t1, t<t0+t2)] = s[c+'/Square/High']
+            
+            # Set it
+            p['V'+c[-1]] = v
+                
+                
+                
+                
+
 
     def _button_connect_clicked(self, *a):
         """
@@ -977,8 +1235,8 @@ class adalm2000():
             # Set the timeout
             self.api.set_timeout(int(s['Timeout']*1000));
 
-            # Set the sampling rate
-            rate = float(s['Rate(MHz)'])*1e6
+            # Set the sampling rate (variable 'rate' used below)
+            rate = self._ai_rates[s.get_list_index('Rate')]
             self.ai.set_sample_rate(rate)
 
             # Set the ranges
@@ -1035,7 +1293,6 @@ class adalm2000():
 
         # Pop the button when we're done.
         self.tab_ai.button_acquire.set_checked(False)
-
 
 
 class sillyscope_api(_mp.visa_tools.visa_api_base):
@@ -2445,12 +2702,12 @@ if __name__ == '__main__':
 
     self = adalm2000()
     self.button_connect.click()
-    self.ao.more.enableChannel(0, True)
-    self.ao.more.enableChannel(1, True)
+    # self.ao.more.enableChannel(0, True)
+    # self.ao.more.enableChannel(1, True)
     
-    # Trigger pulse
-    trigger = _n.zeros(1000)
-    trigger[0:100] = 0.1;
-    self.ao.more.push([_n.linspace(-2,2,1000)*0, trigger])
-    self.tab_ai.button_acquire.click()
+    # # Trigger pulse
+    # trigger = _n.zeros(1000)
+    # trigger[0:100] = 0.1;
+    # self.ao.more.push([_n.linspace(-2,2,1000)*0, trigger])
+    # self.tab_ai.button_acquire.click()
     
