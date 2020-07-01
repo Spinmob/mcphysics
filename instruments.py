@@ -707,14 +707,19 @@ class adalm2000():
         
         # ADC Tab
         self.tab_ai = self.tabs.add_tab('Analog In')
-        self.tab_ai.button_acquire = self.tab_ai.add(_g.Button('Acquire', checkable=True))
+        
+        # Tab area for settings
+        self.tab_ai.tabs_settings = self.tab_ai.add(_g.TabArea(autosettings_path=self.name+'_adc_tabs_settings'))
+        self.tab_ai.tab_settings  = self.tab_ai.tabs_settings.add_tab('AI Settings')
+        
+        self.tab_ai.button_acquire = self.tab_ai.tab_settings.add(_g.Button('Acquire', checkable=True))
         self.tab_ai.button_onair   = self._grid_top.add(_g.Button('On Air',  checkable=True)).set_width(50)
-        self.tab_ai.label_info     = self.tab_ai.add(_g.Label(''))
+        self.tab_ai.label_info     = self.tab_ai.tab_settings.add(_g.Label(''))
 
         # Add sub-tabs for ai plot & analysis
-        self.tab_ai.tabs     = self.tab_ai.add(_g.TabArea(autosettings_path=self.name+'_adc_tabs'), 4,0, alignment=0, row_span=2)
+        self.tab_ai.tabs_data     = self.tab_ai.add(_g.TabArea(autosettings_path=self.name+'_adc_tabs'), alignment=0)
 
-        self.tab_ai.tab_raw  = self.tab_ai.tabs.add_tab('Raw Voltages')
+        self.tab_ai.tab_raw  = self.tab_ai.tabs_data.add_tab('Raw Voltages')
         self.tab_ai.plot_raw = self.tab_ai.tab_raw.add(_g.DataboxPlot('*.raw', autosettings_path=self.name+'_adc_plot_raw'), alignment=0)
         self.tab_ai.plot_raw.ROIs = [
             [_egg.pyqtgraph.InfiniteLine(angle=90, movable=True, pen=(0,2)),
@@ -729,12 +734,12 @@ class adalm2000():
         self.tab_ai.plot_raw.plot()
 
 
-        self.tab_ai.tab_processor = self.tab_ai.tabs.add_tab('Processor')
+        self.tab_ai.tab_processor = self.tab_ai.tabs_data.add_tab('Processor')
         self.tab_ai.processor  = self.tab_ai.tab_processor.add(_g.DataboxProcessor(self.name+'_processor1', self.tab_ai.plot_raw, '*.txt') , alignment=0)
-        self.tab_ai.new_autorow()
-
+        
         # Settings for the acquisition
-        s = self.tab_ai.settings  = self.tab_ai.add(_g.TreeDictionary(self.name+'_adc_settings'), column_span=4)
+        self.tab_ai.tab_settings.new_autorow()
+        s = self.tab_ai.settings  = self.tab_ai.tab_settings.add(_g.TreeDictionary(self.name+'_adc_settings'), column_span=4)
         s.add_parameter('Iterations', 0, tip='How many acquisitions to perform.')
         s.add_parameter('Samples', 1000, limits=(2,None), siPrefix=True, suffix='S', dec=True, tip='How many samples to acquire. 1-8192 guaranteed. \nLarger values possible, depending on USB bandwidth.')
         s.add_parameter('Rate', ['100 MHz', '10 MHz', '1 MHz', '100 kHz', '10 kHz', '1 kHz'], tip='How fast to sample voltages.')
@@ -810,8 +815,7 @@ class adalm2000():
         self.tab_ai.button_auto = s.add_button('Trigger/Auto')
         
         # Formatting
-        self.tab_ai.set_row_stretch(1)
-        self.tab_ai.set_column_stretch(4, 10)
+        self.tab_ai.set_column_stretch(1, 10)
 
         # Transfer settings to plots etc
         self._ai_settings_changed()
@@ -841,12 +845,17 @@ class adalm2000():
         
         # DAC Tab
         self.tab_ao =self.tabs.add_tab('Analog Out')
-        self.tab_ao.button_send = self.tab_ao.add(_g.Button('Send'))
-        self.tab_ao.button_stop = self.tab_ao.add(_g.Button('Zero'))
-        self.tab_ao.button_auto = self.tab_ao.add(_g.Button('Auto', checkable=True))
+        
+        # Settings tabs
+        self.tab_ao.tabs_settings = self.tab_ao.add(_g.TabArea(autosettings_path=self.name+'_tab_ao_tabs_settings'))
+        self.tab_ao.tab_settings = self.tab_ao.tabs_settings.add_tab('Analog Out Settings')
+        
+        self.tab_ao.button_send = self.tab_ao.tab_settings.add(_g.Button('Send'))
+        self.tab_ao.button_stop = self.tab_ao.tab_settings.add(_g.Button('Zero'))
+        self.tab_ao.button_auto = self.tab_ao.tab_settings.add(_g.Button('Auto', checkable=True))
                 
         # Waveform inspector
-        self.tab_ao.tabs_data   = self.tab_ao.add(_g.TabArea(autosettings_path=self.name+'_tab_ao_tabs_data'), row_span=2, alignment=0)
+        self.tab_ao.tabs_data   = self.tab_ao.add(_g.TabArea(autosettings_path=self.name+'_tab_ao_tabs_data'), alignment=0)
         self.tab_ao.tab_design  = self.tab_ao.tabs_data.add_tab('Design')
         self.tab_ao.tab_sent    = self.tab_ao.tabs_data.add_tab('Sent')
         self.tab_ao.plot_design = p = self.tab_ao.tab_design.add(_g.DataboxPlot('*.ao', autosettings_path=self.name+'_ao_plot_design', autoscript=2), alignment=0)
@@ -859,8 +868,8 @@ class adalm2000():
         p['V2'] = []
         
         # Settings
-        self.tab_ao.new_autorow()
-        self.tab_ao.settings = self.tab_ao.add(_g.TreeDictionary(autosettings_path=self.name+'_dac_settings'), column_span=3)
+        self.tab_ao.tab_settings.new_autorow()
+        self.tab_ao.settings = self.tab_ao.tab_settings.add(_g.TreeDictionary(autosettings_path=self.name+'_dac_settings'), column_span=3)
         self._ao_settings_add_channel('Ch1')
         self._ao_settings_add_channel('Ch2')
 
@@ -876,7 +885,7 @@ class adalm2000():
         self.tab_ao.plot_design.after_load_file = self._ao_after_plot_design_load
         
         # Formatting
-        self.tab_ao.set_column_stretch(3)       
+        self.tab_ao.set_column_stretch(1)       
     
     def _ao_button_stop_clicked(self, *a):
         """
