@@ -421,40 +421,40 @@ class _adalm2000_analog_out(_adalm2000_object):
     
     enable = set_enabled
 
-    def get_repeat_modes(self):
+    def get_loop_modes(self):
         """
-        Returns the repeat mode of both channels as tuple.
+        Returns the loop mode of both channels as tuple.
         """
         if self.simulation_mode: return True, True
         return self.more.getCyclic(0), self.more.getCyclic(1)
 
-    def set_repeat_modes(self, repeat1, repeat2):
+    def set_loop_modes(self, loop1, loop2):
         """
-        Sets the repeat mode for each channel.
+        Sets the loop mode for each channel.
 
         Parameters
         ----------
-        repeat1 : bool
-            Whether channel 1 is repeat.
-        repeat2 : bool
-            Whether channel 2 is repeat.
+        loop1 : bool
+            Whether channel 1 is loop.
+        loop2 : bool
+            Whether channel 2 is loop.
 
         Returns
         -------
-        The repeat state of each.
+        The loop state of each.
         """
         if not self.simulation_mode:
             # This is a hack that made it work reliably.
             # Without messing with the buffer, it would only do 
             # one at a time.
             self.zero()
-            self.more.setCyclic(0, repeat1)
-            self.more.setCyclic(1, repeat2)
+            self.more.setCyclic(0, loop1)
+            self.more.setCyclic(1, loop2)
             self.zero()
-            self.more.setCyclic(0, repeat1)
-            self.more.setCyclic(1, repeat2)
+            self.more.setCyclic(0, loop1)
+            self.more.setCyclic(1, loop2)
             
-        return self.get_repeat_modes()
+        return self.get_loop_modes()
 
     def send_samples(self, channel, samples):
         """
@@ -897,9 +897,9 @@ class adalm2000():
         # Set the rates
         self.ao.set_sample_rates(self._ao_get_rate('Ch1'), self._ao_get_rate('Ch2'))
         
-        # Set Repeat mode (BUG: NEED TO DO THIS TWICE FOR IT TO STICK)
-        self.ao.set_repeat_modes(s['Ch1/Repeat'], s['Ch2/Repeat'])
-        self.ao.set_repeat_modes(s['Ch1/Repeat'], s['Ch2/Repeat'])
+        # Set Loop mode (BUG: NEED TO DO THIS TWICE FOR IT TO STICK)
+        self.ao.set_loop_modes(s['Ch1/Loop'], s['Ch2/Loop'])
+        self.ao.set_loop_modes(s['Ch1/Loop'], s['Ch2/Loop'])
         
         # Dual sync'd mode
         if s['Ch1'] and s['Ch2']: self.ao.send_samples_dual(p['V1'], p['V2'])
@@ -951,7 +951,7 @@ class adalm2000():
         s.add_parameter(c, True, tip='Enable analog output 1')
         s.add_parameter(c+'/Rate', ['75 MHz', '7.5 MHz', '750 kHz', '75 kHz', '7.5 kHz', '750 Hz'], tip='How fast to output voltages.')
         s.add_parameter(c+'/Samples',  8000, limits=(1,None), dec=True, suffix='S', siPrefix=True, tip='Number of samples in the waveform. Above 8192, this number depends on USB bandwidth, I think.')
-        s.add_parameter(c+'/Repeat', True, tip='Whether the waveform should repeat.')
+        s.add_parameter(c+'/Loop', True, tip='Whether the waveform should loop.')
         s.add_parameter(c+'/Waveform', ['Sine', 'Square', 'Custom'], tip='Choose a waveform.')
         
         # Sine
@@ -2702,6 +2702,7 @@ if __name__ == '__main__':
 
     self = adalm2000()
     self.button_connect.click()
+    #t = self.tabs.pop_tab(1)
     # self.ao.more.enableChannel(0, True)
     # self.ao.more.enableChannel(1, True)
     
