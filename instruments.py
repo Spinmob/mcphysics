@@ -2715,9 +2715,3 @@ if __name__ == '__main__':
     # self.ao.more.enableChannel(0, True)
     # self.ao.more.enableChannel(1, True)
     
-    # # Trigger pulse
-    # trigger = _n.zeros(1000)
-    # trigger[0:100] = 0.1;
-    # self.ao.more.push([_n.linspace(-2,2,1000)*0, trigger])
-    # self.tab_ai.button_acquire.click()
-    
