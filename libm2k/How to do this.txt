@@ -16,5 +16,7 @@ For Linux, the commands I used were:
 
 The last step took the longest had some mild warnings, and generated the libm2k.py and _libm2k.so files. Note I did not do a "sudo make install", but that should not change anything, since it will just overwrite the binaries we already installed with the same versions. 
 
+For Windows, I just installed libiio and libm2k binaries, pointing the latter to my python installation. Easy as that!
+
 The goal of this is to have a solution where students install two "drivers" of a specific version, and then mcphysics just works.
 
