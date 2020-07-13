@@ -746,10 +746,10 @@ class adalm2000():
         self.tab_ai.tab_controls.new_autorow()
         s = self.tab_ai.settings  = self.tab_ai.tab_controls.add(_g.TreeDictionary(self.name+'.tab_ai.settings', name='AI'), column_span=4)
         s.add_parameter('Iterations', 0, tip='How many acquisitions to perform.')
-        s.add_parameter('Samples', 1000, limits=(2,None), siPrefix=True, suffix='S', dec=True, tip='How many samples to acquire. 1-8192 guaranteed. \nLarger values possible, depending on USB bandwidth.')
+        s.add_parameter('Samples', 1000, bounds=(2,None), siPrefix=True, suffix='S', dec=True, tip='How many samples to acquire. 1-8192 guaranteed. \nLarger values possible, depending on USB bandwidth.')
         s.add_parameter('Rate', ['100 MHz', '10 MHz', '1 MHz', '100 kHz', '10 kHz', '1 kHz'], tip='How fast to sample voltages.')
-        s.add_parameter('Timeout', 0.2, limits=(0.1,None), suffix='s', siPrefix=True, dec=True, tip='How long to wait for a trigger before giving up. 0 means "forever"; be careful with that setting ;).')
-        s.add_parameter('Timeout/Then_What', ['Immediate', 'Wait Again', 'Quit'], limits=(0,None), suffix='s', siPrefix=True, dec=True, tip='How long to wait for a trigger before giving up. 0 means "forever"; be careful with that setting ;).')
+        s.add_parameter('Timeout', 0.2, bounds=(0.1,None), suffix='s', siPrefix=True, dec=True, tip='How long to wait for a trigger before giving up. 0 means "forever"; be careful with that setting ;).')
+        s.add_parameter('Timeout/Then_What', ['Immediate', 'Wait Again', 'Quit'], bounds=(0,None), suffix='s', siPrefix=True, dec=True, tip='How long to wait for a trigger before giving up. 0 means "forever"; be careful with that setting ;).')
 
         # This does not have an effect for some reason, so I disabled it.
         # I notice one cannot disable channels in Scopy either.
@@ -815,8 +815,8 @@ class adalm2000():
         s.add_parameter('Trigger/Ch1/Level', 0.0, step=0.01, suffix='V', siPrefix=True, tip='Trigger level (Volts).')
         s.add_parameter('Trigger/Ch2/Level', 0.0, step=0.01, suffix='V', siPrefix=True, tip='Trigger level (Volts).')
 
-        s.add_parameter('Trigger/Ch1/Hysteresis', 0.0, limits=(0, 2.5), dec=True, suffix='V', siPrefix=True, tip='How far the signal must swing away from the trigger level before another trigger is accepted.')
-        s.add_parameter('Trigger/Ch2/Hysteresis', 0.0, limits=(0, 2.5), dec=True, suffix='V', siPrefix=True, tip='How far the signal must swing away from the trigger level before another trigger is accepted.')
+        s.add_parameter('Trigger/Ch1/Hysteresis', 0.0, bounds=(0, 2.5), dec=True, suffix='V', siPrefix=True, tip='How far the signal must swing away from the trigger level before another trigger is accepted.')
+        s.add_parameter('Trigger/Ch2/Hysteresis', 0.0, bounds=(0, 2.5), dec=True, suffix='V', siPrefix=True, tip='How far the signal must swing away from the trigger level before another trigger is accepted.')
 
         self.tab_ai.button_auto = s.add_button('Trigger/Auto')
         
@@ -903,7 +903,7 @@ class adalm2000():
         # Settings Tab
         tl.tabs_settings     = tl.add(_g.TabArea(self.name+'.tab_li.tabs_settings'))
         tl.tab_settings = ts = tl.tabs_settings.add_tab('LI Settings')
-        tl.number_ao_frequency  = ts.add(_g.NumberBox(1e5, suffix='Hz', siPrefix=True, dec=True, limits=(0, None), autosettings_path=self.name+'.tab_li.number_ao_frequency', tip='Target output frequency.')).set_width(80)
+        tl.number_ao_frequency  = ts.add(_g.NumberBox(1e5, suffix='Hz', siPrefix=True, dec=True, bounds=(0, None), autosettings_path=self.name+'.tab_li.number_ao_frequency', tip='Target output frequency.')).set_width(80)
         tl.label_samples     = ts.add(_g.Label(''))
         ts.new_autorow()
         tl.button_go         = ts.add(_g.Button('Go!',   checkable=True))
@@ -922,22 +922,22 @@ class adalm2000():
         tp.set_column_stretch(3)
        
         # Lock-in settings
-        s.add_parameter('Iterations',  1, limits=(0,None), tip='How many iterations to take at each frequency.')
+        s.add_parameter('Iterations',  1, bounds=(0,None), tip='How many iterations to take at each frequency.')
         s.add_parameter('Output/Rate', ['75 MHz', '7.5 MHz', '750 kHz', '75 kHz', '7.5 kHz', '750 Hz', 'Automatic'], default_list_index=6, tip='Analog output sampling rate for both channels.')
-        s.add_parameter('Output/Min_Buffer', 200, limits=(10,None), dec=True, tip='Minimum samples you want the waveform to contain. As of libm2k v0.2.1, keep this above 200 or there is a serious jitter issue.')
-        s.add_parameter('Output/Max_Buffer',8192, limits=(10,None), dec=True, tip='Maximum samples you want the waveform to contain. Increase this to increase frequency resolution, at the expense of slower sends and eventual buffer crash.')
+        s.add_parameter('Output/Min_Buffer', 200, bounds=(10,None), dec=True, tip='Minimum samples you want the waveform to contain. As of libm2k v0.2.1, keep this above 200 or there is a serious jitter issue.')
+        s.add_parameter('Output/Max_Buffer',8192, bounds=(10,None), dec=True, tip='Maximum samples you want the waveform to contain. Increase this to increase frequency resolution, at the expense of slower sends and eventual buffer crash.')
         s.add_parameter('Output/Amplitude', 0.1, suffix='V', siPrefix=True, dec=True, tip='Amplitude of output sinusoid.')
         s.add_parameter('Output/Trigger', ['Ch1', 'Ch2'], default_list_index=1, tip='Which channel to use as the trigger output. You can set the square wave attributes in the Analog Out tab.')
 
         s.add_parameter('Input/Rate', ['100 MHz', '10 MHz', '1 MHz', '100 kHz', '10 kHz', '1 kHz', 'Automatic'], default_list_index=6, tip='Analog input samping rate for both channels.')
-        s.add_parameter('Input/Max_Buffer',100000, limits=(10,None), dec=True, tip='Maximum input buffer you will tolerate to try and achieve Tau.')
-        s.add_parameter('Input/Settle',  0.05, suffix='s', siPrefix=True, dec=True, limits=(0,   None), tip='How long to let it settle after starting the analog output before acquiring.')
+        s.add_parameter('Input/Max_Buffer',100000, bounds=(10,None), dec=True, tip='Maximum input buffer you will tolerate to try and achieve Tau.')
+        s.add_parameter('Input/Settle',  0.05, suffix='s', siPrefix=True, dec=True, bounds=(0,   None), tip='How long to let it settle after starting the analog output before acquiring.')
         s.add_parameter('Input/Trigger', ['Ch1', 'Ch2', 'External'], default_list_index=1, tip='Which channel to use as a trigger. "External" refers to the TI port.')
-        s.add_parameter('Input/Measure', 0.05, suffix='s', siPrefix=True, dec=True, limits=(1e-6,None), tip='How long to take data. This will be limited by Max_Buffer.')
+        s.add_parameter('Input/Measure', 0.05, suffix='s', siPrefix=True, dec=True, bounds=(1e-6,None), tip='How long to take data. This will be limited by Max_Buffer.')
         
-        s.add_parameter('Sweep/Start',  1e4, suffix='Hz', siPrefix=True, dec=True, limits=(0,None), tip='Approximate start frequency. Be careful with low frequencies and high sample rates. Too many samples will crash this thing.')
-        s.add_parameter('Sweep/Stop',   1e6, suffix='Hz', siPrefix=True, dec=True, limits=(0,None), tip='Approximate start frequency. Be careful with low frequencies and high sample rates. Too many samples will crash this thing.')
-        s.add_parameter('Sweep/Steps',  100, dec=True, limits=(2,None), tip='How many steps to take between f1 and f2')
+        s.add_parameter('Sweep/Start',  1e4, suffix='Hz', siPrefix=True, dec=True, bounds=(0,None), tip='Approximate start frequency. Be careful with low frequencies and high sample rates. Too many samples will crash this thing.')
+        s.add_parameter('Sweep/Stop',   1e6, suffix='Hz', siPrefix=True, dec=True, bounds=(0,None), tip='Approximate start frequency. Be careful with low frequencies and high sample rates. Too many samples will crash this thing.')
+        s.add_parameter('Sweep/Steps',  100, dec=True, bounds=(2,None), tip='How many steps to take between f1 and f2')
         s.add_parameter('Sweep/Log',         False, tip='Log frequency steps?')
         s.add_parameter('Sweep/Auto_Script', False, tip='Whether to load the "appropriate" script into the plotter.')
         
@@ -1368,7 +1368,7 @@ class adalm2000():
 
         s.add_parameter(c, True, tip='Enable analog output 1')
         s.add_parameter(c+'/Rate', ['75 MHz', '7.5 MHz', '750 kHz', '75 kHz', '7.5 kHz', '750 Hz'], tip='How fast to output voltages.')
-        s.add_parameter(c+'/Samples',  8000, limits=(1,None), dec=True, suffix='S', siPrefix=True, tip='Number of samples in the waveform. Above 8192, this number depends on USB bandwidth, I think.')
+        s.add_parameter(c+'/Samples',  8000, bounds=(1,None), dec=True, suffix='S', siPrefix=True, tip='Number of samples in the waveform. Above 8192, this number depends on USB bandwidth, I think.')
         s.add_parameter(c+'/Loop', True, tip='Whether the waveform should loop.')
         s.add_parameter(c+'/Waveform', ['Sine', 'Square', 'Custom'], tip='Choose a waveform.')
         
@@ -1384,8 +1384,8 @@ class adalm2000():
         s.add_parameter(c+'/Square/Cycles',  1, dec=True, tip='How many times to repeat the waveform within the specified number of samples.' )
         s.add_parameter(c+'/Square/High',  0.1, suffix='V', siPrefix=True, tip='High value.')
         s.add_parameter(c+'/Square/Low',   0.0, suffix='V', siPrefix=True, tip='Low value.')
-        s.add_parameter(c+'/Square/Start', 0.0, step=0.01, limits=(0,1), tip='Fractional position within a cycle where the voltage goes high.')
-        s.add_parameter(c+'/Square/Width', 0.5, step=0.01, limits=(0,1), tip='Fractional width of square pulse within a cycle.')
+        s.add_parameter(c+'/Square/Start', 0.0, step=0.01, bounds=(0,1), tip='Fractional position within a cycle where the voltage goes high.')
+        s.add_parameter(c+'/Square/Width', 0.5, step=0.01, bounds=(0,1), tip='Fractional width of square pulse within a cycle.')
 
     def _ao_settings_changed(self, *a):
         """
