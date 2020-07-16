@@ -206,7 +206,7 @@ class visa_gui_base(_g.BaseObject):
         self.button_connect        = self.grid_top.place_object(_g.Button('Connect', True, False)).set_width(60)
         self.label_instrument_name = self.grid_top.place_object(_g.Label('Disconnected'), 100, 0)
         
-        self.settings  = self.grid_bot.place_object(_g.TreeDictionary(name+'_settings.txt', name), alignment=0)
+        self.settings = self.grid_bot.place_object(_g.TreeDictionary(name+'_settings.txt', name), alignment=0)
         
         # Make sure the settings isn't the column that stretches
         self.grid_bot.set_column_stretch(1,1)
