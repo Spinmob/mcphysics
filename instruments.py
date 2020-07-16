@@ -2376,7 +2376,7 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
         self.tab_B2 = self.tabs_data.add_tab('B2')
         self.B2 = self.tab_B2.add(_g.DataboxProcessor('B2', self.B1.plot,  '*.B2'), alignment=0)
         self.tab_B3 = self.tabs_data.add_tab('B3')
-        self.B3 = self.tab_B3.add(_g.DataboxProcessor('B3', self.B2.plot,  '*.B3'), alignment=0); self._regex_disp_ctl()
+        self.B3 = self.tab_B3.add(_g.DataboxProcessor('B3', self.B2.plot,  '*.B3'), alignment=0); self._libregexdisp_ctl()
         
         # After loading a raw file, run the processors
         self.plot_raw.after_load_file = self.after_load_file
@@ -2436,15 +2436,16 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
             self.api.set_mode_single_trigger()
             self.unlock()
 
-    def _regex_disp_ctl(self):
-        # Yeah, so it's not actualy that well hidden. If you re-enable this feature, 
-        # you had better know *exactly* what it's doing! ;) Love, Jack
-        self.A1.settings.hide_parameter('Average/Error')
-        self.A2.settings.hide_parameter('Average/Error')
-        self.A3.settings.hide_parameter('Average/Error')
-        self.B1.settings.hide_parameter('Average/Error')
-        self.B2.settings.hide_parameter('Average/Error')
-        self.B3.settings.hide_parameter('Average/Error')
+    def _libregexdisp_ctl(self, opposite=False):
+        # Yeah, so it's not actualy that well hidden. Congrats. If you 
+        # decide to use this feature you had better know *exactly* what 
+        # it's doing! ;) Love, Jack
+        self.A1.settings.hide_parameter('Average/Error', opposite)
+        self.A2.settings.hide_parameter('Average/Error', opposite)
+        self.A3.settings.hide_parameter('Average/Error', opposite)
+        self.B1.settings.hide_parameter('Average/Error', opposite)
+        self.B2.settings.hide_parameter('Average/Error', opposite)
+        self.B3.settings.hide_parameter('Average/Error', opposite)
 
     def acquisition_is_finished(self):
         """
