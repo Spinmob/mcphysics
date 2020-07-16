@@ -9,3 +9,4 @@ dist/
 egg_settings
 MANIFEST
 README.rst
+*.ipynb_checkpoints*

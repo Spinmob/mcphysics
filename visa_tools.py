@@ -6,7 +6,7 @@ import traceback as _traceback
 _p = _traceback.print_last
 
 try:    import visa as _v
-except: pass
+except: _v = None
 
 _debug_enabled = False
 def _debug(*a):
@@ -49,8 +49,10 @@ class visa_api_base():
         self.idn         = None
         
         # Create a resource management object
-        if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
-        else:         self.resource_manager = _v.ResourceManager()
+        if _v:
+            if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
+            else:         self.resource_manager = _v.ResourceManager()
+        else:             self.resource_manager = None
         
         # If we're in simulation mode, return
         if simulation:
@@ -211,21 +213,24 @@ class visa_gui_base(_g.BaseObject):
         
         # Create a resource management object
         self._pyvisa_py = pyvisa_py
-        if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
-        else:         self.resource_manager = _v.ResourceManager()
-        
+        if _v:
+            if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
+            else:         self.resource_manager = _v.ResourceManager()
+        else:             self.resource_manager = None
+    
         # Get a list of resource names and a dictionary of device aliases
         # To convert from the "easy" name in the combo to the "real" name.
         names = []
         self._device_aliases = dict()
-        for x in self.resource_manager.list_resources():
-            alias = self.resource_manager.resource_info(x).alias
-            if alias == None:
-                self._device_aliases[x] = x
-                names.append(x)
-            else:
-                self._device_aliases[alias] = x
-                names.append(alias)
+        if self.resource_manager:
+            for x in self.resource_manager.list_resources():
+                alias = self.resource_manager.resource_info(x).alias
+                if alias == None:
+                    self._device_aliases[x] = x
+                    names.append(x)
+                else:
+                    self._device_aliases[alias] = x
+                    names.append(alias)
                 
         # VISA settings
         self.settings.add_parameter('VISA/Device', 0, type='list', values=['Simulation']+names)

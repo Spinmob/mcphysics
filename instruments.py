@@ -903,7 +903,7 @@ class adalm2000():
         # Settings Tab
         tl.tabs_settings     = tl.add(_g.TabArea(self.name+'.tab_li.tabs_settings'))
         tl.tab_settings = ts = tl.tabs_settings.add_tab('LI Settings')
-        tl.number_ao_frequency  = ts.add(_g.NumberBox(1e5, suffix='Hz', siPrefix=True, dec=True, bounds=(0, None), autosettings_path=self.name+'.tab_li.number_ao_frequency', tip='Target output frequency.')).set_width(80)
+        tl.number_ao_frequency = ts.add(_g.NumberBox(1e5, suffix='Hz', siPrefix=True, dec=True, bounds=(0, None), autosettings_path=self.name+'.tab_li.number_ao_frequency', tip='Target output frequency.')).set_width(80)
         tl.label_samples     = ts.add(_g.Label(''))
         ts.new_autorow()
         tl.button_go         = ts.add(_g.Button('Go!',   checkable=True))
@@ -2363,8 +2363,58 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
         self._autosettings_controls = ['self.button_1', 'self.button_2', 'self.button_3', 'self.button_4']
         self.load_gui_settings()
 
+        # Add additional analysis tabs
+        self.tab_A1 = self.tabs_data.add_tab('A1')
+        self.A1 = self.tab_A1.add(_g.DataboxProcessor('A1', self.plot_raw, '*.A1'), alignment=0)
+        self.tab_A2 = self.tabs_data.add_tab('A2')
+        self.A2 = self.tab_A2.add(_g.DataboxProcessor('A2', self.A1.plot,  '*.A2'), alignment=0)
+        self.tab_A3 = self.tabs_data.add_tab('A3')
+        self.A3 = self.tab_A3.add(_g.DataboxProcessor('A3', self.A2.plot,  '*.A3'), alignment=0)
+        
+        self.tab_B1 = self.tabs_data.add_tab('B1')
+        self.B1 = self.tab_B1.add(_g.DataboxProcessor('B1', self.plot_raw, '*.B1'), alignment=0)
+        self.tab_B2 = self.tabs_data.add_tab('B2')
+        self.B2 = self.tab_B2.add(_g.DataboxProcessor('B2', self.B1.plot,  '*.B2'), alignment=0)
+        self.tab_B3 = self.tabs_data.add_tab('B3')
+        self.B3 = self.tab_B3.add(_g.DataboxProcessor('B3', self.B2.plot,  '*.B3'), alignment=0); self._regex_disp_ctl()
+        
+        # After loading a raw file, run the processors
+        self.plot_raw.after_load_file = self.after_load_file
+        
         # Show it
         if show: self.window.show(block_command_line=block)
+   
+    def after_load_file(self):
+        """
+        What to do after loading a file.
+        """
+        # update the settings with the file's header info
+        self.settings.update(self.plot_raw)
+        
+        # Run the analysis
+        self.analyze_data()
+    
+    def analyze_data(self):
+        """
+        Do the analysis after each acquisition.
+        """
+        # Massage the data
+        self.A1.run().plot.autosave()
+        self.A2.run().plot.autosave()
+        self.A3.run().plot.autosave()
+        self.B1.run().plot.autosave()
+        self.B2.run().plot.autosave()
+        self.B3.run().plot.autosave() 
+    
+        # Additional analysis that is not of general use.
+        self.analyze_data2()
+    
+    def analyze_data2(self):
+        """
+        Overwrite this function to add your own crazy analysis after all the 
+        "Standard" analyzers are complete.
+        """
+        return
 
     def _after_connect(self):
         """
@@ -2378,8 +2428,6 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
         """
         self.button_acquire.disable()
 
-
-
     def _settings_trigger_changed(self, *a):
         """
         Called when someone clicks the Trigger checkbox.
@@ -2388,6 +2436,15 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
             self.api.set_mode_single_trigger()
             self.unlock()
 
+    def _regex_disp_ctl(self):
+        # Yeah, so it's not actualy that well hidden. If you re-enable this feature, 
+        # you had better know *exactly* what it's doing! ;) Love, Jack
+        self.A1.settings.hide_parameter('Average/Error')
+        self.A2.settings.hide_parameter('Average/Error')
+        self.A3.settings.hide_parameter('Average/Error')
+        self.B1.settings.hide_parameter('Average/Error')
+        self.B2.settings.hide_parameter('Average/Error')
+        self.B3.settings.hide_parameter('Average/Error')
 
     def acquisition_is_finished(self):
         """
@@ -2417,13 +2474,6 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
             self.window.sleep(self.settings['Acquire/RIGOL1000BDE/Trigger_Delay'])
             s = self.api.query(':TRIG:STAT?').strip()
             return s == 'STOP'
-
-    def analyze_data(self):
-        """
-        Overwrite this function to insert your own customized analysis, to
-        be performed after each raw data acquisition.
-        """
-        return self
 
     def get_waveforms(self, plot=True):
         """
@@ -2710,8 +2760,10 @@ class keithley_dmm_api():
     def __init__(self, name='ASRL3::INSTR', pyvisa_py=False):
 
         # Create a resource management object
-        if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
-        else:         self.resource_manager = _v.ResourceManager()
+        if _v:
+            if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
+            else:         self.resource_manager = _v.ResourceManager()
+        else: self.resource_manager = None
 
         # Get time t=t0
         self._t0 = _time.time()
@@ -2742,13 +2794,12 @@ class keithley_dmm_api():
                 self.instrument = None
 
         except:
-            print("ERROR: Could not open instrument. Entering simulation mode.")
             self.instrument = None
-
-            # Now list all available resources
-            print("Available Instruments:")
-            for name in self.resource_manager.list_resources(): print("  "+name)
-
+            if self.resource_manager: 
+                print("ERROR: Could not open instrument. Entering simulation mode.")            
+                print("Available Instruments:")
+                for name in self.resource_manager.list_resources(): print("  "+name)
+            
     def write(self, message, process_events=False):
         """
         Writes the supplied message.
@@ -2949,14 +3000,19 @@ class keithley_dmm(_g.BaseObject):
         self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.csv', autosettings_path+'_plot_raw.txt', autoscript=2), alignment=0)
 
         # Create a resource management object to populate the list
-        if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
-        else:         self.resource_manager = _v.ResourceManager()
+        if _v:
+            if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
+            else:         self.resource_manager = _v.ResourceManager()
+        else: self.resource_manager = None
+
+        # Populate the list.
         names = []
-        for x in self.resource_manager.list_resources():
-            if self.resource_manager.resource_info(x).alias:
-                names.append(str(self.resource_manager.resource_info(x).alias))
-            else:
-                names.append(x)
+        if self.resource_manager:
+            for x in self.resource_manager.list_resources():
+                if self.resource_manager.resource_info(x).alias:
+                    names.append(str(self.resource_manager.resource_info(x).alias))
+                else:
+                    names.append(x)
 
         # VISA settings
         self.settings.add_parameter('VISA/Device', 0, type='list', values=['Simulation']+names)
@@ -3144,9 +3200,13 @@ class keithley_dmm(_g.BaseObject):
 
 if __name__ == '__main__':
 
-    self = adalm2000()
-    self.button_connect.click()
+    # self = adalm2000()
+    # self.button_connect.click()
     #t = self.tabs.pop_tab(1)
     # self.ao.more.enableChannel(0, True)
     # self.ao.more.enableChannel(1, True)
+    
+    # s = self.tab_ai.settings
+    
+    self = keithley_dmm()
     
