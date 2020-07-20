@@ -52,10 +52,12 @@ The McPhysics library is organized heirarchically, and you should use Spyder's c
   * __voigt():__ Voigt probability density function.
  
  ### mcphysics.instruments
-  * __sillyscope():__ Semi-unified graphical interface for interacting with an assortment of Rigol and Tektronix Oscilloscopes.
-  * __sillyscope_api():__ Lower level, non-graphical interface.
-  * __keithley_dmm():__ Graphical interface for our the Keithley digital multimeters (currently 199 and soon 2700).
-  * __keithley_dmm_api():__ Lower level, non-graphical interface.
+  * __adalm2000():__ Graphical interface for the ADALM2000.
+  * __adalm2000_api():__ Lower level, non-graphical interface for the ADALM2000.
+  * __sillyscope():__ Semi-unified graphical interface for interacting with an assortment of Rigol and Tektronix sillyscopes.
+  * __sillyscope_api():__ Lower level, non-graphical interface for the same sillyscopes.
+  * __keithley_dmm():__ Graphical interface for our the Keithley digital multimeters (currently 199).
+  * __keithley_dmm_api():__ Lower level, non-graphical interface for the DMM.
   
  ### mcphysics.playground
   * __fitting_statistics_demo():__ Graphical fake data generator and fitter. Useful for visualizing fit statistics.
