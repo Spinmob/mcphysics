@@ -32,8 +32,11 @@ To upgrade to the latest stable versions,
    pip install mcphysics spinmob --upgrade --no-cache-dir
    ```
 
-## Accessing instruments
+## Accessing VISA instruments
 To access instruments (see below) you will also need a VISA driver, such as Rhode & Schwartz VISA or National Instruments VISA. I recommend [Rhode & Schwarz](https://www.rohde-schwarz.com/ca/driver-pages/remote-control/3-visa-and-tools_231388.html).
+
+## Accessing an ADALM2000
+To access the ADALM2000, you will need to install [libiio](https://github.com/analogdevicesinc/libiio) and [libm2k with python bindings](https://github.com/analogdevicesinc/libm2k). On Windows, this is a matter of running two installers. On Linux (and probably osx), we are required to manually compile the libm2k library, so a specific version of these may be required, if this is the case, the McPhysics library will complain and tell you which version is required when you try to access the device.
 
 ## Organization
 The McPhysics library is organized heirarchically, and you should use Spyder's code completion suggestions to navigate it. You can also type `<ctrl>-i` while your cursor is beside an object to access its documentation. Below is a list of the existing functionality. For more information, please visit our (growing) [wiki](https://github.com/Spinmob/mcphysics/wiki).
