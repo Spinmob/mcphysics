@@ -36,7 +36,7 @@ To upgrade to the latest stable versions,
 To access instruments (see below) you will also need a VISA driver, such as Rhode & Schwartz VISA or National Instruments VISA. I recommend [Rhode & Schwarz](https://www.rohde-schwarz.com/ca/driver-pages/remote-control/3-visa-and-tools_231388.html).
 
 ## Organization
-The McPhysics library is organized heirarchically, and you should use Spyder's code completion suggestions to navigate it. You can also type `<ctrl>-i` while your cursor is beside an object to access its documentation. Below is a list of the existing functionality as of 2019-04-19:
+The McPhysics library is organized heirarchically, and you should use Spyder's code completion suggestions to navigate it. You can also type `<ctrl>-i` while your cursor is beside an object to access its documentation. Below is a list of the existing functionality. For more information, please visit our (growing) [wiki](https://github.com/Spinmob/mcphysics/wiki).
 
 ### mcphysics.data
  * __load_chn():__ Loads a Maestro .Chn file, returning a [spinmob databox](https://github.com/Spinmob/spinmob/wiki/2.-Data-Handling).
@@ -62,5 +62,3 @@ The McPhysics library is organized heirarchically, and you should use Spyder's c
  ### mcphysics.playground
   * __fitting_statistics_demo():__ Graphical fake data generator and fitter. Useful for visualizing fit statistics.
   * __plot_and_integrate_reduced_chi2():__ Plots the reduced chi^2 distribution for the specified degrees of freedom, then numerically integrates it. This is useful if you want to know how reasonable a given value of chi^2 is.
-  
-For more information on these objects, please refer to the (growing) [wiki](https://github.com/Spinmob/mcphysics/wiki).
