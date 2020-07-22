@@ -62,3 +62,5 @@ The McPhysics library is organized heirarchically, and you should use Spyder's c
  ### mcphysics.playground
   * __fitting_statistics_demo():__ Graphical fake data generator and fitter. Useful for visualizing fit statistics.
   * __plot_and_integrate_reduced_chi2():__ Plots the reduced chi^2 distribution for the specified degrees of freedom, then numerically integrates it. This is useful if you want to know how reasonable a given value of chi^2 is.
+  
+For more information on these objects, please refer to the (growing) [wiki](https://github.com/Spinmob/mcphysics/wiki).
