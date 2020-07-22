@@ -52,7 +52,7 @@ The McPhysics library is organized heirarchically, and you should use Spyder's c
   * __voigt():__ Voigt probability density function.
  
  ### mcphysics.instruments
-  * __adalm2000():__ Graphical interface for the ADALM2000.
+  * __[adalm2000()](https://github.com/Spinmob/mcphysics/wiki/instruments.adalm2000()):__ Graphical interface for the ADALM2000.
   * __adalm2000_api():__ Lower level, non-graphical interface for the ADALM2000.
   * __[sillyscope()](https://github.com/Spinmob/mcphysics/wiki/instruments.sillyscope()):__ Semi-unified graphical interface for interacting with an assortment of Rigol and Tektronix sillyscopes.
   * __sillyscope_api():__ Lower level, non-graphical interface for the same sillyscopes.
