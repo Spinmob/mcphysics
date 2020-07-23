@@ -622,7 +622,7 @@ class adalm2000():
     def __init__(self, name='adalm2000'):
 
         # If the import failed, _m2k = None
-        if _m2k == None: print('You need to install libiio and libm2k to use an ADALM2000.')
+        if _m2k == None: _s._warn("You need to install libiio and libm2k to use an ADALM2000.")
 
         # Remember the name
         self.name = name
@@ -637,7 +637,7 @@ class adalm2000():
         """
 
         # Create the window
-        w = self.window = _g.Window('ADALM2000', autosettings_path=self.name+'.window')
+        w = self.window = _g.Window('ADALM2000', autosettings_path=self.name+'.window', size=[1325,10])
 
         # Top row for connection interface, bottom row for data taking
         gt = self._grid_top    = w.add(_g.GridLayout(margins=False), column=1, row=1, alignment=0)
@@ -739,8 +739,23 @@ class adalm2000():
 
         ### Processor tab
 
-        self.tab_ai.tab_processor = self.tab_ai.tabs_data.add_tab('AI Processor')
-        self.tab_ai.processor  = self.tab_ai.tab_processor.add(_g.DataboxProcessor(self.name+'.tab_ai.processor', self.tab_ai.plot_raw, '*.txt') , alignment=0)
+        # Add additional analysis tabs
+        self.tab_ai.tab_A1 = self.tab_ai.tabs_data.add_tab('A1')
+        self.tab_ai.A1     = self.tab_ai.tab_A1.add(_g.DataboxProcessor('A1', self.tab_ai.plot_raw, '*.A1'), alignment=0)
+        self.tab_ai.tab_A2 = self.tab_ai.tabs_data.add_tab('A2')
+        self.tab_ai.A2     = self.tab_ai.tab_A2.add(_g.DataboxProcessor('A2', self.tab_ai.A1.plot,  '*.A2'), alignment=0)
+        self.tab_ai.tab_A3 = self.tab_ai.tabs_data.add_tab('A3')
+        self.tab_ai.A3     = self.tab_ai.tab_A3.add(_g.DataboxProcessor('A3', self.tab_ai.A2.plot,  '*.A3'), alignment=0)
+
+        self.tab_ai.tab_B1 = self.tab_ai.tabs_data.add_tab('B1')
+        self.tab_ai.B1     = self.tab_ai.tab_B1.add(_g.DataboxProcessor('B1', self.tab_ai.plot_raw, '*.B1'), alignment=0)
+        self.tab_ai.tab_B2 = self.tab_ai.tabs_data.add_tab('B2')
+        self.tab_ai.B2     = self.tab_ai.tab_B2.add(_g.DataboxProcessor('B2', self.tab_ai.B1.plot,  '*.B2'), alignment=0)
+        self.tab_ai.tab_B3 = self.tab_ai.tabs_data.add_tab('B3')
+        self.tab_ai.B3     = self.tab_ai.tab_B3.add(_g.DataboxProcessor('B3', self.tab_ai.B2.plot,  '*.B3'), alignment=0); self._libregexdisp_ctl()
+
+        # After loading a raw file, run the processors
+        self.tab_ai.plot_raw.after_load_file = self.after_load_ai_plot_raw
 
         # Settings for the acquisition
         self.tab_ai.tab_controls.new_autorow()
@@ -839,10 +854,6 @@ class adalm2000():
         self.tab_ai.plot_raw.ROIs[0][1].sigPositionChanged.connect(self._ai_cursor_drag)
         self.tab_ai.plot_raw.ROIs[1][1].sigPositionChanged.connect(self._ai_cursor_drag)
 
-        # If you found this, congrats, feel free to comment it out. But you'd
-        # better make sure you know exactly what it does ;)
-        self.tab_ai.processor.settings.hide_parameter('Average/Error')
-
     def _build_tab_ao(self):
         """
         Assembles the analog out tab.
@@ -854,7 +865,7 @@ class adalm2000():
 
         # Settings tabs
         self.tab_ao.tabs_settings = self.tab_ao.add(_g.TabArea(autosettings_path=self.name+'.tab_ao.tabs_settings'))
-        self.tab_ao.tab_controls = self.tab_ao.tabs_settings.add_tab('AO Settings')
+        self.tab_ao.tab_controls  = self.tab_ao.tabs_settings.add_tab('AO Settings')
 
         self.tab_ao.button_send = self.tab_ao.tab_controls.add(_g.Button('Send', checkable=True))
         self.tab_ao.button_stop = self.tab_ao.tab_controls.add(_g.Button('Zero'))
@@ -1370,7 +1381,7 @@ class adalm2000():
         s.add_parameter(c+'/Rate', ['75 MHz', '7.5 MHz', '750 kHz', '75 kHz', '7.5 kHz', '750 Hz'], tip='How fast to output voltages.')
         s.add_parameter(c+'/Samples',  8000, bounds=(1,None), dec=True, suffix='S', siPrefix=True, tip='Number of samples in the waveform. Above 8192, this number depends on USB bandwidth, I think.')
         s.add_parameter(c+'/Loop', True, tip='Whether the waveform should loop.')
-        s.add_parameter(c+'/Waveform', ['Sine', 'Square', 'Custom'], tip='Choose a waveform.')
+        s.add_parameter(c+'/Waveform', ['Sine', 'Square', 'Pulse_Decay', 'Custom'], tip='Choose a waveform.')
 
         # Sine
         s.add_parameter(c+'/Sine',           0.0, suffix='Hz', siPrefix=True, tip='Frequency (from settings below).', readonly=True)
@@ -1380,12 +1391,18 @@ class adalm2000():
         s.add_parameter(c+'/Sine/Phase',     0.0, step=5, suffix=' deg', tip='Phase of sine (90 corresponds to cosine).')
 
         # Square
-        s.add_parameter(c+'/Square', 0, suffix='Hz', siPrefix=True, tip='Frequency (from settings below).', readonly=True)
+        s.add_parameter(c+'/Square',       0.0, suffix='Hz', siPrefix=True, tip='Frequency (from settings below).', readonly=True)
         s.add_parameter(c+'/Square/Cycles',  1, dec=True, tip='How many times to repeat the waveform within the specified number of samples.' )
         s.add_parameter(c+'/Square/High',  0.1, suffix='V', siPrefix=True, tip='High value.')
         s.add_parameter(c+'/Square/Low',   0.0, suffix='V', siPrefix=True, tip='Low value.')
         s.add_parameter(c+'/Square/Start', 0.0, step=0.01, bounds=(0,1), tip='Fractional position within a cycle where the voltage goes high.')
         s.add_parameter(c+'/Square/Width', 0.5, step=0.01, bounds=(0,1), tip='Fractional width of square pulse within a cycle.')
+
+        # Square
+        s.add_parameter(c+'/Pulse_Decay/Amplitude',  0.1,   suffix='V',  siPrefix=True, tip='Pulse amplitude.')
+        s.add_parameter(c+'/Pulse_Decay/Offset',     0.0,   suffix='V',  siPrefix=True, tip='Baseline offset.')
+        s.add_parameter(c+'/Pulse_Decay/Tau',        10e-6, suffix='s',  siPrefix=True, dec=True, tip='Exponential decay time constant.')
+        s.add_parameter(c+'/Pulse_Decay/Zero',       False, tip='Whether to zero the output voltage at the end of the pulse.')
 
     def _ao_settings_changed(self, *a):
         """
@@ -1407,7 +1424,7 @@ class adalm2000():
         """
         # Show and hide waveform designers
         s = self.tab_ao.settings
-        for w in ['Sine', 'Square']: s.hide_parameter(c+'/'+w, w == s[c+'/Waveform'])
+        for w in ['Sine', 'Square', 'Pulse_Decay']: s.hide_parameter(c+'/'+w, w == s[c+'/Waveform'])
 
     def _ao_update_design(self):
         """
@@ -1449,11 +1466,12 @@ class adalm2000():
             return
 
         # Get the frequency and period for the other modes
-        f = s[c+'/'+w]              # Frequency in Hz
-        T = 1.0/f                   # Period (sec)
+        if w in ['Sine', 'Square']:
+            f = s[c+'/'+w]              # Frequency in Hz
+            T = 1.0/f                   # Period (sec)
 
         # Get the waveform
-        if   w == 'Sine': p['V'+c[-1]] = s[c+'/Sine/Amplitude']*_n.sin((2*_n.pi*f)*t + s[c+'/Sine/Phase']*_n.pi/180.0)
+        if   w == 'Sine': p['V'+c[-1]] = s[c+'/Sine/Offset'] + s[c+'/Sine/Amplitude']*_n.sin((2*_n.pi*f)*t + s[c+'/Sine/Phase']*_n.pi/180.0)
         elif w == 'Square':
 
             # Start with the "low" values
@@ -1475,6 +1493,10 @@ class adalm2000():
             # Set it
             p['V'+c[-1]] = v
 
+        elif w == 'Pulse_Decay':
+            p['V'+c[-1]] = s[c+'/Pulse_Decay/Offset'] + s[c+'/Pulse_Decay/Amplitude']*_n.exp(-t/s[c+'/Pulse_Decay/Tau'])
+            if s[c+'/Pulse_Decay/Zero']:
+                p['V'+c[-1]][-1] = 0
 
 
 
@@ -1562,6 +1584,17 @@ class adalm2000():
 
         return
 
+    def _libregexdisp_ctl(self, opposite=False):
+        # Yeah, so it's not actualy that well hidden. Congrats. If you
+        # decide to use this feature you had better know *exactly* what
+        # it's doing! ;) Love, Jack
+        self.tab_ai.A1.settings.hide_parameter('Average/Error', opposite)
+        self.tab_ai.A2.settings.hide_parameter('Average/Error', opposite)
+        self.tab_ai.A3.settings.hide_parameter('Average/Error', opposite)
+        self.tab_ai.B1.settings.hide_parameter('Average/Error', opposite)
+        self.tab_ai.B2.settings.hide_parameter('Average/Error', opposite)
+        self.tab_ai.B3.settings.hide_parameter('Average/Error', opposite)
+
     def _ai_get_rate(self):
         """
         Returns the rate.
@@ -1605,9 +1638,10 @@ class adalm2000():
             V1 = self.tab_ai.plot_raw.ROIs[0][1].getPos()[1]
             V2 = self.tab_ai.plot_raw.ROIs[1][1].getPos()[1]
 
-            # Set them on the hardware
-            self.ai.set_trigger_levels(V1, V2)
-            V1, V2 = self.ai.get_trigger_levels()
+            # Set them on the hardware if we are not in simulation mode
+            if not self.api.simulation_mode:
+                self.ai.set_trigger_levels(V1, V2)
+                V1, V2 = self.ai.get_trigger_levels()
 
             # Update the cursor to the actual value
             self.tab_ai.plot_raw.ROIs[0][1].setPos((0,V1))
@@ -1643,7 +1677,6 @@ class adalm2000():
         # Easy coding
         s  = self.tab_ai.settings
         p  = self.tab_ai.plot_raw
-        p1 = self.tab_ai.processor
 
         # Iteration number
         n = 0; self.tab_ai.label_info.set_text('Iteration: '+str(n))
@@ -1706,8 +1739,8 @@ class adalm2000():
                 p.plot()
                 p.autosave()
 
-                # Send it to the processor
-                p1.run()
+                # External analysis
+                self.process_data()
 
                 # Send it to the demodulator
                 self.demodulate()
@@ -1738,6 +1771,37 @@ class adalm2000():
         # Pop the button when we're done.
         self.tab_ai.button_acquire.set_checked(False)
 
+    def after_load_ai_plot_raw(self):
+        """
+        What to do after loading a file.
+        """
+        # update the settings with the file's header info
+        self.settings.update(self.plot_raw)
+
+        # Run the analysis
+        self.process_data()
+
+    def process_data(self):
+        """
+        Do the analysis after each acquisition.
+        """
+        # Massage the data
+        self.tab_ai.A1.run().plot.autosave()
+        self.tab_ai.A2.run().plot.autosave()
+        self.tab_ai.A3.run().plot.autosave()
+        self.tab_ai.B1.run().plot.autosave()
+        self.tab_ai.B2.run().plot.autosave()
+        self.tab_ai.B3.run().plot.autosave()
+
+        # Additional analysis that is not of general use.
+        self.process_data2()
+
+    def process_data2(self):
+        """
+        Overwrite this function to add your own crazy analysis after all the
+        "Standard" analyzers are complete.
+        """
+        return
 
 class sillyscope_api(_mp.visa_tools.visa_api_base):
     """
@@ -2395,9 +2459,9 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
         self.settings.update(self.plot_raw)
 
         # Run the analysis
-        self.analyze_data()
+        self.process_data()
 
-    def analyze_data(self):
+    def process_data(self):
         """
         Do the analysis after each acquisition.
         """
@@ -2410,9 +2474,9 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
         self.B3.run().plot.autosave()
 
         # Additional analysis that is not of general use.
-        self.analyze_data2()
+        self.process_data2()
 
-    def analyze_data2(self):
+    def process_data2(self):
         """
         Overwrite this function to add your own crazy analysis after all the
         "Standard" analyzers are complete.
@@ -2677,7 +2741,7 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
             self.window.process_events()
 
             # External analysis
-            self.analyze_data()
+            self.process_data()
 
             # End condition
             _debug('  checking end condition')
@@ -3212,4 +3276,4 @@ if __name__ == '__main__':
 
     # s = self.tab_ai.settings
 
-    self = sillyscope()
+    a = adalm2000()
