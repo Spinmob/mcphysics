@@ -560,11 +560,11 @@ class adalm2000_api():
         # Assume it's working.
         else:
             # Open the connection
-            print('Opening', name)
+            print('Opening "'+name+'"')
 
             # If we are trying to open a real object
             if not name == "Simulation":
-
+                
                 # Create the m2k handle
                 self.m2k = _m2k.contextOpen(name).toM2k()
 
@@ -582,7 +582,8 @@ class adalm2000_api():
 
             # If anything goes wrong, simulation mode
             else:
-                self.ai   = _adalm2000_analog_in(None)   # Simulated ai
+                self.ai    = _adalm2000_analog_in(None)   # Simulated ai
+                self.ao    = _adalm2000_analog_out(None)  # Simulated ao
                 self.power = _adalm2000_power(None) # Simulated power supply
                 self.simulation_mode = True
 
