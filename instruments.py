@@ -3059,12 +3059,16 @@ class keithley_dmm(_g.BaseObject):
             self.buttons.append(self.grid_top.place_object(_g.Button(str(n+1),True, True).set_width(25)))
             self.buttons[n].signal_toggled.connect(self.save_gui_settings)
 
-        self.button_acquire   = self.grid_top.place_object(_g.Button('Acquire',True).disable())
-        self.label_dmm_name   = self.grid_top.place_object(_g.Label('Disconnected'))
+        self.button_acquire = self.grid_top.place_object(_g.Button('Acquire',True).disable())
+        self.label_dmm_name = self.grid_top.place_object(_g.Label('Disconnected'))
 
         self.settings  = self.grid_bot.place_object(_g.TreeDictionary(autosettings_path+'_settings.txt')).set_width(250)
         self.tabs_data = self.grid_bot.place_object(_g.TabArea(autosettings_path+'_tabs_data.txt'), alignment=0)
         self.tab_raw   = self.tabs_data.add_tab('Raw Data')
+
+        self.label_path = self.tab_raw.add(_g.Label('Output Path:').set_colors('blue'))
+        self.tab_raw.new_autorow()
+
         self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.csv', autosettings_path+'_plot_raw.txt', autoscript=2), alignment=0)
 
         # Create a resource management object to populate the list
@@ -3162,6 +3166,9 @@ class keithley_dmm(_g.BaseObject):
         # Ask the user for the dump file
         self.path = _s.dialogs.save('*.csv', 'Select an output file.', force_extension='*.csv')
         if self.path == None: return
+
+        # Update the label
+        self.label_path.set_text('Output Path: ' + self.path)
 
         _debug('  path='+repr(self.path))
 
@@ -3276,4 +3283,6 @@ if __name__ == '__main__':
 
     # s = self.tab_ai.settings
 
-    a = adalm2000()
+    #a = adalm2000()
+
+    k = keithley_dmm()
