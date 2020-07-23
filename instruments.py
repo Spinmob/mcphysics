@@ -619,7 +619,7 @@ class adalm2000():
         a gui with many instances), used primarily for the remembering settings.
         Could be "Carl" for example.
     """
-    def __init__(self, name='adalm2000'):
+    def __init__(self, name='adalm2000', block=False):
 
         # If the import failed, _m2k = None
         if _m2k == None: _s._warn("You need to install libiio and libm2k to use an ADALM2000.")
@@ -628,10 +628,10 @@ class adalm2000():
         self.name = name
 
         # Build the graphical user interface
-        self._build_gui()
+        self._build_gui(block)
 
 
-    def _build_gui(self):
+    def _build_gui(self, block=False):
         """
         Builds the graphical interface
         """
@@ -665,7 +665,7 @@ class adalm2000():
         self.tabs.disable()
 
         # Let's see it!
-        self.window.show()
+        self.window.show(block)
 
 
     def _build_tab_power(self):
