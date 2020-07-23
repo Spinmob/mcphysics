@@ -867,9 +867,9 @@ class adalm2000():
         self.tab_ao.tabs_settings = self.tab_ao.add(_g.TabArea(autosettings_path=self.name+'.tab_ao.tabs_settings'))
         self.tab_ao.tab_controls  = self.tab_ao.tabs_settings.add_tab('AO Settings')
 
-        self.tab_ao.button_send = self.tab_ao.tab_controls.add(_g.Button('Send', checkable=True))
-        self.tab_ao.button_stop = self.tab_ao.tab_controls.add(_g.Button('Zero'))
-        self.tab_ao.button_auto = self.tab_ao.tab_controls.add(_g.Button('Auto', checkable=True))
+        self.tab_ao.button_send   = self.tab_ao.tab_controls.add(_g.Button('Send', checkable=True))
+        self.tab_ao.checkbox_auto = self.tab_ao.tab_controls.add(_g.CheckBox('Auto', autosettings_path=self.name+'.tab_ao.checkbox_auto'))
+        self.tab_ao.button_stop   = self.tab_ao.tab_controls.add(_g.Button('Stop'))
 
         # Waveform inspector
         self.tab_ao.tabs_data   = self.tab_ao.add(_g.TabArea(autosettings_path=self.name+'.tab_ao.tabs_data'), alignment=0)
@@ -894,7 +894,7 @@ class adalm2000():
         self._ao_settings_changed()
 
         # Link callbacks
-        self.tab_ao.button_auto.signal_clicked.connect (self._ao_settings_changed)
+        self.tab_ao.checkbox_auto.signal_toggled.connect (self._ao_settings_changed)
         self.tab_ao.settings.connect_any_signal_changed(self._ao_settings_changed)
         self.tab_ao.button_send.signal_clicked.connect(self._ao_button_send_clicked)
         self.tab_ao.button_stop.signal_clicked.connect(self._ao_button_stop_clicked)
@@ -924,10 +924,10 @@ class adalm2000():
         ts.set_column_stretch(3)
 
         # Data Tab
-        tl.tabs_data        = tl.add(_g.TabArea(self.name+'.tab_li.tabs_data'), alignment=0)
-        tl.tab_plot   = tp  = tl.tabs_data.add_tab('LI Demodulation')
-        tl.button_enable    = tp.add(_g.Button('Enable Demodulation', checkable=True, autosettings_path=self.name+'.tab_li.button_enable')).set_width(200)
+        tl.tabs_data              = tl.add(_g.TabArea(self.name+'.tab_li.tabs_data'), alignment=0)
+        tl.tab_plot   = tp        = tl.tabs_data.add_tab('LI Demodulation')
         tl.number_demod_frequency = tp.add(_g.NumberBox(0.0, suffix='Hz', siPrefix=True, autosettings_path=self.name+'.tab_li.number_demod_frequency', tip='Frequency at which to perform the demodulation. Can be different from the LI settings frequency.')).set_width(120)
+        tl.checkbox_enable        = tp.add(_g.CheckBox('Enable Demodulation', autosettings_path=self.name+'.tab_li.checkbox_enable'))
         tp.new_autorow()
         tl.plot             = tp.add(_g.DataboxPlot('*.lockin', self.name+'.tab_li.plot'), column_span=4, alignment=0)
         tp.set_column_stretch(3)
@@ -938,18 +938,18 @@ class adalm2000():
         s.add_parameter('Output/Min_Buffer', 200, bounds=(10,None), dec=True, tip='Minimum samples you want the waveform to contain. As of libm2k v0.2.1, keep this above 200 or there is a serious jitter issue.')
         s.add_parameter('Output/Max_Buffer',8192, bounds=(10,None), dec=True, tip='Maximum samples you want the waveform to contain. Increase this to increase frequency resolution, at the expense of slower sends and eventual buffer crash.')
         s.add_parameter('Output/Amplitude', 0.1, suffix='V', siPrefix=True, dec=True, tip='Amplitude of output sinusoid.')
-        s.add_parameter('Output/Trigger', ['Ch1', 'Ch2'], default_list_index=1, tip='Which channel to use as the trigger output. You can set the square wave attributes in the Analog Out tab.')
+        s.add_parameter('Output/Trigger_Out', ['Ch1', 'Ch2'], default_list_index=1, tip='Which channel to use as the trigger output. You can set the square wave attributes in the Analog Out tab.')
 
         s.add_parameter('Input/Rate', ['100 MHz', '10 MHz', '1 MHz', '100 kHz', '10 kHz', '1 kHz', 'Automatic'], default_list_index=6, tip='Analog input samping rate for both channels.')
         s.add_parameter('Input/Max_Buffer',100000, bounds=(10,None), dec=True, tip='Maximum input buffer you will tolerate to try and achieve Tau.')
-        s.add_parameter('Input/Settle',  0.05, suffix='s', siPrefix=True, dec=True, bounds=(0,   None), tip='How long to let it settle after starting the analog output before acquiring.')
-        s.add_parameter('Input/Trigger', ['Ch1', 'Ch2', 'External'], default_list_index=1, tip='Which channel to use as a trigger. "External" refers to the TI port.')
-        s.add_parameter('Input/Measure', 0.05, suffix='s', siPrefix=True, dec=True, bounds=(1e-6,None), tip='How long to take data. This will be limited by Max_Buffer.')
+        s.add_parameter('Input/Settle',  50e-6, suffix='s', siPrefix=True, dec=True, bounds=(0,   None), tip='How long to let it settle after starting the analog output before acquiring.')
+        s.add_parameter('Input/Trigger_In', ['Ch1', 'Ch2', 'External'], default_list_index=1, tip='Which channel to use as a trigger. "External" refers to the TI port.')
+        s.add_parameter('Input/Measure', 50e-6, suffix='s', siPrefix=True, dec=True, bounds=(1e-6,None), tip='How long to take data. This will be limited by Max_Buffer.')
 
         s.add_parameter('Sweep/Start',  1e4, suffix='Hz', siPrefix=True, dec=True, bounds=(0,None), tip='Approximate start frequency. Be careful with low frequencies and high sample rates. Too many samples will crash this thing.')
         s.add_parameter('Sweep/Stop',   1e6, suffix='Hz', siPrefix=True, dec=True, bounds=(0,None), tip='Approximate start frequency. Be careful with low frequencies and high sample rates. Too many samples will crash this thing.')
         s.add_parameter('Sweep/Steps',  100, dec=True, bounds=(2,None), tip='How many steps to take between f1 and f2')
-        s.add_parameter('Sweep/Log',         False, tip='Log frequency steps?')
+        s.add_parameter('Sweep/Log_Scale',         False, tip='Log frequency steps?')
         s.add_parameter('Sweep/Auto_Script', False, tip='Whether to load the "appropriate" script into the plotter.')
 
         # Link signals to functions
@@ -990,8 +990,8 @@ class adalm2000():
         Y = _n.sin(2*_n.pi*f*t)
 
         # Normalize
-        X = X/sum(X*X)
-        Y = Y/sum(Y*Y)
+        X = _n.nan_to_num(X/sum(X*X))
+        Y = _n.nan_to_num(Y/sum(Y*Y))
 
         # Demodulate
         V1X = sum(d['V1']*X)
@@ -1026,7 +1026,7 @@ class adalm2000():
         self.tab_li.button_go.set_colors(None, None)
 
         # Enable demodulation analysis
-        self.tab_li.button_enable.set_checked(True)
+        self.tab_li.checkbox_enable.set_checked(True)
 
         # Make sure the first iteration gets set correctly
         self._li_needs_configure_ao_ai = True
@@ -1065,7 +1065,7 @@ class adalm2000():
 
         # All done!
         self.tab_li.button_go    .set_checked(False)
-        self.tab_li.button_enable.set_checked(False)
+        self.tab_li.checkbox_enable.set_checked(False)
 
 
 
@@ -1086,11 +1086,11 @@ class adalm2000():
         # Load the plot script if we're supposed to
         if s['Sweep/Auto_Script']:
 
-            if s['Sweep/Log']: self.tab_li.plot.load_script(_os.path.join(_mp.__path__[0], 'plot_scripts', 'ADALM2000', 'li_sweep_magphase_log.py'))
+            if s['Sweep/Log_Scale']: self.tab_li.plot.load_script(_os.path.join(_mp.__path__[0], 'plot_scripts', 'ADALM2000', 'li_sweep_magphase_log.py'))
             else:              self.tab_li.plot.load_script(_os.path.join(_mp.__path__[0], 'plot_scripts', 'ADALM2000', 'li_sweep_magphase.py'))
 
         # Get the frequency list
-        if s['Sweep/Log']: fs = _s.fun.erange(s['Sweep/Start'], s['Sweep/Stop'], s['Sweep/Steps'])
+        if s['Sweep/Log_Scale']: fs = _s.fun.erange(s['Sweep/Start'], s['Sweep/Stop'], s['Sweep/Steps'])
         else:              fs = _n.linspace  (s['Sweep/Start'], s['Sweep/Stop'], s['Sweep/Steps'])
 
         # Do the loop
@@ -1187,7 +1187,7 @@ class adalm2000():
 
         ### Set up the AO tab.
 
-        self.tab_ao.button_auto.set_checked(False)
+        self.tab_ao.checkbox_auto.set_checked(False)
         so = self.tab_ao.settings
         sl = self.tab_li.settings
 
@@ -1201,7 +1201,7 @@ class adalm2000():
         so.set_list_index('Ch2/Rate', no)
 
         # Use one channel for triggering and one for output
-        cht = sl['Output/Trigger']
+        cht = sl['Output/Trigger_Out']
         if cht == 'Ch1': chs = 'Ch2'
         else:            chs = 'Ch1'
 
@@ -1249,12 +1249,12 @@ class adalm2000():
         # Other settings
         si['Iterations'] = 1
 
-        if sl['Input/Trigger'] == 'Ch1':
+        if sl['Input/Trigger_In'] == 'Ch1':
             si['Trigger/In']            = 'Ch1'
             si['Trigger/Ch1']           = 'Analog'
             si['Trigger/Ch1/Condition'] = 'Rising'
 
-        elif sl['Input/Trigger'] == 'Ch2':
+        elif sl['Input/Trigger_In'] == 'Ch2':
             si['Trigger/In']            = 'Ch2'
             si['Trigger/Ch2']           = 'Analog'
             si['Trigger/Ch2/Condition'] = 'Rising'
@@ -1415,7 +1415,7 @@ class adalm2000():
         self._ao_update_design()
 
         # If we're autosending
-        if self.tab_ao.button_auto.is_checked(): self.tab_ao.button_send.click()
+        if self.tab_ao.checkbox_auto.is_checked(): self.tab_ao.button_send.click()
 
     def _ao_settings_select_waveform(self, c):
         """
@@ -1743,7 +1743,7 @@ class adalm2000():
                 self.process_data()
 
                 # Send it to the demodulator
-                self.demodulate()
+                if self.tab_li.checkbox_enable.is_checked(): self.demodulate()
 
                 # Increment, update move on.
                 n += 1
