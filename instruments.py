@@ -636,7 +636,6 @@ class adalm2000():
         """
         Builds the graphical interface
         """
-
         # Create the window
         w = self.window = _g.Window('ADALM2000', autosettings_path=self.name+'.window', size=[1325,10])
 
@@ -648,8 +647,8 @@ class adalm2000():
         if _m2k: contexts = list(_m2k.getAllContexts())
         else:    contexts = []
         contexts.append('Simulation')
-        self.combo_contexts = gt.add(_g.ComboBox(contexts))
-        self.button_connect = gt.add(_g.Button('Connect', checkable=True))
+        self.combo_contexts = gt.add(_g.ComboBox(contexts, tip='Choose a device.'))
+        self.button_connect = gt.add(_g.Button('Connect', checkable=True, tip='Connect to chosen device.'))
         self.label_status   = gt.add(_g.Label(''))
         gt.set_column_stretch(2)
 
@@ -661,6 +660,9 @@ class adalm2000():
         self._build_tab_ao()
         self._build_tab_li()
         self._build_tab_power()
+
+        # Connect remaining signals
+        self.button_connect.signal_clicked.connect(self._button_connect_clicked)
 
         # Disable the tabs until we connect
         self.tabs.disable()
@@ -675,15 +677,15 @@ class adalm2000():
         """
         # Power tab
         self.tab_power = self.tabs.add_tab('Power Supply')
-        self.tab_power.number_set_Vp    = self.tab_power.add(_g.NumberBox(5, 1, (0,5), suffix='V', siPrefix=True))
-        self.tab_power.button_enable_Vp = self.tab_power.add(_g.Button('Enable V+', checkable=True))
-        self.tab_power.button_monitor_Vp= self.tab_power.add(_g.Button('Monitor',   checkable=True, checked=True))
+        self.tab_power.number_set_Vp    = self.tab_power.add(_g.NumberBox(5, 1, (0,5), suffix='V', siPrefix=True, tip='Setpoint for the positive supply.'))
+        self.tab_power.button_enable_Vp = self.tab_power.add(_g.Button('Enable V+', checkable=True, tip='Enable the positive supply.'))
+        self.tab_power.button_monitor_Vp= self.tab_power.add(_g.Button('Monitor',   checkable=True, checked=True, tip='Monitor the actual output voltage.'))
         self.tab_power.label_Vp         = self.tab_power.add(_g.Label(''))
 
         self.tab_power.new_autorow()
-        self.tab_power.number_set_Vm    = self.tab_power.add(_g.NumberBox(-5, 1, (-5,0), suffix='V', siPrefix=True))
-        self.tab_power.button_enable_Vm = self.tab_power.add(_g.Button('Enable V-', checkable=True))
-        self.tab_power.button_monitor_Vm= self.tab_power.add(_g.Button('Monitor',   checkable=True, checked=True))
+        self.tab_power.number_set_Vm    = self.tab_power.add(_g.NumberBox(-5, 1, (-5,0), suffix='V', siPrefix=True, tip='Setpoint for the negative supply.'))
+        self.tab_power.button_enable_Vm = self.tab_power.add(_g.Button('Enable V-', checkable=True, tip='Enable the negative supply.'))
+        self.tab_power.button_monitor_Vm= self.tab_power.add(_g.Button('Monitor',   checkable=True, checked=True, tip='Monitor the actual output voltage.'))
         self.tab_power.label_Vm         = self.tab_power.add(_g.Label(''))
 
         self.tab_power.new_autorow()
@@ -694,7 +696,6 @@ class adalm2000():
         self.tab_power.set_row_stretch(2)
 
         # Connect all the signals
-        self.button_connect              .signal_clicked.connect(self._button_connect_clicked)
         self.tab_power.number_set_Vp     .signal_changed.connect(self._power_settings_changed)
         self.tab_power.number_set_Vm     .signal_changed.connect(self._power_settings_changed)
         self.tab_power.button_enable_Vp  .signal_clicked.connect(self._power_settings_changed)
@@ -717,8 +718,8 @@ class adalm2000():
         self.tab_ai.tabs_settings = self.tab_ai.add(_g.TabArea(autosettings_path=self.name+'.tab_ai.tabs_settings'))
         self.tab_ai.tab_controls  = self.tab_ai.tabs_settings.add_tab('AI Settings')
 
-        self.tab_ai.button_acquire = self.tab_ai.tab_controls.add(_g.Button('Acquire', checkable=True))
-        self.tab_ai.button_onair   = self.tab_ai.tab_controls.add(_g.Button('On Air',  checkable=True)).set_width(50)
+        self.tab_ai.button_acquire = self.tab_ai.tab_controls.add(_g.Button('Acquire', checkable=True, tip='Acquire voltages vs time according to the settings below.'))
+        self.tab_ai.button_onair   = self.tab_ai.tab_controls.add(_g.Button('On Air',  checkable=True, tip='Indicates when data is actually being collected.')).set_width(50)
         self.tab_ai.label_info     = self.tab_ai.tab_controls.add(_g.Label(''))
 
         # Add sub-tabs for ai plot & analysis
@@ -799,7 +800,8 @@ class adalm2000():
             'Digital In'
             ], tip='Which source to use for triggering an acquisition.')
 
-        s.add_parameter('Trigger/Delay', 0.0, suffix='s', siPrefix=True, step=0.01, tip='Horizontal (time) offset relative to trigger point. The trigger point is always defined to be at time t=0.')
+        s.add_parameter('Trigger/Delay', 0.0, suffix='s', siPrefix=True, step=0.01, 
+                        tip='Horizontal (time) offset relative to trigger point. The trigger point is always defined to be at time t=0.')
 
         s.add_parameter('Trigger/Ch1', [
             'Immediate',
@@ -834,7 +836,7 @@ class adalm2000():
         s.add_parameter('Trigger/Ch1/Hysteresis', 0.0, bounds=(0, 2.5), dec=True, suffix='V', siPrefix=True, tip='How far the signal must swing away from the trigger level before another trigger is accepted.')
         s.add_parameter('Trigger/Ch2/Hysteresis', 0.0, bounds=(0, 2.5), dec=True, suffix='V', siPrefix=True, tip='How far the signal must swing away from the trigger level before another trigger is accepted.')
 
-        self.tab_ai.button_auto = s.add_button('Trigger/Auto')
+        self.tab_ai.button_auto = s.add_button('Trigger/Auto', tip="Select reasonable trigger levels based on the currently shown data.")
 
         # Formatting
         self.tab_ai.set_column_stretch(1, 10)
@@ -868,9 +870,9 @@ class adalm2000():
         self.tab_ao.tabs_settings = self.tab_ao.add(_g.TabArea(autosettings_path=self.name+'.tab_ao.tabs_settings'))
         self.tab_ao.tab_controls  = self.tab_ao.tabs_settings.add_tab('AO Settings')
 
-        self.tab_ao.button_send   = self.tab_ao.tab_controls.add(_g.Button('Send', checkable=True))
-        self.tab_ao.checkbox_auto = self.tab_ao.tab_controls.add(_g.CheckBox('Auto', autosettings_path=self.name+'.tab_ao.checkbox_auto'))
-        self.tab_ao.button_stop   = self.tab_ao.tab_controls.add(_g.Button('Stop'))
+        self.tab_ao.button_send   = self.tab_ao.tab_controls.add(_g.Button('Send', checkable=True, tip='Send the designed waveform to the actual analog outputs.'))
+        self.tab_ao.checkbox_auto = self.tab_ao.tab_controls.add(_g.CheckBox('Auto', autosettings_path=self.name+'.tab_ao.checkbox_auto', tip='Automatically send the designed waveform whenever it changes.'))
+        self.tab_ao.button_stop   = self.tab_ao.tab_controls.add(_g.Button('Stop', tip='Stop the output and set it to zero.'))
 
         # Waveform inspector
         self.tab_ao.tabs_data   = self.tab_ao.add(_g.TabArea(autosettings_path=self.name+'.tab_ao.tabs_data'), alignment=0)
@@ -918,8 +920,8 @@ class adalm2000():
         tl.number_ao_frequency = ts.add(_g.NumberBox(1e5, suffix='Hz', siPrefix=True, dec=True, bounds=(0, None), autosettings_path=self.name+'.tab_li.number_ao_frequency', tip='Target output frequency.')).set_width(80)
         tl.label_samples     = ts.add(_g.Label(''))
         ts.new_autorow()
-        tl.button_go         = ts.add(_g.Button('Go!',   checkable=True))
-        tl.button_sweep      = ts.add(_g.Button('Sweep', checkable=True))
+        tl.button_go         = ts.add(_g.Button('Go!',   checkable=True, tip='Set the frequency, acquire data, and demodulate it.'))
+        tl.button_sweep      = ts.add(_g.Button('Sweep', checkable=True, tip='Step the frequency according to the sweep below, pressing the "Go!" button at each step.'))
         ts.new_autorow()
         tl.settings     = s  = ts.add(_g.TreeDictionary(self.name+'.tab_li.tab_settings.settings', name='LI'), column_span=4)
         ts.set_column_stretch(3)
@@ -928,7 +930,7 @@ class adalm2000():
         tl.tabs_data              = tl.add(_g.TabArea(self.name+'.tab_li.tabs_data'), alignment=0)
         tl.tab_plot   = tp        = tl.tabs_data.add_tab('LI Demodulation')
         tl.number_demod_frequency = tp.add(_g.NumberBox(0.0, suffix='Hz', siPrefix=True, autosettings_path=self.name+'.tab_li.number_demod_frequency', tip='Frequency at which to perform the demodulation. Can be different from the LI settings frequency.')).set_width(120)
-        tl.checkbox_enable        = tp.add(_g.CheckBox('Enable Demodulation', autosettings_path=self.name+'.tab_li.checkbox_enable'))
+        tl.checkbox_enable        = tp.add(_g.CheckBox('Enable Demodulation', autosettings_path=self.name+'.tab_li.checkbox_enable', tip='Demodulate the next incoming data at the frequency to the left, and append the result.'))
         tp.new_autorow()
         tl.plot             = tp.add(_g.DataboxPlot('*.lockin', self.name+'.tab_li.plot'), column_span=4, alignment=0)
         tp.set_column_stretch(3)
