@@ -1007,7 +1007,7 @@ class adalm2000():
         else:          n = len(p[0])
 
         # Append to the demodder
-        p.append_data_point([n, f, V1X, V1Y, V2X, V2Y], ['n', 'f', 'V1X', 'V1Y', 'V2X', 'V2Y'])
+        p.append_row([n, f, V1X, V1Y, V2X, V2Y], ['n', 'f', 'V1X', 'V1Y', 'V2X', 'V2Y'])
 
         # Update the header
         d.copy_headers_to(p)
@@ -1568,7 +1568,7 @@ class adalm2000():
             data_point.append(Vm)
 
         # Add it to the history
-        self.tab_power.plot.append_data_point(data_point, ['t-t0', 'V+', 'V-'])
+        self.tab_power.plot.append_row(data_point, ['t-t0', 'V+', 'V-'])
         self.tab_power.plot.plot()
 
 

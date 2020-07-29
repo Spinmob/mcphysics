@@ -250,7 +250,7 @@ class fitting_statistics_demo():
             row  .append(e[n])
         
         # If the parameters haven't changed, just append the data
-        self.plot_parameters.append_data_point(row, ckeys=ckeys)
+        self.plot_parameters.append_row(row, ckeys=ckeys)
         
         # If this is the first row, set up the histograms
         if len(self.plot_parameters[0]) == 1:
