@@ -3070,7 +3070,7 @@ class keithley_dmm(_g.BaseObject):
         self.tabs_data = self.grid_bot.place_object(_g.TabArea(autosettings_path+'_tabs_data.txt'), alignment=0)
         self.tab_raw   = self.tabs_data.add_tab('Raw Data')
 
-        self.label_path = self.tab_raw.add(_g.Label('Output Path:').set_colors('blue'))
+        self.label_path = self.tab_raw.add(_g.Label('Output Path:').set_colors('cyan' if _s.settings['dark_theme'] else 'blue'))
         self.tab_raw.new_autorow()
 
         self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.csv', autosettings_path+'_plot_raw.txt', autoscript=2), alignment=0)
@@ -3127,8 +3127,8 @@ class keithley_dmm(_g.BaseObject):
 
             # Tell the user what dmm is connected
             if self.api.instrument == None:
-                self.label_dmm_name.set_text('Simulation')
-                self.label_dmm_name.set_style('font-weight: bold; color: red; font-size: 12pt;')
+                self.label_dmm_name.set_text('*** Simulation Mode ***')
+                self.label_dmm_name.set_colors('pink' if _s.settings['dark_theme'] else 'red')
                 self.button_connect.set_colors(background='pink')
             else:
                 self.label_dmm_name.set_text(self.api.model)

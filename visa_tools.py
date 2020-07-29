@@ -1,4 +1,5 @@
 import time    as _t
+import spinmob as _s
 import spinmob.egg as _egg
 _g = _egg.gui
 
@@ -57,7 +58,7 @@ class visa_api_base():
         # If we're in simulation mode, return
         if simulation:
             self.instrument = None
-            self.idn = 'Simulation Mode'
+            self.idn = '*** Simulation Mode ***'
             return
         
         # Try to open the instrument.
@@ -268,7 +269,7 @@ class visa_gui_base(_g.BaseObject):
             
             # If we're in simulation mode, make it very clear
             if self.api.instrument == None:
-                self.label_instrument_name.set_style('font-weight: bold; color: red; font-size: 12pt;')
+                self.label_instrument_name.set_colors('pink' if _s.settings['dark_theme'] else 'red')
                 self.button_connect.set_colors(background='pink')
             else:
                 self.label_instrument_name.set_style('')
