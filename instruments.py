@@ -1523,12 +1523,13 @@ class adalm2000():
         # If simulation mode, make this clear
         if self.api.simulation_mode:
             self.label_status.set_text('*** SIMULATION MODE ***')
-            self.label_status.set_colors('red')
+            self.label_status.set_colors('pink' if _s.settings['dark_theme'] else 'red')
+            self.button_connect.set_colors('black', 'pink')
 
         # Otherwise, give some information
         else:
             self.label_status.set_text(self.api.get_infostring())
-            self.label_status.set_colors('blue')
+            self.label_status.set_colors('cyan')
 
         # For now, just disable these
         self.button_connect.disable()
@@ -1556,15 +1557,15 @@ class adalm2000():
 
         # Update the labels and plot
         if Vp == None:
-            self.tab_power.label_Vp.set_text('(not measured)').set_colors('red')
+            self.tab_power.label_Vp.set_text('(not measured)').set_colors('pink' if _s.settings['dark_theme'] else 'red')
         else:
-            self.tab_power.label_Vp.set_text('%.3f V' % Vp).set_colors('black')
+            self.tab_power.label_Vp.set_text('%.3f V' % Vp).set_colors(None)
             data_point.append(Vp)
 
         if Vm == None:
-            self.tab_power.label_Vm.set_text('(not measured)').set_colors('red')
+            self.tab_power.label_Vm.set_text('(not measured)').set_colors('pink' if _s.settings['dark_theme'] else 'red')
         else:
-            self.tab_power.label_Vm.set_text('%.3f V' % Vm).set_colors('black')
+            self.tab_power.label_Vm.set_text('%.3f V' % Vm).set_colors(None)
             data_point.append(Vm)
 
         # Add it to the history
@@ -1723,7 +1724,7 @@ class adalm2000():
             # Get the data
             self.tab_ai.button_onair.set_checked(True).set_colors('red', 'pink'); self.window.process_events();
             vs = self.ai.get_samples(s['Samples'])
-            self.tab_ai.button_onair.set_checked(False).set_colors('black', None); self.window.process_events();
+            self.tab_ai.button_onair.set_checked(False).set_colors(None, None); self.window.process_events();
 
             # If vs==None it's a timeout
             if vs:
@@ -3128,7 +3129,7 @@ class keithley_dmm(_g.BaseObject):
             if self.api.instrument == None:
                 self.label_dmm_name.set_text('Simulation')
                 self.label_dmm_name.set_style('font-weight: bold; color: red; font-size: 12pt;')
-                self.button_connect.set_colors(background='red')
+                self.button_connect.set_colors(background='pink')
             else:
                 self.label_dmm_name.set_text(self.api.model)
                 self.label_dmm_name.set_style('')
