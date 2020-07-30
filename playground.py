@@ -27,6 +27,9 @@ import spinmob     as _s
 import spinmob.egg as _egg
 _g = _egg.gui
 
+import traceback as _traceback
+_p = _traceback.print_last
+
 
 
 def plot_and_integrate_reduced_chi2(dof=10, xmin=1e-6, xmax=5, steps=1e5):
@@ -230,24 +233,21 @@ class fitting_statistics_demo():
         self.window.process_events()
         
         # Now append the fit results to the next tab's plotter
-        p   = list(self.fitter.results[0])
-        e   = list(_n.sqrt(self.fitter.results[1].diagonal()))
-        x2  = self.fitter.reduced_chi_squared()
-        dof = len(self.fitter.get_processed_data()[0][0])-len(p)
-        row = p+e+x2+dof
-        pnames = self.fitter.get_pnames()
+        ps  = self.fitter.results.params
+        x2  = self.fitter.get_reduced_chi_squared()
+        dof = self.fitter.get_degrees_of_freedom()
         
         ckeys = ['reduced_chi2', 'DOF']
         row   = [x2,dof]
-        for n in range(len(p)):
+        for pname in ps:
             
             # Append the fit parameter
-            ckeys.append(pnames[n])
-            row  .append(p[n])
+            ckeys.append(pname)
+            row  .append(ps[pname].value)
 
             # Append the fit error
-            ckeys.append(pnames[n]+'_error')
-            row  .append(e[n])
+            ckeys.append(pname+'_error')
+            row  .append(ps[pname].stderr)
         
         # If the parameters haven't changed, just append the data
         self.plot_parameters.append_row(row, ckeys=ckeys)
@@ -260,11 +260,11 @@ class fitting_statistics_demo():
             
             # Generate a plot script
             s = 'x = [None]\ny = [d[0],d[1]'
-            for n in range(len(p)):
+            for n in range(len(ps)):
                 s = s+',d['+str(2*n+2)+']'
             
             s = s+']\n\nxlabels = "Iteration"\nylabels = [ d.ckeys[0], d.ckeys[1]'
-            for n in range(len(p)):
+            for n in range(len(ps)):
                 s = s+',d.ckeys['+str(2*n+2)+']'
             s = s+']'
             
@@ -277,14 +277,14 @@ class fitting_statistics_demo():
             self.figure_stats.clear()
         
             # Calculate how many rows of plots are needed
-            rows = int(_n.ceil(len(p)*0.5)+1)
+            rows = int(_n.ceil(len(ps)*0.5)+1)
         
             # Reduced chi^2 histogram
             self.axes_histograms.append(self.figure_stats.add_subplot(rows, 2, 1))
             self.axes_histograms.append(self.figure_stats.add_subplot(rows, 2, 2))
         
             # Parameter histograms
-            for n in range(len(p)):
+            for n in range(len(ps)):
                 self.axes_histograms.append(self.figure_stats.add_subplot(rows, 2, n+3))
                     
         # Update the parameters plot!
