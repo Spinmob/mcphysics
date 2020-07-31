@@ -2,6 +2,11 @@ import sys as _sys
 import os  as _os
 import spinmob
 
+
+
+# Get the version
+exec(spinmob.fun.read_lines(_os.path.join(__path__[0],'setup.py'))[0])
+
 # Windows ADALM2000 Drivers
 if _sys.platform in ['win32']:
     try:    import libm2k as _m2k

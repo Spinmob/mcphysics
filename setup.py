@@ -1,12 +1,10 @@
-
-
-version = '1.2.5'
+__version__ = '1.3.0' # Keep this on the first line
 
 
 
 from distutils.core import setup
 setup(name           = 'McPhysics',
-      version        = version,
+      version        = __version__,
       description    = 'Useful tools for the McGill Undergraduate Physics Labs',
       author         = 'Jack Sankey',
       author_email   = 'jack.sankey@gmail.com',
