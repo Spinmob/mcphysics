@@ -377,14 +377,14 @@ class fitting_statistics_demo():
                 
                 # Plot the histogram
                 self.axes_histograms[n+2].clear()
-                N,B,c = self.axes_histograms[n+2].hist(self.plot_parameters[2*n+2], self.tree_settings['Stats/bins'], label=self.fitter.get_variables()[n].name)
+                N,B,c = self.axes_histograms[n+2].hist(self.plot_parameters[2*n+2], self.tree_settings['Stats/bins'], label=self.fitter.get_parameter_names()[n])
                 x = (B[1:]+B[:-1])*0.5
                 
                 # Include the error bars
                 self.axes_histograms[n+2].errorbar(x, N, _n.sqrt(N), ls='', marker='+')
             
                 # Tidy up
-                self.axes_histograms[n+2].set_xlabel(self.fitter.get_pnames()[n])
+                self.axes_histograms[n+2].set_xlabel(self.fitter.get_parameter_names()[n])
                 self.axes_histograms[n+2].set_ylabel('Counts')
                 
                 # Plot the expected distribution, calculated from the mean
