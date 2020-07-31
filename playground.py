@@ -373,11 +373,11 @@ class fitting_statistics_demo():
             self.axes_histograms[1].legend()
             
             # Now plot the distributions of the other fit parameters.
-            for n in range(len(self.fitter.get_pnames())):
+            for n in range(len(self.fitter.p_fit)):
                 
                 # Plot the histogram
                 self.axes_histograms[n+2].clear()
-                N,B,c = self.axes_histograms[n+2].hist(self.plot_parameters[2*n+2], self.tree_settings['Stats/bins'], label=self.fitter.get_pnames()[n])
+                N,B,c = self.axes_histograms[n+2].hist(self.plot_parameters[2*n+2], self.tree_settings['Stats/bins'], label=self.fitter.get_variables()[n].name)
                 x = (B[1:]+B[:-1])*0.5
                 
                 # Include the error bars
