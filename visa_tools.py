@@ -269,7 +269,7 @@ class visa_gui_base(_g.BaseObject):
             
             # If we're in simulation mode, make it very clear
             if self.api.instrument == None:
-                self.label_instrument_name.set_colors('pink' if _s.settings['dark_theme'] else 'red')
+                self.label_instrument_name.set_colors('pink' if _s.settings['dark_theme_qt'] else 'red')
                 self.button_connect.set_colors(background='pink')
             else:
                 self.label_instrument_name.set_style('')
