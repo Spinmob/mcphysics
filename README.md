@@ -17,7 +17,7 @@ If you have installed McPhysics as described below, you do not need to also inst
 
 3. Install spinmob and mcphysics via pip:
    ```
-   pip install spinmob mcphysics pyvisa
+   pip install spinmob mcphysics pyvisa lmfit
    ```
 
 4. Open Spyder and start playing. Example script:
