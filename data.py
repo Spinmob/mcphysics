@@ -78,7 +78,7 @@ def load_chns(paths=None, **kwargs):
     for path in paths: ds.append(load_chn(path, **kwargs))
     return ds
 
-def plot_chn_files(xscript='d[0]', yscript='d[1]', eyscript='sqrt(d[1])', marker='+', linestyle='', xlabel='Channel', ylabel='Counts', paths=None, **kwargs):
+def plot_chns(xscript='d[0]', yscript='d[1]', eyscript='sqrt(d[1])', marker='+', linestyle='', xlabel='Channel', ylabel='Counts', paths=None, **kwargs):
     """
     Opens a bunch of chn files and plots the specified script for each. You can
     get the same result by loading multiple chn files (returns a list of databoxes)

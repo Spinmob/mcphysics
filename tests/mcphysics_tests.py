@@ -42,7 +42,7 @@ class Test_errthing(_ut.TestCase):
         self.assertEqual(len(ds[1]), 2)
 
         _s.pylab.figure(1)
-        _m.data.plot_chn_files(paths=[path('signal.Chn'), path('background.Chn')])
+        _m.data.plot_chns(paths=[path('signal.Chn'), path('background.Chn')])
 
         image = _m.data.load_image(path('image.jpg'))
         self.assertEqual(image.shape, (612, 816, 3))
