@@ -7,7 +7,7 @@ import os      as _os
 
 
 
-def load_chn(path=None):
+def load_chn(path=None, **kwargs):
     """
     Loads a Maestro CHN file at the specified path. Will return a databox with all 
     the information.
@@ -16,12 +16,14 @@ def load_chn(path=None):
     ----------
     path=None
         If None, a dialog will pop up. Otherwise specify a valid path (string).
+        
+    Optional keyword arguments, e.g., delimeter=',', are sent to spinmob.data.databox()
     """
     if path==None: path = _s.dialogs.load(filters="*.Chn")
     if path==None: return
     
     # Create a databox
-    d = _s.data.databox()
+    d = _s.data.databox(**kwargs)
     
     # Open the file
     fh = open(path,mode="rb")
@@ -57,7 +59,7 @@ def load_chn(path=None):
     
     return d
 
-def load_chns(paths=None):
+def load_chns(paths=None, **kwargs):
     """
     Loads multiple chn files, returning a list of databoxes.
     
@@ -66,12 +68,14 @@ def load_chns(paths=None):
     paths=None
         If None, a dialog will pop up, allowing you to select multiople files.
         Otherwise, specify a valid *list* of paths, e.g. ['C:/test/path.chn', 'C:/test/path2.chn']
+    
+    Optional keyword arguments (e.g., delimiter=',') are sent to load_chn()
     """
-    if paths==None: paths=_s.dialogs.load_multiple(filters='*.Chn')
+    if paths==None: paths=_s.dialogs.load_multiple(filters='*.Chn', **kwargs)
     if paths==None: return
     
     ds = []
-    for path in paths: ds.append(load_chn(path))
+    for path in paths: ds.append(load_chn(path, **kwargs))
     return ds
 
 def plot_chn_files(xscript='d[0]', yscript='d[1]', eyscript='sqrt(d[1])', marker='+', linestyle='', xlabel='Channel', ylabel='Counts', paths=None, **kwargs):
@@ -109,6 +113,35 @@ def plot_chn_files(xscript='d[0]', yscript='d[1]', eyscript='sqrt(d[1])', marker
                          xlabel=xlabel, ylabel=ylabel, 
                          title=title, **kwargs)
     
+def convert_chn_to_csv(chn_paths=None, output_dir=None):
+    """
+    Opens the supplied Maestro Chn files and saves them as csv
+
+    Parameters
+    ----------
+    chn_paths=None : list of strings
+        List of paths to Chn files. If None, this will pop up a dialog.
+    
+    output_dir=None: string
+        Path to output directory. If None, this will pop up a dialog.
+    """
+    ds = load_chns(chn_paths, delimiter=',')
+    if output_dir is None: output_dir = _s.dialogs.select_directory('Select an output directory.')
+    
+    for d in ds: 
+        
+        # Get the file name
+        filename = _os.path.split(d.path)[-1]
+        
+        # Replace the extension
+        s = filename.split('.')
+        s[-1] = '.csv'
+        filename = '.'.join(s)
+        
+        # Save it
+        d.save_file(_os.path.join(output_dir, filename))
+    
+    return ds
 
 
 # Only import this if imageio is installed

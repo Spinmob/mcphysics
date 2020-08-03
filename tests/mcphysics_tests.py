@@ -41,6 +41,7 @@ class Test_errthing(_ut.TestCase):
         self.assertEqual(len(ds), 2)
         self.assertEqual(len(ds[1]), 2)
 
+        _s.pylab.figure(1)
         _m.data.plot_chn_files(paths=[path('signal.Chn'), path('background.Chn')])
 
         image = _m.data.load_image(path('image.jpg'))
@@ -49,9 +50,12 @@ class Test_errthing(_ut.TestCase):
         images = _m.data.load_images([path('image.jpg')])
         self.assertEqual(_n.shape(images), (1,612,816,3))
 
+        ds = _m.data.convert_chn_to_csv([path('signal.Chn'),path('background.Chn')])
+        
 
     def test_functions(self):
 
+        _s.pylab.figure(2)
         _s.plot.xy.function(['em_gaussian(x,1,2)', 'voigt(x,2,1)', 'erfcx(x)', 'reduced_chi2(x,10)'],
                              1e-6,5,1000,g=_m.functions.__dict__)
 
