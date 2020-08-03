@@ -5,7 +5,8 @@ import spinmob
 
 
 # Get the version
-exec(spinmob.fun.read_lines(_os.path.join(__path__[0],'setup.py'))[0])
+try: exec(spinmob.fun.read_lines(_os.path.join(__path__[0],'setup.py'))[0])
+except: __version__ = 'unknown'
 
 # Windows ADALM2000 Drivers
 if _sys.platform in ['win32']:

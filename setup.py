@@ -1,4 +1,4 @@
-__version__ = '1.3.3' # Keep this on the first line
+__version__ = '1.3.6' # Keep this on the first line
 
 
 
@@ -10,5 +10,14 @@ setup(name           = 'McPhysics',
       author_email   = 'jack.sankey@gmail.com',
       url            = 'https://github.com/sankeylab/mcphysics',
       packages       = ['mcphysics'],
-      package_dir    = {'mcphysics' : '.'}
+      package_dir    = {'mcphysics' : '.'},
+      package_data={
+          ''  : [
+              './setup.py',
+              './plot_scripts/*/*', 
+              './tests/*',
+              './tests/data/*'
+            ],
+          },
+      include_package_data=True,
      )
