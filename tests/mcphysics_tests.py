@@ -11,7 +11,7 @@ a = b = c = d = e = x = None
 if _os.path.exists('egg_settings'): _sh.rmtree('egg_settings')
 
 # Path to the data folder
-data_path = _os.path.join(_os.path.dirname(_m.__file__), '_tests', 'data')
+data_path = _os.path.join(_os.path.dirname(_m.__file__), 'tests', 'data')
 def path(filename):
     """
     Assembles a path to a particular file.
