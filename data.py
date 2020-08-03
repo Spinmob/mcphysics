@@ -71,7 +71,7 @@ def load_chns(paths=None, **kwargs):
     
     Optional keyword arguments (e.g., delimiter=',') are sent to load_chn()
     """
-    if paths==None: paths=_s.dialogs.load_multiple(filters='*.Chn', **kwargs)
+    if paths==None: paths=_s.dialogs.load_multiple(filters='*.Chn')
     if paths==None: return
     
     ds = []
@@ -126,7 +126,10 @@ def convert_chn_to_csv(chn_paths=None, output_dir=None):
         Path to output directory. If None, this will pop up a dialog.
     """
     ds = load_chns(chn_paths, delimiter=',')
+    if ds is None: return
+    
     if output_dir is None: output_dir = _s.dialogs.select_directory('Select an output directory.')
+    if output_dir is None: return
     
     for d in ds: 
         
