@@ -13,7 +13,7 @@ if _sys.platform in ['win32']:
     try:    import libm2k as _m2k
     except:
         _m2k = None
-        spinmob._warn('To use an ADALM2000 on Windows, you need to install the m2k/ADALM2000 drivers, libiio, and libm2k with python bindings.')
+        spinmob._warn('To use an ADALM2000 on Windows, you need to install libm2k with python bindings.')
 
 
 # OSX ADALM2000 Drivers
