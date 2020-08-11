@@ -1,4 +1,4 @@
-__version__ = '1.3.10' # Keep this on the first line
+__version__ = '1.4.0' # Keep this on the first line
 
 
 
@@ -14,7 +14,7 @@ setup(name           = 'McPhysics',
       package_data={
           ''  : [
               './setup.py',
-              './plot_scripts/*/*', 
+              './plot_scripts/*/*',
               './tests/*',
               './tests/data/*'
             ],

@@ -1,43 +1,76 @@
 import sys as _sys
 import os  as _os
-import spinmob
+import traceback as _traceback
+_p = _traceback.print_last
 
+try:    import spinmob
+except: raise Exception('You definitely need to install spinmob to do anything in mcphysics.')
 
+# Add the appropriate paths for different operating systems
+
+# Location of the linux libm2k dll
+if not _sys.platform in ['win32', 'darwin']: _sys.path.append(_os.path.join(__path__[0], 'libm2k', 'linux'))
 
 # Get the version
 try: exec(spinmob.fun.read_lines(_os.path.join(__path__[0],'setup.py'))[0])
 except: __version__ = 'unknown'
 
-# Windows ADALM2000 Drivers
-if _sys.platform in ['win32']:
-    try:    import libm2k as _m2k
+# Import all the other semi-optional libraries
+def _safe_import(lib):
+    try:
+        exec('import '+lib)
+        return eval(lib)
     except:
-        _m2k = None
-        spinmob._warn('To use an ADALM2000 on Windows, you need to install libm2k with python bindings.')
+        return None
+
+_imageio        = _safe_import('imageio')
+_libm2k         = _safe_import('libm2k')
+_visa           = _safe_import('visa')
+_serial         = _safe_import('serial')
+_minimalmodbus  = _safe_import('minimalmodbus')
 
 
-# OSX ADALM2000 Drivers
-elif _sys.platform in ['darwin']:
-    spinmob._warn('No ADALM2000 on OSX yet.')
-    _m2k = None
+_debug_enabled = False
+def _debug(*a):
+    if _debug_enabled:
+        s = []
+        for x in a: s.append(str(x))
+        print(', '.join(s))
 
-# Linux ADALM2000 Drivers
-else:
-    _sys.path.append(_os.path.join(__path__[0], 'libm2k', 'linux'))
-    try: import libm2k as _m2k
-    except:
-        _m2k = None
-        spinmob._warn('To use an ADALM2000 on Linux, you need to install libiio v0.21, and libm2k v0.2.1.')
+def check_installation():
+    """
+    Prints out the status of the optional libraries.
+    """
+    modules = [
+        'imageio',
+        'lmfit',
+        'libm2k',
+        'matplotlib',
+        'minimalmodbus',
+        'numpy',
+        'pyqtgraph',
+        'OpenGL',
+        'scipy',
+        'serial',
+        'visa',]
 
+    # Try importing them
+    installed = []
+    missing   = []
+    for m in modules:
+        try:
+            exec('import ' + m)
+            if m in ['visa', 'serial', 'OpenGL']: installed.append('py'+m.lower())
+            else:                       installed.append(m)
+        except:
+            if m in ['visa', 'serial', 'OpenGL']: missing.append('py'+m.lower())
+            else:                       missing.append(m)
 
-# Test for VISA
-try:    import visa as _v
-except:
-    spinmob._warn('Visa driver and / or pyvisa not installed. On Windows, consider Rhode & Schwartz VISA or NI-VISA, then pip install pyvisa. On Linux, pip install pyvisa and pyvisa-py')
-    _v = None
+    if len(installed): print('\nINSTALLED\n  '+'\n  '.join(installed))
+    if len(missing):   print('\nMISSING\n  '    +'\n  '.join(missing))
+    print()
 
-from . import visa_tools
-from . import instruments
+import mcphysics.instruments as instruments
 from . import data
 from . import functions
 from . import playground

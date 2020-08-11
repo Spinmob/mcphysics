@@ -24,12 +24,13 @@ class Test_errthing(_ut.TestCase):
     Test class for mcphysics library.
     """
 
-
     def setUp(self):
         return
 
     def tearDown(self):
         return
+
+    def test_check_installation(self): _m.check_installation()
 
     def test_data(self):
 
@@ -50,8 +51,12 @@ class Test_errthing(_ut.TestCase):
         images = _m.data.load_images([path('image.jpg')])
         self.assertEqual(_n.shape(images), (1,612,816,3))
 
-        ds = _m.data.convert_chn_to_csv([path('signal.Chn'),path('background.Chn')])
-        
+        ds = _m.data.convert_chn_to_csv([path('signal.Chn'),path('background.Chn')], 'data')
+        print()
+        for d in ds:
+            print('Removing '+d.path)
+            _os.remove(d.path)
+
 
     def test_functions(self):
 
@@ -59,13 +64,10 @@ class Test_errthing(_ut.TestCase):
         _s.plot.xy.function(['em_gaussian(x,1,2)', 'voigt(x,2,1)', 'erfcx(x)', 'reduced_chi2(x,10)'],
                              1e-6,5,1000,g=_m.functions.__dict__)
 
-    def test_instruments(self):
-        global a, b, c
-
-        a = _m.instruments.adalm2000(block=True)
-        b = _m.instruments.sillyscope(block=True)
-        c = _m.instruments.keithley_dmm(block=True)
-
+    def test_instruments_adalm2000(self):        _m.instruments.adalm2000(block=True)
+    def test_instruments_sillyscope(self):       _m.instruments.sillyscope(block=True)
+    def test_instruments_keithley_dmm(self):     _m.instruments.keithley_dmm(block=True)
+    def test_instruments_auber_syl53x2p(self):   _m.instruments.auber_syl53x2p(block=True)
 
     def test_playground(self):
         global b
@@ -75,5 +77,6 @@ class Test_errthing(_ut.TestCase):
         print()
         _m.playground.plot_and_integrate_reduced_chi2()
 
+
 if __name__ == "__main__":
-    _ut.main()
+    _ut.main(failfast=True)

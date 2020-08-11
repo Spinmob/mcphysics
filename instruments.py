@@ -19,7 +19,7 @@ import numpy   as _n
 import time    as _t
 import spinmob as _s
 import spinmob.egg as _egg
-import mcphysics as _mp; _m2k = _mp._m2k; _v = _mp._v
+import mcphysics as _mp
 import os      as _os
 import time    as _time
 _g = _egg.gui
@@ -33,6 +33,7 @@ def _debug(*a):
         s = []
         for x in a: s.append(str(x))
         print(', '.join(s))
+
 
 class _adalm2000_object():
     """
@@ -130,12 +131,12 @@ class _adalm2000_analog_in(_adalm2000_object):
         if self.simulation_mode: return self
 
         if channel1 is not None:
-            if channel1: self.more.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_25V)
-            else:        self.more.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_2_5V)
+            if channel1: self.more.setRange(_mp._libm2k.CHANNEL_1, _mp._libm2k.PLUS_MINUS_25V)
+            else:        self.more.setRange(_mp._libm2k.CHANNEL_1, _mp._libm2k.PLUS_MINUS_2_5V)
 
         if channel2 is not None:
-            if channel2: self.more.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_25V)
-            else:        self.more.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_2_5V)
+            if channel2: self.more.setRange(_mp._libm2k.CHANNEL_2, _mp._libm2k.PLUS_MINUS_25V)
+            else:        self.more.setRange(_mp._libm2k.CHANNEL_2, _mp._libm2k.PLUS_MINUS_2_5V)
 
         return self
 
@@ -159,12 +160,12 @@ class _adalm2000_analog_in(_adalm2000_object):
 
         """
         if channel1 is not None:
-            if channel1: self.more.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_2_5V)
-            else:        self.more.setRange(_m2k.CHANNEL_1, _m2k.PLUS_MINUS_25V)
+            if channel1: self.more.setRange(_mp._libm2k.CHANNEL_1, _mp._libm2k.PLUS_MINUS_2_5V)
+            else:        self.more.setRange(_mp._libm2k.CHANNEL_1, _mp._libm2k.PLUS_MINUS_25V)
 
         if channel2 is not None:
-            if channel2: self.more.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_2_5V)
-            else:        self.more.setRange(_m2k.CHANNEL_2, _m2k.PLUS_MINUS_25V)
+            if channel2: self.more.setRange(_mp._libm2k.CHANNEL_2, _mp._libm2k.PLUS_MINUS_2_5V)
+            else:        self.more.setRange(_mp._libm2k.CHANNEL_2, _mp._libm2k.PLUS_MINUS_25V)
 
         return self
 
@@ -550,8 +551,9 @@ class adalm2000_api():
     """
     def __init__(self, name):
 
-        # If the import failed, _m2k = None
-        if _m2k == None:
+        # If the import failed, _mp._libm2k = None
+        if _mp._libm2k == None:
+            _s._warn('You need to install libm2k to access the adalm2000s.')
             self.simulation_mode = True
             self.ai    = _adalm2000_analog_in(None)
             self.ao    = _adalm2000_analog_out(None)
@@ -564,9 +566,9 @@ class adalm2000_api():
 
             # If we are trying to open a real object
             if not name == "Simulation":
-                
+
                 # Create the m2k handle
-                self.m2k = _m2k.contextOpen(name).toM2k()
+                self.m2k = _mp._libm2k.contextOpen(name).toM2k()
 
                 # Get the ai, ao, and power.
                 self.ai    = _adalm2000_analog_in (self.m2k.getAnalogIn())
@@ -622,8 +624,7 @@ class adalm2000():
     """
     def __init__(self, name='adalm2000', block=False):
 
-        # If the import failed, _m2k = None
-        if _m2k == None: _s._warn("You need to install libiio and libm2k to use an ADALM2000.")
+        if _mp._libm2k == None: _s._warn('You need to install libm2k to access the adalm2000s.')
 
         # Remember the name
         self.name = name
@@ -644,7 +645,7 @@ class adalm2000():
         gb = self._grid_bottom = w.add(_g.GridLayout(margins=False), column=1, row=2, alignment=0)
 
         # Add a combo box for all the available devices and a button to connect
-        if _m2k: contexts = list(_m2k.getAllContexts())
+        if _mp._libm2k: contexts = list(_mp._libm2k.getAllContexts())
         else:    contexts = []
         contexts.append('Simulation')
         self.combo_contexts = gt.add(_g.ComboBox(contexts, tip='Choose a device.'))
@@ -800,7 +801,7 @@ class adalm2000():
             'Digital In'
             ], tip='Which source to use for triggering an acquisition.')
 
-        s.add_parameter('Trigger/Delay', 0.0, suffix='s', siPrefix=True, step=0.01, 
+        s.add_parameter('Trigger/Delay', 0.0, suffix='s', siPrefix=True, step=0.01,
                         tip='Horizontal (time) offset relative to trigger point. The trigger point is always defined to be at time t=0.')
 
         s.add_parameter('Trigger/Ch1', [
@@ -1833,6 +1834,7 @@ class sillyscope_api(_mp.visa_tools.visa_api_base):
 
 
     def __init__(self, name='TDS1012B', pyvisa_py=False, simulation=False, timeout=3e3, write_sleep=0.0):
+        if not _mp._visa: _s._warn('You need to install pyvisa to use the sillyscopes.')
 
         # Run the basic stuff
         _mp.visa_tools.visa_api_base.__init__(self, name=name, pyvisa_py=pyvisa_py, simulation=simulation, timeout=timeout, write_sleep=write_sleep)
@@ -2384,6 +2386,7 @@ class sillyscope(_mp.visa_tools.visa_gui_base):
 
     """
     def __init__(self, name='sillyscope', show=True, block=False, pyvisa_py=False):
+        if not _mp._visa: _s._warn('You need to install pyvisa to use the sillyscopes.')
 
         # Run the baseline stuff
         _mp.visa_tools.visa_gui_base.__init__(self, name=name, show=False, block=False, api=sillyscope_api, pyvisa_py=pyvisa_py, window_size=[1000,500])
@@ -2830,11 +2833,12 @@ class keithley_dmm_api():
 
 
     def __init__(self, name='ASRL3::INSTR', pyvisa_py=False):
+        if not _mp._visa: _s._warn('You need to install pyvisa to use the Keithley DMMs.')
 
         # Create a resource management object
-        if _v:
-            if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
-            else:         self.resource_manager = _v.ResourceManager()
+        if _mp._visa:
+            if pyvisa_py: self.resource_manager = _mp._visa.ResourceManager('@py')
+            else:         self.resource_manager = _mp._visa.ResourceManager()
         else: self.resource_manager = None
 
         # Get time t=t0
@@ -3041,6 +3045,7 @@ class keithley_dmm(_g.BaseObject):
         Whether to block the command line while showing the window.
     """
     def __init__(self, autosettings_path='keithley_dmm', pyvisa_py=False, block=False):
+        if not _mp._visa: _s._warn('You need to install pyvisa to use the Keithley DMMs.')
 
         # No scope selected yet
         self.api = None
@@ -3076,9 +3081,9 @@ class keithley_dmm(_g.BaseObject):
         self.plot_raw  = self.tab_raw.place_object(_g.DataboxPlot('*.csv', autosettings_path+'_plot_raw.txt', autoscript=2), alignment=0)
 
         # Create a resource management object to populate the list
-        if _v:
-            if pyvisa_py: self.resource_manager = _v.ResourceManager('@py')
-            else:         self.resource_manager = _v.ResourceManager()
+        if _mp._visa:
+            if pyvisa_py: self.resource_manager = _mp._visa.ResourceManager('@py')
+            else:         self.resource_manager = _mp._visa.ResourceManager()
         else: self.resource_manager = None
 
         # Populate the list.
