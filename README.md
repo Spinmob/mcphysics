@@ -10,14 +10,15 @@ If you have installed McPhysics as described below, you do not need to also inst
 
 1. Download and install [Anaconda Python 3](https://www.anaconda.com/distribution/) or [Miniconda Python 3](https://docs.conda.io/en/latest/miniconda.html). See additional instructions below for OSX.
 
-2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the requisite packages available in the conda repository:
+2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the requisite packages available in the conda and pypi repositories:
    ```
-   conda install numpy scipy imageio matplotlib pyqtgraph spyder pyopengl
+   conda install imageio matplotlib numpy pyqtgraph pyopengl pyserial scipy spyder
+   pip install pyvisa lmfit
    ```
 
 3. Install spinmob and mcphysics via pip:
    ```
-   pip install spinmob mcphysics pyvisa lmfit
+   pip install spinmob mcphysics
    ```
 
 4. Open Spyder and start playing. Example script:
