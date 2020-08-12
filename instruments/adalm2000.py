@@ -1,3 +1,8 @@
+# TO DO:
+    # Write a baseline test script for the set_trigger_conditions() in external Ch2
+    # _ai_settings_changed: Hide/show irrelevant trigger entries and the trigger level cursors in TI mode.
+
+
 import os        as _os
 import time      as _t
 import numpy     as _n
@@ -243,8 +248,10 @@ class _adalm2000_analog_in(_adalm2000_object):
         """
         if not self.simulation_mode:
             t = self.more.getTrigger()
-            t.setAnalogCondition(0, condition1)
-            t.setAnalogCondition(1, condition2)
+            t.setAnalogCondition        (0, condition1)
+            t.setAnalogExternalCondition(0, condition1)
+            t.setAnalogCondition        (1, condition2)
+            t.setAnalogExternalCondition(1, condition2) # BUG? This seems not to have any effect.
 
         return self
 
@@ -789,7 +796,7 @@ class adalm2000():
             'Trigger In',
             'Analog In',
             'Digital In'
-            ], tip='Which source to use for triggering an acquisition.')
+            ], tip='Which trigger event to send to the trigger out (TO) port.')
 
         s.add_parameter('Trigger/Delay', 0.0, suffix='s', siPrefix=True, step=0.01,
                         tip='Horizontal (time) offset relative to trigger point. The trigger point is always defined to be at time t=0.')
@@ -797,7 +804,7 @@ class adalm2000():
         s.add_parameter('Trigger/Ch1', [
             'Immediate',
             'Analog',
-            'External',
+            'External (TI)',
             'Digital or Analog',
             'Digital and Analog',
             'Digital xor Analog',
@@ -809,7 +816,7 @@ class adalm2000():
         s.add_parameter('Trigger/Ch2', [
             'Immediate',
             'Analog',
-            'External',
+            'External (TI)',
             'Digital or Analog',
             'Digital and Analog',
             'Digital xor Analog',
@@ -937,7 +944,7 @@ class adalm2000():
         s.add_parameter('Input/Rate', ['100 MHz', '10 MHz', '1 MHz', '100 kHz', '10 kHz', '1 kHz', 'Automatic'], default_list_index=6, tip='Analog input samping rate for both channels.')
         s.add_parameter('Input/Max_Buffer',100000, bounds=(10,None), dec=True, tip='Maximum input buffer you will tolerate to try and achieve Tau.')
         s.add_parameter('Input/Settle',  50e-6, suffix='s', siPrefix=True, dec=True, bounds=(0,   None), tip='How long to let it settle after starting the analog output before acquiring.')
-        s.add_parameter('Input/Trigger_In', ['Ch1', 'Ch2', 'External'], default_list_index=1, tip='Which channel to use as a trigger. "External" refers to the TI port.')
+        s.add_parameter('Input/Trigger_In', ['Ch1', 'Ch2', 'External (TI)'], default_list_index=1, tip='Which channel to use as a trigger. "External" refers to the TI port.')
         s.add_parameter('Input/Measure', 50e-6, suffix='s', siPrefix=True, dec=True, bounds=(1e-6,None), tip='How long to take data. This will be limited by Max_Buffer.')
 
         s.add_parameter('Sweep/Start',  1e4, suffix='Hz', siPrefix=True, dec=True, bounds=(0,None), tip='Approximate start frequency. Be careful with low frequencies and high sample rates. Too many samples will crash this thing.')
@@ -1256,7 +1263,7 @@ class adalm2000():
         # Otherwise it's external
         else:
             si['Trigger/In']            = 'Ch1'
-            si['Trigger/Ch1']           = 'External'
+            si['Trigger/Ch1']           = 'External (TI)'
             si['Trigger/Ch1/Condition'] = 'Rising'
 
         # Also update the demod frequency
@@ -1690,6 +1697,11 @@ class adalm2000():
             # self.api.ai.enableChannel(0, s['Ch1'])
             # self.api.ai.enableChannel(1, s['Ch2'])
 
+            # BUG WORKAROUND: set_trigger_conditions() doesn't seem to work for Ch2 External.
+            if s['Trigger/In'] == 'Ch2' and s['Trigger/Ch2'] == 'External (TI)':
+                s['Trigger/In'] = 'Ch1'
+                s['Trigger/Ch1'] = 'External (TI)'
+
             # Set the timeout
             self.api.set_timeout(int(s['Timeout']*1000));
 
@@ -1804,3 +1816,12 @@ class adalm2000():
         """
         return
 
+
+
+
+if __name__ == '__main__':
+    _m = _mp._libm2k
+    a = adalm2000()
+    a.button_connect.click()
+    a.tab_ao.button_send.click()
+    a.tab_ai.button_acquire.click()
