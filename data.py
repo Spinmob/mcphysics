@@ -43,6 +43,16 @@ def load_chn(path=None, **kwargs):
     # Get the counts data
     spectrum = _n.zeros(channel_count,dtype=int)
     for i in range(channel_count): [spectrum[i]] = _struct.unpack("I",buffer[32+4*i:36+4*i])
+
+    # Get the byte offset of the data
+    offset = 36+4*(channel_count-1)
+
+    # Get the size of the "Sample description" string
+    info_size = int.from_bytes( buffer[offset+320:offset+321], "big" )
+
+    # Extract "Sample description" string
+    info = buffer[offset+321:offset+321+info_size].decode()
+
     d['Channel'] = range(channel_count)
     d['Counts']  = spectrum
 
@@ -50,13 +60,23 @@ def load_chn(path=None, **kwargs):
     if "1" == start_date[7]: century = 20
     else:                    century = 19
     start_RFC2822 = "%s %s %02d%s %s:%s:%s" % (start_date[0:2], start_date[2:5], century, start_date[5:7], start_time[0:2], start_time[2:4], ascii_seconds)
+    s = _t.strptime(start_RFC2822,"%d %b %Y %H:%M:%S")
+    start = dict(
+        year     = s.tm_year,
+        month    = s.tm_mon,
+        day      = s.tm_mday,
+        hour     = s.tm_hour,
+        minute   = s.tm_min,
+        second   = s.tm_sec,
+        year_day = s.tm_yday)
 
     # Header info
     d.path=path
-    d.h(path=path)
-    d.h(start_time = _t.strptime(start_RFC2822,"%d %b %Y %H:%M:%S"))
-    d.h(real_time = 0.02*real_time_20ms)
-    d.h(live_time = 0.02*live_time_20ms)
+    d.h(description = info,
+        start_time  = start,
+        real_time   = 0.02*real_time_20ms,
+        live_time   = 0.02*live_time_20ms,
+        path        = path,)
 
     return d
 

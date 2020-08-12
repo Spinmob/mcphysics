@@ -19,7 +19,7 @@ def path(filename):
     return _os.path.join(data_path, filename)
 
 
-class Test_errthing(_ut.TestCase):
+class errthing(_ut.TestCase):
     """
     Test class for mcphysics library.
     """
@@ -32,7 +32,8 @@ class Test_errthing(_ut.TestCase):
 
     def test_check_installation(self): _m.check_installation()
 
-    def test_data(self):
+    def test_data_chn(self):
+        global d
 
         d = _m.data.load_chn(path('signal.Chn'))
         self.assertEqual(len(d), 2)
@@ -42,8 +43,21 @@ class Test_errthing(_ut.TestCase):
         self.assertEqual(len(ds), 2)
         self.assertEqual(len(ds[1]), 2)
 
+        ds = _m.data.convert_chn_to_csv([path('signal.Chn'),path('background.Chn')], '')
+        d = _s.data.load('signal.csv')
+        self.assertEqual(d.h('start')['month'], 9)
+
+        # Clean up
+        print()
+        for d in ds:
+            print('Removing '+d.path)
+            _os.remove(d.path)
+
         _s.pylab.figure(1)
         _m.data.plot_chns(paths=[path('signal.Chn'), path('background.Chn')])
+
+
+    def test_data_images(self):
 
         image = _m.data.load_image(path('image.jpg'))
         self.assertEqual(image.shape, (612, 816, 3))
@@ -51,11 +65,7 @@ class Test_errthing(_ut.TestCase):
         images = _m.data.load_images([path('image.jpg')])
         self.assertEqual(_n.shape(images), (1,612,816,3))
 
-        ds = _m.data.convert_chn_to_csv([path('signal.Chn'),path('background.Chn')], 'data')
-        print()
-        for d in ds:
-            print('Removing '+d.path)
-            _os.remove(d.path)
+
 
 
     def test_functions(self):
@@ -79,4 +89,5 @@ class Test_errthing(_ut.TestCase):
 
 
 if __name__ == "__main__":
-    _ut.main(failfast=True)
+    _ut.main()
+    #_ut.main(defaultTest='errthing.test_data_chn')
