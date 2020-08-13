@@ -597,12 +597,16 @@ class adalm2000():
 
     Parameters
     ----------
-    name : str, optional
+    name='adalm2000' : str
         Optional identifier for this instance of adalm2000 (in case you build
         a gui with many instances), used primarily for the remembering settings.
         Could be "Carl" for example.
+    show=True : bool
+        Whether to show the window upon creation.
+    block=False : bool
+        Whether to block the console when showing the window.
     """
-    def __init__(self, name='adalm2000', block=False):
+    def __init__(self, name='adalm2000', show=True, block=False):
 
         if _mp._libm2k == None: _s._warn('You need to install libm2k to access the adalm2000s.')
 
@@ -611,6 +615,10 @@ class adalm2000():
 
         # Build the graphical user interface
         self._build_gui(block)
+
+        # If we're supposed to show the window.
+        if show: self.window.show(block)
+
 
     def _event_window_close(self, *a):
         """
@@ -666,7 +674,6 @@ class adalm2000():
 
         # Let's see it!
         self.window.event_close = self._event_window_close
-        self.window.show(block)
 
 
     def _build_tab_power(self):
@@ -855,11 +862,11 @@ class adalm2000():
         self.tab_ai.plot_raw.ROIs[0][1].sigPositionChanged.connect(self._ai_cursor_drag)
         self.tab_ai.plot_raw.ROIs[1][1].sigPositionChanged.connect(self._ai_cursor_drag)
 
-    def _build_tab_ao(self):
+    def _build_tab_ao(self, ao_rates=[75e6, 75e5, 75e4, 75e3, 75e2, 75e1]):
         """
         Assembles the analog out tab.
         """
-        self._ao_rates = [75e6, 75e5, 75e4, 75e3, 75e2, 75e1]
+        self._ao_rates = ao_rates
 
         # DAC Tab
         self.tab_ao =self.tabs.add_tab('Analog Out')

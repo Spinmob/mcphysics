@@ -17,6 +17,9 @@
 import traceback as _traceback
 _p = _traceback.print_last
 
+from . import gui_tools as _gui_tools
+from . import serial_tools as _serial_tools
+
 from . import adalm2000  as _adalm2000
 adalm2000_api = _adalm2000.adalm2000_api
 adalm2000     = _adalm2000.adalm2000

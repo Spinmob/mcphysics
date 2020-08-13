@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import mcphysics as _mp
 import numpy as _n
 import spinmob.egg as _egg
@@ -7,7 +9,8 @@ _g = _egg.gui
 import spinmob as _s
 import time as _time
 
-from . import serial_tools as _serial_tools
+try:    from . import serial_tools as _serial_tools
+except: _serial_tools = _mp.instruments._serial_tools
 
 _debug_enabled = False
 _debug = _mp._debug
@@ -155,6 +158,9 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         # Add GUI stuff to the bottom grid
         self.tabs = self.grid_bot.add(_g.TabArea(autosettings_path=name+'.tabs'), alignment=0)
         self.tab_stream = self.tabs.add_tab('Stream')
+
+        self.label_temperature = self.tab_stream.add(_g.Label('Temperature:')).set_style('font-size: 20pt; font-weight: bold; color: '+('pink' if _s.settings['dark_theme_qt'] else 'red'))
+        self.tab_stream.new_autorow()
         self.label_setpoint  = self.tab_stream.add(_g.Label('Setpoint:'))
         self.number_setpoint = self.tab_stream.add(_g.NumberBox(-273.16, bounds=(-273.16, 500), suffix=' C')).set_width(100)
         self.text_note       = self.tab_stream.add(_g.TextBox('Note')).set_width(200)
@@ -230,6 +236,7 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         # Append this to the databox
         self.plot_stream.append_row([t, T, S, P], ckeys=['Time (s)', 'Temperature (C)', 'Setpoint (C)', 'Power (%)'])
         self.plot_stream.plot()
+        self.label_temperature.set_text('Temperature: %.1f °C' % T)
         self.window.process_events()
 
         # If the dump file is checked, dump the row

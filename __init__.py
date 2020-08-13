@@ -28,6 +28,7 @@ _libm2k         = _safe_import('libm2k')
 _visa           = _safe_import('visa')
 _serial         = _safe_import('serial')
 _minimalmodbus  = _safe_import('minimalmodbus')
+_sounddevice    = _safe_import('sounddevice')
 
 
 _debug_enabled = False
@@ -52,6 +53,7 @@ def check_installation():
         'OpenGL',
         'scipy',
         'serial',
+        'sounddevice',
         'visa',]
 
     # Try importing them
