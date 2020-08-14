@@ -161,14 +161,15 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
 
         self.label_temperature = self.tab_stream.add(_g.Label('Temperature:')).set_style('font-size: 20pt; font-weight: bold; color: '+('pink' if _s.settings['dark_theme_qt'] else 'red'))
         self.tab_stream.new_autorow()
-        self.label_setpoint  = self.tab_stream.add(_g.Label('Setpoint:'))
-        self.number_setpoint = self.tab_stream.add(_g.NumberBox(-273.16, bounds=(-273.16, 500), suffix=' C')).set_width(100)
-        self.text_note       = self.tab_stream.add(_g.TextBox('Note')).set_width(200)
-        self.button_dump     = self.tab_stream.add(_g.Button('Dump Data', checkable=True))
-        self.label_dump_path = self.tab_stream.add(_g.Label(''))
+        self.tab_stream.grid_controls = self.tab_stream.add(_g.GridLayout(margins=False))
+        self.label_setpoint  = self.tab_stream.grid_controls.add(_g.Label('Setpoint:'))
+        self.number_setpoint = self.tab_stream.grid_controls.add(_g.NumberBox(-273.16, bounds=(-273.16, 500), suffix=' C')).set_width(100)
+        self.text_note       = self.tab_stream.grid_controls.add(_g.TextBox('Note')).set_width(200)
+        self.button_dump     = self.tab_stream.grid_controls.add(_g.Button('Dump Data', checkable=True))
+        self.label_dump_path = self.tab_stream.grid_controls.add(_g.Label(''))
 
         # Expand remaining space
-        self.tab_stream.set_column_stretch(self.tab_stream._auto_column)
+        self.tab_stream.grid_controls.set_column_stretch(self.tab_stream.grid_controls._auto_column)
 
         # Make the plotter.
         self.tab_stream.new_autorow()
