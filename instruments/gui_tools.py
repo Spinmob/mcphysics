@@ -55,12 +55,20 @@ class signal_chain(_g.Window):
         """
         Runs the data processing chain on whatever data is in self.plot_raw.
         """
-        self.A1.run()
-        self.A2.run()
-        self.A3.run()
-        self.B1.run()
-        self.B2.run()
-        self.B3.run()
+        # Speed optimization...
+        if self.A1.settings['Enabled']:
+            self.A1.run()
+            if self.A2.settings['Enabled']:
+                self.A2.run()
+                if self.A3.settings['Enabled']:
+                    self.B3.run()
+
+        if self.B1.settings['Enabled']:
+            self.B1.run()
+            if self.B2.settings['Enabled']:
+                self.B2.run()
+                if self.B3.settings['Enabled']:
+                    self.B3.run()
         return self
 
     run = process_data
@@ -104,6 +112,7 @@ class waveform_designer(_g.Window):
         self.tab_settings  = self.tabs_settings.add_tab('Waveform Settings')
         self.tab_settings.new_autorow()
         self.settings      = self.tab_settings.add(_g.TreeDictionary(autosettings_path=name+'.settings', name=name+'.settings'))
+        self.settings.set_width(250)
 
         # Plot tabs
         self.tabs_plots  = self.add(_g.TabArea(autosettings_path=name+'.tabs_plots'), alignment=0)
@@ -172,10 +181,14 @@ class waveform_designer(_g.Window):
         When someone changes the ao settings, update the waveform.
         """
         if len(a):
-            c0 = a[0].parent().name()
-            if a[0].name() in ['Rate', 'Samples']:
-                self._sync_rates_and_samples(c0)
+            key = a[0].parent().name() + '/' + a[0].name()
 
+            # Update the other quantities for this channel
+            self._sync_rates_samples_time(key)
+
+            # Sync the other settings if we're supposed to.
+            if a[0].name() in ['Rate', 'Samples', 'Time']:
+                self._sync_channels(a[0].parent().name())
 
         # Select the appropriate waveform
         for c in self._channels: self._settings_select_waveform(c)
@@ -195,16 +208,42 @@ class waveform_designer(_g.Window):
         for w in self._waveforms:
             s.hide_parameter(channel+'/'+w, w == s[channel+'/Waveform'])
 
-    def _sync_rates_and_samples(self, channel):
+    def _sync_rates_samples_time(self, key):
+        """
+        Syncs the Rate, Samples, and Time based on what changed.
+        """
+        x = key.split('/')
+
+        # If we get a Rate, Samples, or Time, update the others
+        if x[1] in ['Rate', 'Samples', 'Time']:
+            s = self.settings
+
+            # If Rate or Time changed, set the number of samples, rounding
+            if x[1] in ['Rate', 'Time']: s.set_value(x[0]+'/Samples', _n.ceil(s[x[0]+'/Time'] * self.get_rate(x[0])), block_key_signals=True)
+
+            # Make sure the time matches the rounded samples (or changed samples!)
+            s.set_value(x[0]+'/Time', s[x[0]+'/Samples'] / self.get_rate(x[0]), block_key_signals=True)
+
+
+    def _sync_channels(self, channel):
         """
         Syncs them up if we're supposed to, using channel as the example.
         """
-        c0 = channel
 
         # Synchronize the rates and samples
         for c in self._channels:
-            if self.sync_rates:   self.settings.set_value(c+'/Rate',    self.settings[c0+'/Rate'],    block_key_signals=True)
-            if self.sync_samples: self.settings.set_value(c+'/Samples', self.settings[c0+'/Samples'], block_key_signals=True)
+
+            # Only edit the OTHER channels
+            if c != channel:
+
+                # Sync the rates if we're supposed to
+                if self.sync_rates:
+                    self.settings.set_value(c+'/Rate',    self.settings[channel+'/Rate'], block_key_signals=True)
+
+                # Sync the samples if we're supposed to
+                if self.sync_samples:
+                    self.settings.set_value(c+'/Samples', self.settings[channel+'/Samples'], block_key_signals=True)
+                    self.settings.set_value(c+'/Time',    self.settings[channel+'/Time'],    block_key_signals=True)
 
 
     def _update_design(self):
@@ -263,35 +302,36 @@ class waveform_designer(_g.Window):
 
         # If we got a single value, it should be a floating point number
         if not _s.fun.is_iterable(rates):
-            s.add_parameter(c+'/Rate', rates, bounds=(1e-9, None), dec=True, siPrefix=True, suffix='Hz', tip='Output sampling rate (Hz).')
+            s.add_parameter(c+'/Rate', rates, bounds=(1e-9, None), dec=True, siPrefix=True, suffix='Hz', tip='Output sampling rate (synced with Samples and Time).')
         else:
             rate_strings = []
             for a in rates: rate_strings.append(str(a))
-            s.add_parameter(c+'/Rate', rate_strings, tip='Output sampling rate (Hz).')
+            s.add_parameter(c+'/Rate', rate_strings, tip='Output sampling rate (Hz, synced with Samples and Time).')
 
-        s.add_parameter(c+'/Samples',  1000.0, bounds=(1,None), dec=True, suffix='S', siPrefix=True, tip='Number of samples in the waveform.')
-        s.add_parameter(c+'/Waveform', ['Sine', 'Square', 'Pulse_Decay', 'Custom'], tip='Choose a waveform. "Custom" corresponds to whatever data you add to self.plot_design.')
+        s.add_parameter(c+'/Samples',  1000.0, bounds=(1,     None), dec=True, suffix='S', siPrefix=True, tip='Number of samples in the waveform (synced with Time and Rate).')
+        s.add_parameter(c+'/Time',     0.0,    bounds=(1e-12, None), dec=True, suffix='s', siPrefix=True, tip='Duration of waveform (synced with Samples and Rate).')
+        s.add_parameter(c+'/Waveform', ['Square', 'Sine', 'Pulse_Decay', 'Custom'], tip='Choose a waveform. "Custom" corresponds to whatever data you add to self.plot_design.')
 
         # Sine
         s.add_parameter(c+'/Sine',           0.0, suffix='Hz', siPrefix=True, tip='Frequency (from settings below).', readonly=True)
-        s.add_parameter(c+'/Sine/Cycles',      1, dec=True, tip='How many times to repeat the waveform within the specified number of samples.' )
-        s.add_parameter(c+'/Sine/Amplitude', 0.1, suffix='V', siPrefix=True, tip='Amplitude (not peak-to-peak).')
+        s.add_parameter(c+'/Sine/Cycles',      8, dec=True, tip='How many times to repeat the waveform within the specified number of samples.' )
+        s.add_parameter(c+'/Sine/Amplitude', 0.1, step=0.1, suffix='V', siPrefix=True, tip='Amplitude (not peak-to-peak).')
         s.add_parameter(c+'/Sine/Offset',    0.0, suffix='V', siPrefix=True, tip='Offset.')
         s.add_parameter(c+'/Sine/Phase',     0.0, step=5, suffix=' deg', tip='Phase of sine (90 corresponds to cosine).')
 
         # Square
         s.add_parameter(c+'/Square',       0.0, suffix='Hz', siPrefix=True, tip='Frequency (from settings below).', readonly=True)
-        s.add_parameter(c+'/Square/Cycles',  1, dec=True, tip='How many times to repeat the waveform within the specified number of samples.' )
+        s.add_parameter(c+'/Square/Cycles',  8, dec=True, tip='How many times to repeat the waveform within the specified number of samples.' )
         s.add_parameter(c+'/Square/High',  0.1, suffix='V', siPrefix=True, step=0.1, tip='High value.')
         s.add_parameter(c+'/Square/Low',   0.0, suffix='V', siPrefix=True, step=0.1, tip='Low value.')
         s.add_parameter(c+'/Square/Start', 0.0, step=0.01, bounds=(0,1), tip='Fractional position within a cycle where the voltage goes high.')
         s.add_parameter(c+'/Square/Width', 0.5, step=0.01, bounds=(0,1), tip='Fractional width of square pulse within a cycle.')
 
         # Square
-        s.add_parameter(c+'/Pulse_Decay/Amplitude',  0.1,   suffix='V',  siPrefix=True, tip='Pulse amplitude.')
-        s.add_parameter(c+'/Pulse_Decay/Offset',     0.0,   suffix='V',  siPrefix=True, tip='Baseline offset.')
-        s.add_parameter(c+'/Pulse_Decay/Tau',        0.1,   suffix='s',  siPrefix=True, dec=True, tip='Exponential decay time constant.')
-        s.add_parameter(c+'/Pulse_Decay/Zero',       False, tip='Whether to zero the output voltage at the end of the pulse.')
+        s.add_parameter(c+'/Pulse_Decay/Amplitude', 0.1, step=0.1, suffix='V',  siPrefix=True, tip='Pulse amplitude.')
+        s.add_parameter(c+'/Pulse_Decay/Offset',    0.0, step=0.1, suffix='V',  siPrefix=True, tip='Baseline offset.')
+        s.add_parameter(c+'/Pulse_Decay/Tau',       0.1,   suffix='s',  siPrefix=True, dec=True, tip='Exponential decay time constant.')
+        s.add_parameter(c+'/Pulse_Decay/Zero',      False, tip='Whether to zero the output voltage at the end of the pulse.')
 
         # Loop option
         s.add_parameter(c+'/Loop', True, tip='Whether the waveform should loop.')
@@ -304,7 +344,8 @@ class waveform_designer(_g.Window):
 
         # Update the waveforms
         self._settings_changed()
-        self._sync_rates_and_samples(channel)
+        self._sync_rates_samples_time(channel+'/Samples')
+        self._sync_channels(channel)
 
         return self
 
@@ -326,6 +367,7 @@ class waveform_designer(_g.Window):
 
 
 if __name__ == '__main__':
+    _egg.clear_egg_settings()
     #self = signal_chain()
     self = waveform_designer(sync_samples=True, sync_rates=True)
     self.add_channel('Ch1',7000).add_channel('Ch2',5000)
