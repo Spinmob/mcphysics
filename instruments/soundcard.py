@@ -150,7 +150,9 @@ class soundcard():
             self.button_play.set_colors(None, 'red')
             if not self.stream: self._start_stream()
 
-        else: self.button_play.set_colors(None, None)
+        else:
+            self.button_play.set_colors(None, None)
+            self._decide_to_quit_stream()
 
         # Otherwise we let it finish on its own.
 
@@ -174,114 +176,24 @@ class soundcard():
 
             if not self.stream: self._start_stream()
 
-        else: self.button_record.set_colors(None, None)
+        else:
+            self.button_record.set_colors(None, None)
+            self._decide_to_quit_stream()
 
         # Otherwise we let it finish on its own.
 
-    def _push_pull_data(self):
+
+    def _push_pull_done(self, data):
         """
-        Pushes the next block of data into the available output buffer, and
-        pulls the next block of available data into the input buffer.
+        A complete data set has been collected. The argument is a copy of the array.
         """
-        # New input buffer
-        self._ni = 0
-        self._buffer_in = _n.zeros((int(self.tab_input.settings['Samples']),2)) # Initial Buffer.
 
-        # Output buffer is created elsewhere.
-
-        # Accumulate data until we're full (break out)
-        while True:
-
-            # If there is any room in the hardware buffer to write.
-            if self.stream.write_available: self._push_available()
-
-            # If there is anything to read
-            if self.stream.read_available:
-
-                # Get the index range to read
-                n1 = self._ni
-                n2 = self._ni + self.stream.read_available
-                Ni = len(self._buffer_in)
-
-                # Make sure we don't go over the end of the array
-                if n2 > Ni: n2 = Ni
-
-                # Get what's available
-                data, oops_in = self.stream.read(n2-n1)
-                if oops_in:
-                    print('Warning: Input Overflow')
-                    self.checkbox_overflow(True)
-
-                # Stick it in our buffer
-                self._buffer_in[n1:n2] = data
-
-                # If we're full, break out.
-                if n2 == Ni: break
-
-                # Otherwise, prep for the next one.
-                else: self._ni = n2
-
-    def _push_available(self):
-        """
-        Pushes the next block to the available buffer.
-        """
-        # Bounds on what's available
-        n1 = self._no
-        n2 = self._no+self.stream.write_available
-
-        # Get the arrays to send out
-        L = _n.take(self.pd['Left'],  range(n1,n2), mode='wrap')
-        R = _n.take(self.pd['Right'], range(n1,n2), mode='wrap')
-
-        # Write what's possible
-        oops_out = self.stream.write(
-            _n.ascontiguousarray(
-                _n.array([L, R], dtype=_n.float32).transpose() ) )
-        if oops_out:
-            print('Warning: Output Underflow')
-            self.checkbox_underflow(True)
-
-        # Update the current index
-        self._no = n2
-
-    def _push_pull_done(self, *a):
-        """
-        A complete data set has been collected.
-        """
-        # If we're ready for more data,
+        # If we're ready for more data, handle it
         if self._ready_for_more_data:
             self._ready_for_more_data = False # This is for future threads to look at.
 
-            # This is for us locally.
-            data = _n.array(self._buffer_in)
-
             # Increment the number of iterations.
             self.tab_input.number_iteration.increment()
-
-        # Otherwise, we have to skip this data!
-        else:
-            data = None
-            self.tab_input.number_missed.increment()
-            self.checkbox_overflow(True)
-
-        # Regardless of what we do with this data, we should still fire off
-        # A thread to collect more, because the buffer is so hungry.
-        if self.button_record.is_checked() or self.button_play.is_checked():
-            _s.thread.start(self._push_pull_data, done=self._push_pull_done)
-        else:
-            self.stream.stop()
-            self.stream = None
-
-            # Enable the sample rate again
-            self.combo_rate.enable()
-            self.combo_device.enable()
-            self.number_buffer.enable()
-            self.button_playrecord.enable()
-            self.button_record.set_colors(None, None)
-            self.button_play  .set_colors(None, None)
-
-        # Now, if we're supposed to process this data, do so.
-        if not data is None:
 
             # Generate the time array
             Ni = len(data)
@@ -295,79 +207,105 @@ class soundcard():
             self.pr.autosave()
             self.signal_chain.run()
 
-            # Reset the ready flag
+            # All processed, so we can reset the ready flag
             self._ready_for_more_data = True
 
-    # def _stream_callback(self, indata, outdata, frames, time, status):
-    #     """
-    #     Called automatically by a running stream whenever it has and requires
-    #     data.
-    #     """
-    #     if self.button_play() or self.button_record():
+        # Otherwise, we have to skip this data!
+        else:
+            self.tab_input.number_missed.increment()
+            self.checkbox_overflow(True)
 
-    #         # OUTPUT DATA
+    def _decide_to_quit_stream(self):
+        """
+        Stops the stream and re-enables various controls
+        """
+        # to continue streaming.
+        if not self.button_record.is_checked() and not self.button_play.is_checked():
+            self.stream.stop()
+            self.stream = None
 
-    #         # Bounds
-    #         n1 = self._no
-    #         n2 = self._no+frames
+            # Enable the sample rate again
+            self.combo_rate.enable()
+            self.combo_device.enable()
+            self.number_buffer.enable()
+            self.button_playrecord.enable()
+            self.button_record.set_colors(None, None)
+            self.button_play  .set_colors(None, None)
 
-    #         # Overwrite the elements of the supplied output buffer.
-    #         outdata[:,0] = _n.take(self.pd['Left'],  range(n1,n2), mode='wrap')
-    #         outdata[:,1] = _n.take(self.pd['Right'], range(n1,n2), mode='wrap')
+    def _stream_callback(self, indata, outdata, frames, time, status):
+        """
+        Called automatically by a running stream whenever it has and requires
+        data.
+        """
+        if self.button_play() or self.button_record():
+            print(repr(status), frames)
 
-    #         # Update the current index
-    #         self._no = n2
+            # OUTPUT DATA
+            so = self.tab_output.settings
 
+            # Bounds
+            n1 = self._no
+            n2 = self._no+frames
 
-    #         # INPUT DATA
+            # Overwrite the elements of the supplied output buffer.
+            if so['Left']:  outdata[:,0] = _n.take(self.pd['Left'],  range(n1,n2), mode='wrap')
+            else:           outdata[:,0] = 0.0
+            if so['Right']: outdata[:,1] = _n.take(self.pd['Right'], range(n1,n2), mode='wrap')
+            else:           outdata[:,1] = 0.0
 
-    #         # Special case: self._ni == 0 means we need to create our input buffer
-    #         if self._ni == 0:
-
-    #             # Create the buffer.
-    #             self._buffer_in = _n.zeros((int(self.tab_input.settings['Samples']),2), dtype=_n.float32)
-
-    #             # If there is a tail, pre-concatenate with incoming data
-    #             if not self._buffer_tail is None:
-    #                 indata = _n.concatenate((self._buffer_tail, indata))
-    #                 frames = len(indata)
-    #                 self._buffer_tail = None
-
-    #         # Get the index range to readk for our OWN buffer
-    #         n1 = self._ni
-    #         n2 = self._ni + frames
-    #         Ni = len(self._buffer_in)
-
-    #         # Make sure we don't go over the end of the array
-    #         if n2 > Ni:
-
-    #             # Set the max to our max.
-    #             n2 = Ni
-
-    #             # Save the tail!
-    #             self._buffer_tail = indata[n2:]
-
-    #         # Stick it in our buffer
-    #         self._buffer_in[n1:n2] = indata[0:n2-n1]
-
-    #         # If we're full, send a signal to take it.
-            # if n2 == Ni:
-            #     self._ni = 0
-            #     self.stream.signals.done.emit(_n.array(self._buffer_in))
-
-    #         # Otherwise, prep for the next one.
-    #         else: self._ni = n2
+            # Update the current index
+            self._no = n2
 
 
-    #     # Everything is unchecked. Tell it to stop.
-    #     elif self.stream:
-    #         self.stream.stop()
-    #         self.stream = None
+            # INPUT DATA
+
+            # Special case: self._ni == 0 means we need to create our input buffer
+            if self._ni == 0:
+
+                # Create the buffer.
+                self._buffer_in = _n.zeros((int(self.tab_input.settings['Samples']),2), dtype=_n.float32)
+
+                # If there is a tail, pre-concatenate with incoming data
+                if not self._buffer_tail is None:
+                    indata = _n.concatenate((self._buffer_tail, indata))
+                    frames = len(indata)
+                    self._buffer_tail = None
+
+            # Get the index range to readk for our OWN buffer
+            n1 = self._ni
+            n2 = self._ni + frames
+            Ni = len(self._buffer_in)
+
+            # Make sure we don't go over the end of the array
+            if n2 > Ni:
+
+                # Set the max to our max.
+                n2 = Ni
+
+                # Save the tail!
+                self._buffer_tail = indata[n2:]
+
+            # Stick it in our buffer
+            self._buffer_in[n1:n2] = indata[0:n2-n1]
+
+            # If we're full, send a signal to take it.
+            if n2 == Ni:
+                self._ni = 0
+                self.stream.signals.done.emit(_n.array(self._buffer_in))
+
+            # Otherwise, prep for the next one.
+            else: self._ni = n2
+
+
+        # Everything is unchecked. Tell it to stop.
+        elif self.stream:
+            self.stream.stop()
+            self.stream = None
 
 
     def _start_stream(self, *a):
         """
-        Someone clicked "record".
+        Someone clicked "record" or "play".
         """
         # First run setup.
         self.combo_rate.disable()
@@ -381,18 +319,15 @@ class soundcard():
         self._no = 0 # Output current index
         self._ni = 0 # Input current index
         self._ready_for_more_data = True
-        #self._buffer_tail = None
+        self._buffer_tail = None
         self.stream = self.api.Stream(
                 samplerate         = float(self.tab_input.settings['Rate']),
-                blocksize          = self.number_buffer(), # 0 for "optimal" latency
-                channels           = 2,)
-                #callback           = self._stream_callback)
-        #self.stream.signals = _s.thread._signals()
-        #self.stream.signals.done.connect(self._push_pull_done)
+                blocksize          = self.number_buffer(), # 0 for "optimal" latenyucy
+                channels           = 2,
+                callback           = self._stream_callback)
+        self.stream.signals = _s.thread._signals()
+        self.stream.signals.done.connect(self._push_pull_done)
         self.stream.start()
-
-        # Start a collection. This involves hungry buffers so we set it on its own thread.
-        _s.thread.start(self._push_pull_data, done=self._push_pull_done)
 
     def _button_playrecord_clicked(self, *a):
         si = self.tab_input.settings
