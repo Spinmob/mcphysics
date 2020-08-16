@@ -246,7 +246,7 @@ class soundcard():
 
     def _push_pull_done(self, *a):
         """
-        Data set collected.
+        A complete data set has been collected.
         """
         # If we're ready for more data,
         if self._ready_for_more_data:
@@ -298,71 +298,71 @@ class soundcard():
             # Reset the ready flag
             self._ready_for_more_data = True
 
-    def _stream_callback(self, indata, outdata, frames, time, status):
-        """
-        Called automatically by a running stream whenever it has and requires
-        data.
-        """
-        if self.button_play() or self.button_record():
+    # def _stream_callback(self, indata, outdata, frames, time, status):
+    #     """
+    #     Called automatically by a running stream whenever it has and requires
+    #     data.
+    #     """
+    #     if self.button_play() or self.button_record():
 
-            # OUTPUT DATA
+    #         # OUTPUT DATA
 
-            # Bounds
-            n1 = self._no
-            n2 = self._no+frames
+    #         # Bounds
+    #         n1 = self._no
+    #         n2 = self._no+frames
 
-            # Overwrite the elements of the supplied output buffer.
-            outdata[:,0] = _n.take(self.pd['Left'],  range(n1,n2), mode='wrap')
-            outdata[:,1] = _n.take(self.pd['Right'], range(n1,n2), mode='wrap')
+    #         # Overwrite the elements of the supplied output buffer.
+    #         outdata[:,0] = _n.take(self.pd['Left'],  range(n1,n2), mode='wrap')
+    #         outdata[:,1] = _n.take(self.pd['Right'], range(n1,n2), mode='wrap')
 
-            # Update the current index
-            self._no = n2
-
-
-            # INPUT DATA
-
-            # Special case: self._ni == 0 means we need to create our input buffer
-            if self._ni == 0:
-
-                # Create the buffer.
-                self._buffer_in = _n.zeros((int(self.tab_input.settings['Samples']),2), dtype=_n.float32)
-
-                # If there is a tail, pre-concatenate with incoming data
-                if not self._buffer_tail is None:
-                    indata = _n.concatenate((self._buffer_tail, indata))
-                    frames = len(indata)
-                    self._buffer_tail = None
-
-            # Get the index range to readk for our OWN buffer
-            n1 = self._ni
-            n2 = self._ni + frames
-            Ni = len(self._buffer_in)
-
-            # Make sure we don't go over the end of the array
-            if n2 > Ni:
-
-                # Set the max to our max.
-                n2 = Ni
-
-                # Save the tail!
-                self._buffer_tail = indata[n2:]
-
-            # Stick it in our buffer
-            self._buffer_in[n1:n2] = indata[0:n2-n1]
-
-            # If we're full, send a signal to take it.
-            if n2 == Ni: self.stream.signals.done.emit(_n.array(self._buffer_in))
-
-            # Otherwise, prep for the next one.
-            else: self._ni = n2
+    #         # Update the current index
+    #         self._no = n2
 
 
-        # Everything is unchecked. Tell it to stop.
-        elif self.stream:
-            self.stream.stop()
-            self.stream = None
+    #         # INPUT DATA
+
+    #         # Special case: self._ni == 0 means we need to create our input buffer
+    #         if self._ni == 0:
+
+    #             # Create the buffer.
+    #             self._buffer_in = _n.zeros((int(self.tab_input.settings['Samples']),2), dtype=_n.float32)
+
+    #             # If there is a tail, pre-concatenate with incoming data
+    #             if not self._buffer_tail is None:
+    #                 indata = _n.concatenate((self._buffer_tail, indata))
+    #                 frames = len(indata)
+    #                 self._buffer_tail = None
+
+    #         # Get the index range to readk for our OWN buffer
+    #         n1 = self._ni
+    #         n2 = self._ni + frames
+    #         Ni = len(self._buffer_in)
+
+    #         # Make sure we don't go over the end of the array
+    #         if n2 > Ni:
+
+    #             # Set the max to our max.
+    #             n2 = Ni
+
+    #             # Save the tail!
+    #             self._buffer_tail = indata[n2:]
+
+    #         # Stick it in our buffer
+    #         self._buffer_in[n1:n2] = indata[0:n2-n1]
+
+    #         # If we're full, send a signal to take it.
+            # if n2 == Ni:
+            #     self._ni = 0
+            #     self.stream.signals.done.emit(_n.array(self._buffer_in))
+
+    #         # Otherwise, prep for the next one.
+    #         else: self._ni = n2
 
 
+    #     # Everything is unchecked. Tell it to stop.
+    #     elif self.stream:
+    #         self.stream.stop()
+    #         self.stream = None
 
 
     def _start_stream(self, *a):

@@ -2,6 +2,8 @@
     # Write a baseline test script for the set_trigger_conditions() in external Ch2
     # _ai_settings_changed: Hide/show irrelevant trigger entries and the trigger level cursors in TI mode.
 
+# NOTE: See gui_tools rather than copying code from here. A lot of the general
+# device-indepenedent functionality lives there, and was used in soundcard.py.
 
 import os        as _os
 import time      as _t

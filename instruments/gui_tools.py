@@ -9,6 +9,65 @@ _x = None
 
 
 
+def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=200, max_samples=8096):
+    """
+    Finds the closest frequency (Hz) that is possible for the specified rate (Hz)
+    and a buffer size between min_samples and max_samples.
+
+    Parameters
+    ----------
+    f_target : float
+        Target frequency (Hz)
+
+    rate: float
+        Sampling rate (Hz)
+
+    min_samples : int
+        Minimum buffer size allowed.
+
+    max_samples : int
+        Maximum buffer size allowed.
+
+    Returns
+    -------
+    nearest achievable frequency
+
+    number of full cycles within the buffer for this frequency
+
+    buffer size to achieve this
+    """
+
+    # Now, given this rate, calculate the number of points needed to make one cycle.
+    N1 = rate / f_target # This is a float with a remainder
+
+    # The goal now is to add an integer number of these cycles up to the
+    # max_samples and look for the one with the smallest remainder.
+    max_cycles = int(        max_samples/N1 )
+    min_cycles = int(_n.ceil(min_samples/N1))
+
+    # List of options to search
+    options = _n.array(range(min_cycles,max_cycles+1)) * N1 # Possible floats
+
+    # How close each option is to an integer.
+    residuals = _n.minimum(abs(options-_n.ceil(options)), abs(options-_n.floor(options)))
+
+    # Now we can get the number of cycles
+    c = _n.where(residuals==min(residuals))[0][0]
+
+    # Now we can get the number of samples
+    N = int(_n.round(N1*(c+min_cycles)))
+
+    # If this is below the minimum value, set it to the minimum
+    if N < min_samples: N = min_samples
+
+    # Now, given this number of points, which might include several oscillations,
+    # calculate the actual closest frequency
+    df = rate/N # Frequency step
+    n  = int(_n.round(f_target/df)) # Number of cycles
+    f  = n*df # Actual frequency that fits.
+
+    return f, n, N
+
 class signal_chain(_g.Window):
     """
     Tab area containing a raw data tab and signal processing tabs.
@@ -120,6 +179,23 @@ class waveform_designer(_g.Window):
         self.tab_design.new_autorow()
         self.plot_design = self.tab_design.add(_g.DataboxPlot(file_type='*.w', autosettings_path=name+'.plot_design', autoscript=2, **kwargs), alignment=0)
 
+    def _get_nearest_frequency_settings(self, key):
+        """
+        Finds the closest frequency possible for the current settings, then
+        updates the value at this key. Assumes the frequency key is something like
+        'Channel/Square'
+        """
+        channel = key.split('/')[-2]
+        f, cycles, samples = get_nearest_frequency_settings(
+            f_target    = self.settings[key],
+            rate        = self.get_rate(channel),
+            min_samples = self.settings[channel+'/Samples/Min'],
+            max_samples = self.settings[channel+'/Samples/Max'])
+
+        # Now update the settings
+        self.settings[channel+'/Samples'] = samples
+        self.settings[key+'/Cycles']      = cycles
+
     def _generate_waveform(self, channel='Ch1'):
         """
         Generates the waveform in settings channel, and
@@ -181,14 +257,20 @@ class waveform_designer(_g.Window):
         When someone changes the ao settings, update the waveform.
         """
         if len(a):
-            key = a[0].parent().name() + '/' + a[0].name()
+            name = a[0].name()
+            key = self.settings.get_full_key(a[0])
 
             # Update the other quantities for this channel
             self._sync_rates_samples_time(key)
 
             # Sync the other settings if we're supposed to.
-            if a[0].name() in ['Rate', 'Samples', 'Time']:
+            if name in ['Rate', 'Samples', 'Time']:
                 self._sync_channels(a[0].parent().name())
+
+            # If it's a frequency, we have to calculate the closest possible
+            elif name in ['Sine', 'Square']: self._get_nearest_frequency_settings(key)
+
+
 
         # Select the appropriate waveform
         for c in self._channels: self._settings_select_waveform(c)
@@ -270,8 +352,7 @@ class waveform_designer(_g.Window):
         Returns the frequency for the settings under the specified root (e.g. c='Ch1', w='Sine')
         """
         s = self.settings
-        s.set_value(c+'/'+w, self.get_rate(c)/s[c+'/Samples']*s[c+'/'+w+'/Cycles'],
-            block_all_signals=True)
+        s.set_value(c+'/'+w, self.get_rate(c)/s[c+'/Samples']*s[c+'/'+w+'/Cycles'], block_key_signals=True)
 
     def add_channel(self, channel='Ch1', rates=None):
         """
@@ -309,21 +390,24 @@ class waveform_designer(_g.Window):
             s.add_parameter(c+'/Rate', rate_strings, tip='Output sampling rate (Hz, synced with Samples and Time).')
 
         s.add_parameter(c+'/Samples',  1000.0, bounds=(1,     None), dec=True, suffix='S', siPrefix=True, tip='Number of samples in the waveform (synced with Time and Rate).')
+        s.add_parameter(c+'/Samples/Min', 256, int=True, bounds=(2,None), tip='Minimum number of samples allowed to achieve desired frequencies.')
+        s.add_parameter(c+'/Samples/Max',8192, int=True, bounds=(2,None), tip='Maximum number of samples allowed to achieve desired frequencies.')
+
         s.add_parameter(c+'/Time',     0.0,    bounds=(1e-12, None), dec=True, suffix='s', siPrefix=True, tip='Duration of waveform (synced with Samples and Rate).')
         s.add_parameter(c+'/Waveform', ['Square', 'Sine', 'Pulse_Decay', 'Custom'], tip='Choose a waveform. "Custom" corresponds to whatever data you add to self.plot_design.')
 
         # Sine
-        s.add_parameter(c+'/Sine',           0.0, suffix='Hz', siPrefix=True, tip='Frequency (from settings below).', readonly=True)
-        s.add_parameter(c+'/Sine/Cycles',      8, dec=True, tip='How many times to repeat the waveform within the specified number of samples.' )
-        s.add_parameter(c+'/Sine/Amplitude', 0.1, step=0.1, suffix='V', siPrefix=True, tip='Amplitude (not peak-to-peak).')
-        s.add_parameter(c+'/Sine/Offset',    0.0, suffix='V', siPrefix=True, tip='Offset.')
-        s.add_parameter(c+'/Sine/Phase',     0.0, step=5, suffix=' deg', tip='Phase of sine (90 corresponds to cosine).')
+        s.add_parameter(c+'/Sine',           0.0,   suffix='Hz', siPrefix=True, tip='Frequency (from settings below).')
+        s.add_parameter(c+'/Sine/Cycles',      8,   dec=True, tip='How many times to repeat the waveform within the specified number of samples.' )
+        s.add_parameter(c+'/Sine/Amplitude', 0.1,   step=0.1, suffix='V', siPrefix=True, tip='Amplitude (not peak-to-peak).')
+        s.add_parameter(c+'/Sine/Offset',    0.0,   step=0.1, suffix='V', siPrefix=True, tip='Offset.')
+        s.add_parameter(c+'/Sine/Phase',     0.0,   step=5, suffix=' deg', tip='Phase of sine (90 corresponds to cosine).')
 
         # Square
-        s.add_parameter(c+'/Square',       0.0, suffix='Hz', siPrefix=True, tip='Frequency (from settings below).', readonly=True)
+        s.add_parameter(c+'/Square',       0.0, suffix='Hz', siPrefix=True, tip='Frequency (from settings below).')
         s.add_parameter(c+'/Square/Cycles',  8, dec=True, tip='How many times to repeat the waveform within the specified number of samples.' )
-        s.add_parameter(c+'/Square/High',  0.1, suffix='V', siPrefix=True, step=0.1, tip='High value.')
-        s.add_parameter(c+'/Square/Low',   0.0, suffix='V', siPrefix=True, step=0.1, tip='Low value.')
+        s.add_parameter(c+'/Square/High',  0.1, step=0.1, suffix='V', siPrefix=True, tip='High value.')
+        s.add_parameter(c+'/Square/Low',   0.0, step=0.1, suffix='V', siPrefix=True, tip='Low value.')
         s.add_parameter(c+'/Square/Start', 0.0, step=0.01, bounds=(0,1), tip='Fractional position within a cycle where the voltage goes high.')
         s.add_parameter(c+'/Square/Width', 0.5, step=0.01, bounds=(0,1), tip='Fractional width of square pulse within a cycle.')
 
@@ -366,7 +450,10 @@ class waveform_designer(_g.Window):
 
 
 
+
+
 if __name__ == '__main__':
+
     _egg.clear_egg_settings()
     #self = signal_chain()
     self = waveform_designer(sync_samples=True, sync_rates=True)
