@@ -270,8 +270,6 @@ class waveform_designer(_g.Window):
             # If it's a frequency, we have to calculate the closest possible
             elif name in ['Sine', 'Square']: self._get_nearest_frequency_settings(key)
 
-
-
         # Select the appropriate waveform
         for c in self._channels: self._settings_select_waveform(c)
 
