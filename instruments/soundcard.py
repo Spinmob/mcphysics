@@ -33,9 +33,12 @@ class soundcard():
 
         self.name = name
         self._rates = [8000, 11025, 22050, 32000, 44100, 48000, 96000, 192000]
-        self.stream = None
+
+        # All data accessed by the push-pull thread lives in this dictionary.
+        # If you're using this dictionary, make sure to lock the thread!
+        self._shared = dict()
+        self._shared['stream'] = None
         self._thread_locker = _s.thread.locker()
-        self._thread_shared_data = dict()
 
         # Make sure we have the library
         if _mp._sounddevice is None:
@@ -119,6 +122,7 @@ class soundcard():
         s.add_parameter('Trigger/Level',      0.0,  step=0.01, bounds=(-1,1), tip='Trigger level')
         s.add_parameter('Trigger/Hysteresis', 0.01, step=0.01, bounds=(0,2),  tip='How far on the other side of the trigger the signal must go before retriggering is allowed.')
         s.add_parameter('Trigger/Mode', ['Rising Edge', 'Falling Edge'], tip='Trigger on the rising or falling edge.')
+        s.add_parameter('Trigger/Stay_Triggered', False, tip='After triggering, remain triggered to collect continuous data thereafter.')
 #        s.add_parameter('Trigger/Delay',      0.0,  suffix='s', siPrefix=True, tip='How long to wait after the trigger before keeping the data. Negative number means it will keep that much data before the trigger.')
 
         # Aliases and shortcuts
@@ -143,12 +147,10 @@ class soundcard():
             alignment=0)
         self.waveform_designer.add_channel('Left')
         self.waveform_designer.add_channel('Right')
-        self.waveform_designer.after_settings_changed = self._after_waveform_changed
 
         # aliases and shortcuts
         self.plot_design = self.pd = self.tab_output.plot_design = self.waveform_designer.plot_design
         self.tab_output.settings = self.waveform_designer.settings
-
 
         # Hide the Rates (they're controlled by the top combo) and sync
         self.tab_input .settings.hide_parameter('Rate')
@@ -167,26 +169,13 @@ class soundcard():
         # Show the window
         if show: self.window.show(block)
 
-    def _after_waveform_changed(self):
-        """
-        After the settings change in the waveform designer.
-        """
-        # self._thread_locker.lock()
-
-        # # Update the waveform
-        # so = self.tab_output.settings
-        # self._thread_shared_data['L'] = _n.array(self.pd['Left'],  dtype=_n.float32) * (1 if so['Left']  else 0)
-        # self._thread_shared_data['R'] = _n.array(self.pd['Right'], dtype=_n.float32) * (1 if so['Left']  else 0)
-
-        # self._thread_locker.unlock()
-
     def _button_force_clicked(self, *a):
         """
         Someone clicked "force" to force the trigger.
         """
         # Update the GUI and thread.
         self._thread_locker.lock()
-        self._thread_shared_data['triggered'] = True
+        self._shared['triggered'] = True
         self._thread_locker.unlock()
 
     def _button_play_toggled(self, *a):
@@ -196,12 +185,12 @@ class soundcard():
         self._thread_locker.lock()
 
         # Send signals to the thread
-        self._thread_shared_data['button_play'] = self.button_play()
+        self._shared['button_play'] = self.button_play()
 
         if self.button_play.is_checked():
 
-            self.button_play.set_colors(None, 'red')
-            if not self.stream: self._start_stream()
+            self.button_play.set_colors('white', 'red')
+            if not self._shared['stream']: self._start_stream()
 
         else: self.button_play.set_colors(None, None)
 
@@ -215,57 +204,56 @@ class soundcard():
         self._thread_locker.lock()
 
         # Send signals to the thread
-        self._thread_shared_data['button_record'] = self.button_record()
+        self._shared['button_record'] = self.button_record()
 
         # We do special stuff when the record button is turned on.
-        if self.button_record.is_checked():
+        if self.button_record():
 
             # We're starting over, so clear the stream.
-            if self.stream: self.stream.read(self.stream.read_available)
+            if self._shared['stream']:
+                self._shared['stream'].read(self._shared['stream'].read_available)
 
-            self.t_start     = _t.time()
-            self.tab_input.number_iteration(1)
-            self.tab_input.number_missed(0)
-            self.button_record.set_colors(None, 'red')
+            self.button_record.set_colors('white', 'red')
 
-            if not self.stream: self._start_stream()
+            if not self._shared['stream']: self._start_stream()
 
-        else:
-            self.button_record.set_colors(None, None)
-            self.tab_input.button_triggered(False).set_text('Idle').set_colors(None, None)
+        else: self.button_record.set_colors(None, None)
 
         self._thread_locker.unlock()
 
         # let it finish on its own.
 
-    def _before_push_pull_thread(self):
+    def _before_push_pull_thread(self, stay_triggered=False):
         """
         Sets the appropriate state of things and pulls some data to thread-variables
         before starting the thread.
 
         This will always be called between threads, so should be safe.
         """
-        # Update the state of the trigger button.
-        if self.button_record():
-            if self.tab_input.settings['Trigger'] == 'Continuous':
-                self.tab_input.button_triggered(True).set_text('Continuous').set_colors('white','blue')
-            else:
-                self.tab_input.button_triggered(False).set_text('Waiting').set_colors('white','green')
-        else: self.tab_input.button_triggered(False).set_text('Idle').set_colors(None, None)
-
+        si = self.tab_input.settings
         so = self.tab_output.settings
 
+        # Update the state of the trigger button.
+        bt = self.tab_input.button_triggered
+        if si['Trigger'] == 'Continuous':
+            bt(True).set_text('Continuous').set_colors('white','blue')
+        elif self._shared['triggered'] and stay_triggered:
+            bt(True).set_text('Locked').set_colors('white','red')
+        else:
+            bt(False).set_text('Waiting').set_colors('white','green')
+
         # Store some thread variables
-        self._thread_shared_data.update(dict(
-            si        = self.tab_input.settings.get_dictionary(short_keys=True)[1],
-            triggered = self.tab_input.button_triggered(),
+        self._shared.update(dict(
+            si            = self.tab_input.settings.get_dictionary(short_keys=True)[1],
+            triggered     = self.tab_input.button_triggered(),
+            trigger_type  = si['Trigger'],
             button_record = self.button_record(),
             button_play   = self.button_play(),
-            L         = _n.array(self.pd['Left'],  dtype=_n.float32) * (1 if so['Left']  else 0),
-            R         = _n.array(self.pd['Right'], dtype=_n.float32) * (1 if so['Right'] else 0),))
+            L         = _n.array(self.pd['Left'],  dtype=_n.float32) * (1 if so['Left']  and self.button_play() else 0),
+            R         = _n.array(self.pd['Right'], dtype=_n.float32) * (1 if so['Right'] and self.button_play() else 0),))
 
 
-    def _push_pull_data(self):
+    def _push_pull_thread(self):
         """
         Pushes the next block of data into the available output buffer, and
         pulls the next block of available data into the input buffer.
@@ -280,64 +268,68 @@ class soundcard():
         # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
         self._thread_locker.lock()
 
-        si = dict(self._thread_shared_data['si'])
-        button_play = self._thread_shared_data['button_play']
-        button_record = self._thread_shared_data['button_record']
+        button_play   = self._shared['button_play']
+        button_record = self._shared['button_record']
+
+        # Reset the internal index and create a new buffer based on settings.
+        ni = 0
+        Ni = int(self._shared['si']['Samples'])
+        buffer_in = _n.zeros((Ni,2), dtype=_n.float32)
 
         self._thread_locker.unlock()
         # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-        # Reset the internal index and create a new buffer based on settings.
-        ni = 0
-        Ni = int(si['Samples'])
-        buffer_in = _n.zeros((Ni,2), dtype=_n.float32)
-
-        # Accumulate data until we're full (break out)
+        # Push and pull data until we've collected a full data set.
+        # Note we always push and pull even if play or record are disabled
+        # At a factor-of-two-ish performance hit level, we keep the input
+        # and output synchronized, eliminating the need for a trigger channel!
         while button_play or button_record:
 
             # We just lock each time through the loop to be safe / easy.
             # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
             self._thread_locker.lock()
 
+            si = self._shared['si']
+
             # Set this to True if we keep some data; used to decide what to do at the end.
             data_kept = False
 
             # If there is any room in the hardware buffer to write.
-            if self.stream.write_available:
+            if self._shared['stream'].write_available:
 
                 # Bounds on what's available
-                n1 = self._thread_shared_data['no']
-                n2 = self._thread_shared_data['no']+self.stream.write_available
+                n1 = self._shared['no']
+                n2 = self._shared['no']+self._shared['stream'].write_available
 
                 # Get the arrays to send out
-                L = _n.take(self._thread_shared_data['L'], range(n1,n2), mode='wrap')
-                R = _n.take(self._thread_shared_data['R'], range(n1,n2), mode='wrap')
+                L = _n.take(self._shared['L'], range(n1,n2), mode='wrap')
+                R = _n.take(self._shared['R'], range(n1,n2), mode='wrap')
 
                 # Write what's possible
-                oops_out = self.stream.write(
+                oops_out = self._shared['stream'].write(
                     _n.ascontiguousarray(
                         _n.array([L, R], dtype=_n.float32).transpose() ) )
                 if oops_out: self._signal_output_underflow.emit(None)
 
                 # Update the current index
-                self._thread_shared_data['no'] = n2
+                self._shared['no'] = n2
 
             # If there is anything to read
-            if self.stream.read_available:
+            if self._shared['stream'].read_available:
 
                 # Get the index range to read
                 n1 = ni
-                n2 = ni + self.stream.read_available # May as well be the latest number.
+                n2 = ni + self._shared['stream'].read_available # May as well be the latest number.
 
                 # Make sure we don't go over the end of the array
                 if n2 > Ni: n2 = Ni
 
                 # Get what's available
-                data, oops_in = self.stream.read(n2-n1)
+                data, oops_in = self._shared['stream'].read(n2-n1)
                 if oops_in: self._signal_input_overflow.emit(None)
 
                 # If we're already triggered, collect the data
-                if self._thread_shared_data['triggered']:
+                if self._shared['triggered'] or self._shared['trigger_type'] == 'Continuous':
                     buffer_in[n1:n2] = data
                     data_kept = True
 
@@ -377,7 +369,7 @@ class soundcard():
                     if i_trigger is not None:
 
                         # Push the button so we know to collect data for the next runs
-                        self._thread_shared_data['triggered'] = True
+                        self._shared['triggered'] = True
                         self._signal_trigger_changed.emit('Triggered')
 
                         # Collect the reduced data set
@@ -392,7 +384,7 @@ class soundcard():
 
                     # If we're full or have stopped, break out; emits signal_done
                     if n2 == Ni:
-                        self._signal_push_pull_done.emit(buffer_in)
+                        self._signal_push_pull_done.emit(buffer_in if button_record else None)
                         self._thread_locker.unlock()
                         return
 
@@ -400,8 +392,8 @@ class soundcard():
                     else: ni = n2
 
             # Get the button status
-            button_play   = self._thread_shared_data['button_play']
-            button_record = self._thread_shared_data['button_record']
+            button_play   = self._shared['button_play']
+            button_record = self._shared['button_record']
 
             # At the end of each iteration, unlock
             self._thread_locker.unlock()
@@ -419,12 +411,14 @@ class soundcard():
         """
         # Regardless of what we do with this data, we should fire off
         # a thread to collect more, because the buffers are hungry.
+        si = self.tab_input.settings
         if self.button_record.is_checked() or self.button_play.is_checked():
-            self._before_push_pull_thread()
-            _s.thread.start(self._push_pull_data)
+            self._before_push_pull_thread(
+                stay_triggered = si['Trigger/Stay_Triggered'] and self._shared['triggered'])
+            _s.thread.start(self._push_pull_thread, priority=1)
         else:
-            self.stream.stop()
-            self.stream = None
+            self._shared['stream'].stop()
+            self._shared['stream'] = None
 
             # Enable the sample rate again
             self.combo_rate.enable()
@@ -442,6 +436,8 @@ class soundcard():
         if self._ready_for_more_data and not data is None:
             self._ready_for_more_data = False
 
+            self.tab_input.number_iteration.increment()
+
             # Generate the time array
             Ni = len(data)
             R  = float(self.combo_rate.get_text())
@@ -458,9 +454,8 @@ class soundcard():
             self._ready_for_more_data = True
 
         # Otherwise, we haven't finished processing the previous data yet.
-        elif not data is None:
-            self.tab_input.number_missed.increment()
-            self.checkbox_overflow(True)
+        else: self.tab_input.number_missed.increment()
+
 
 
     def _start_stream(self, *a):
@@ -476,12 +471,17 @@ class soundcard():
         self.checkbox_overflow.set_checked(False)
         self.checkbox_underflow.set_checked(False)
 
+        self.t_start     = _t.time()
+        self.tab_input.number_iteration(0)
+        self.tab_input.number_missed(0)
+
         # Ready for more data
         self._ready_for_more_data = True
 
         # Create and start the stream
-        self._thread_shared_data['no'] = 0
-        self.stream = self.api.Stream(
+        self._shared['no'] = 0
+        self._shared['triggered'] = False
+        self._shared['stream'] = self.api.Stream(
                 samplerate         = float(self.tab_input.settings['Rate']),
                 blocksize          = self.number_buffer(), # 0 for "optimal" latency
                 channels           = 2,)
@@ -497,8 +497,8 @@ class soundcard():
         # Before starting, update some gui stuff, and pull some data into
         # thread-safe variables. The thread should not be accessing GUI elements.
         self._before_push_pull_thread()
-        self.stream.start()
-        _s.thread.start(self._push_pull_data)
+        self._shared['stream'].start()
+        _s.thread.start(self._push_pull_thread, priority=1)
 
 
     def _event_output_underflow(self, *a):
@@ -577,23 +577,27 @@ class soundcard():
 
             # If we set the trigger to continuous and are running, Trigger.
             if  a[0].name() == 'Trigger' \
-            and self.stream:
+            and self._shared['stream']:
                 if a[0].value() == 'Continuous':
                     self.tab_input.button_triggered(True).set_text('Continuous').set_colors('white','blue')
                 else:
                     self.tab_input.button_triggered(False).set_text('Waiting').set_colors('white', 'green')
 
-        self._thread_shared_data['si'] = self.tab_input.settings.get_dictionary()[1]
+        self._shared['si'] = self.tab_input.settings.get_dictionary(short_keys=True)[1]
         self._thread_locker.unlock()
 
     def _timer_status_tick(self, *a):
         """
         Updates the status of the inner workings.
         """
-        if self.stream: self.button_stream(True).set_colors('white', 'green')
-        else:           self.button_stream(False).set_colors(None, None)
+        self._thread_locker.lock()
+
+        if self._shared['stream']: self.button_stream(True).set_colors('white', 'green')
+        else:            self.button_stream(False).set_colors(None, None)
 
         self.number_threads(_s.thread.pool.activeThreadCount())
+
+        self._thread_locker.unlock()
 
     def get_devices(self):
         """
