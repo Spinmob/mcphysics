@@ -77,50 +77,50 @@ class soundcard():
         self.button_record = self.grid_top.add(_g.Button(
             'Record', checkable=True,
             signal_toggled = self._button_record_toggled))
-        
+
         self.checkbox_overflow = self.grid_top.add(_g.CheckBox('Overflow  '))
-        
+
         self.button_play = self.grid_top.add(_g.Button(
             'Play', checkable=True,
             signal_toggled = self._button_play_toggled))
-        
+
         self.checkbox_underflow= self.grid_top.add(_g.CheckBox('Underflow  '))
-        
+
         self.button_playrecord = self.grid_top.add(_g.Button(
             'Play+Record', checkable=True,
             signal_toggled = self._button_playrecord_toggled)).set_width(110)
-        
+
         self.grid_top.set_column_stretch(self.grid_top._auto_column)
         self.grid_top._auto_column += 1
-        
+
         self.grid_top.add(_g.Label('    Status:'))
         self.button_stream  = self.grid_top.add(_g.Button('Stream').set_width(70))
         self.number_threads = self.grid_top.add(_g.NumberBox(int=True).set_width(50))
         self.timer_status  = _g.Timer(100, signal_tick=self._timer_status_tick)
 
-        
+
 
         # AI tab
-        self.tab_input = self.tabs.add_tab('Input')
-        self.tab_input.tabs_settings = self.tab_input.add(_g.TabArea(autosettings_path=name+'.tab_input.tabs_settings'))
-        self.tab_input.tab_settings  = self.tab_input.tabs_settings.add_tab('Input Settings')
+        self.tab_in = self.tabs.add_tab('Input')
+        self.tab_in.tabs_settings = self.tab_in.add(_g.TabArea(autosettings_path=name+'.tab_in.tabs_settings'))
+        self.tab_in.tab_settings  = self.tab_in.tabs_settings.add_tab('Input Settings')
 
-        self.tab_input.grid_controls    = self.tab_input.tab_settings.add(_g.GridLayout(margins=False))
-        self.tab_input.label_iteration  = self.tab_input.grid_controls.add(_g.Label('Iteration:'))
-        self.tab_input.number_iteration = self.tab_input.grid_controls.add(_g.NumberBox(0, int=True))
-        self.tab_input.label_missed     = self.tab_input.grid_controls.add(_g.Label('Missed:'))
-        self.tab_input.number_missed    = self.tab_input.grid_controls.add(_g.NumberBox(0, int=True))
+        self.tab_in.grid_controls    = self.tab_in.tab_settings.add(_g.GridLayout(margins=False))
+        self.tab_in.label_iteration  = self.tab_in.grid_controls.add(_g.Label('Iteration:'))
+        self.tab_in.number_iteration = self.tab_in.grid_controls.add(_g.NumberBox(0, int=True))
+        self.tab_in.label_missed     = self.tab_in.grid_controls.add(_g.Label('Missed:'))
+        self.tab_in.number_missed    = self.tab_in.grid_controls.add(_g.NumberBox(0, int=True))
 
-        self.tab_input.tab_settings.new_autorow()
-        self.tab_input.grid_trigger     = self.tab_input.tab_settings.add(_g.GridLayout(margins=False), alignment=0)
-        self.tab_input.button_triggered = self.tab_input.grid_trigger.add(_g.Button(
+        self.tab_in.tab_settings.new_autorow()
+        self.tab_in.grid_trigger     = self.tab_in.tab_settings.add(_g.GridLayout(margins=False), alignment=0)
+        self.tab_in.button_triggered = self.tab_in.grid_trigger.add(_g.Button(
             text = 'Idle', checkable=True,
             signal_toggled = self._button_triggered_toggled), alignment=0)
-       
-        self.tab_input.tab_settings.new_autorow()
-        self.tab_input.settings = s = self.tab_input.tab_settings.add(_g.TreeDictionary(
-            autosettings_path  = name+'.tab_input.settings',
-            name               = name+'.tab_input.settings',
+
+        self.tab_in.tab_settings.new_autorow()
+        self.tab_in.settings = s = self.tab_in.tab_settings.add(_g.TreeDictionary(
+            autosettings_path  = name+'.tab_in.settings',
+            name               = name+'.tab_in.settings',
             new_signal_changed = self._settings_changed_input), alignment=0)
         s.set_width(270)
 
@@ -131,27 +131,25 @@ class soundcard():
         s.add_parameter('Time',       0.0, bounds=(1e-9, None), dec=True, siPrefix=True, suffix='s', tip='Duration of recording (synced with Rate and Samples).')
         s.add_parameter('Trigger', ['Continuous', 'Left', 'Right'], tip='Trigger Mode')
         s.add_parameter('Trigger/Level',      0.0,  step=0.01, bounds=(-1,1), tip='Trigger level')
-        s.add_parameter('Trigger/Hysteresis', 0.01, step=0.01, bounds=(0,2),  tip='How far on the other side of the trigger the signal must go before retriggering is allowed.')
+        s.add_parameter('Trigger/Hysteresis', 0.01, step=0.01, bounds=(0,2), dec=True, tip='How far on the other side of the trigger the signal must go before retriggering is allowed.')
         s.add_parameter('Trigger/Mode', ['Rising Edge', 'Falling Edge'], tip='Trigger on the rising or falling edge.')
         s.add_parameter('Trigger/Stay_Triggered', False, tip='After triggering, remain triggered to collect continuous data thereafter.')
 #        s.add_parameter('Trigger/Delay',      0.0,  suffix='s', siPrefix=True, tip='How long to wait after the trigger before keeping the data. Negative number means it will keep that much data before the trigger.')
 
         # Aliases and shortcuts
-        self.signal_chain = self.sc = self.tab_input.add(_gt.signal_chain(name+'.tabs_ai_plots'), alignment=0)
-        self.plot_raw = self.tab_input.plot_raw = self.pr = self.signal_chain.plot_raw
-        self.A1       = self.tab_input.A1       = self.signal_chain.A1
-        self.A2       = self.tab_input.A2       = self.signal_chain.A2
-        self.A3       = self.tab_input.A3       = self.signal_chain.A3
-        self.B1       = self.tab_input.B1       = self.signal_chain.B1
-        self.B2       = self.tab_input.B2       = self.signal_chain.B2
-        self.B3       = self.tab_input.B3       = self.signal_chain.B3
-        self.tab_input.set_column_stretch(1)
-
-
+        self.signal_chain = self.sc = self.tab_in.add(_gt.signal_chain(name+'.tabs_ai_plots'), alignment=0)
+        self.tab_in.plot_raw = self.signal_chain.plot_raw
+        self.tab_in.A1       = self.tab_in.A1       = self.signal_chain.A1
+        self.tab_in.A2       = self.tab_in.A2       = self.signal_chain.A2
+        self.tab_in.A3       = self.tab_in.A3       = self.signal_chain.A3
+        self.tab_in.B1       = self.tab_in.B1       = self.signal_chain.B1
+        self.tab_in.B2       = self.tab_in.B2       = self.signal_chain.B2
+        self.tab_in.B3       = self.tab_in.B3       = self.signal_chain.B3
+        self.tab_in.set_column_stretch(1)
 
         # AO tab
-        self.tab_output = self.tabs.add_tab('Output')
-        self.waveform_designer = self.wd = self.tab_output.add(
+        self.tab_out = self.tabs.add_tab('Output')
+        self.waveform_designer = self.wd = self.tab_out.add(
             _gt.waveform_designer(channels=['L','R'],
                                   rates=self._rates,
                                   name=name+'.waveform_designer',
@@ -162,13 +160,13 @@ class soundcard():
         self.waveform_designer.add_channel('Right')
 
         # aliases and shortcuts
-        self.plot_design = self.pd = self.tab_output.plot_design = self.waveform_designer.plot_design
-        self.tab_output.settings = self.waveform_designer.settings
+        self.tab_out.plot_design = self.waveform_designer.plot_design
+        self.tab_out.settings    = self.waveform_designer.settings
 
         # Hide the Rates (they're controlled by the top combo) and sync
-        self.tab_input .settings.hide_parameter('Rate')
-        self.tab_output.settings.hide_parameter('Left/Rate')
-        self.tab_output.settings.hide_parameter('Right/Rate')
+        self.tab_in .settings.hide_parameter('Rate')
+        self.tab_out.settings.hide_parameter('Left/Rate')
+        self.tab_out.settings.hide_parameter('Right/Rate')
         self._combo_rate_changed()
 
         # Sync everything
@@ -193,6 +191,9 @@ class soundcard():
             text            = 'Sweep Frequency',
             checkable       = True,
             signal_toggled  = self._button_sweep_frequency_toggled).set_width(130))
+
+        self.tab_demod.number_step = self.tab_demod.grid_sweep.add(_g.NumberBox(
+            0, int=True, bounds=(0,None), tip='Current step number.'))
 
         # Add the sweep settings
         s = self.tab_demod.settings
@@ -229,6 +230,10 @@ class soundcard():
             suffix = 's', siPrefix = True,
             tip = 'Minimum amount of data to collect (will be an integer number of periods).')
 
+        s.add_parameter('Sweep/Block', 0.05, dec=True,
+            suffix = 's', siPrefix = True,
+            tip = 'While waiting and collecting, chop the incoming data into blocks of this length.')
+
         s.add_parameter('Sweep/Repeat', 1, dec=True,
             suffix='reps', siPrefix=True,
             tip = 'How many times to repeat the demod at each step after settling.')
@@ -236,6 +241,14 @@ class soundcard():
         s.add_parameter('Sweep/Log', False,
             tip = 'Whether to use log-spaced steps between Start and Stop.')
 
+        self.tab_demod.plot_raw   = self.tab_demod.demodulator.plot_raw
+        self.tab_demod.plot_demod = self.tab_demod.demodulator.plot_demod
+
+        # Sweep signals
+        self.signal_sweep_iterate  = _s.thread.signal(self._sweep_iterate)
+        self.signal_waveform_ok    = _s.thread.signal(self._sweep_waveform_ok)
+        self.signal_sweep_new_data = _s.thread.signal(self._sweep_new_data)
+        self.signal_sweep_done     = _s.thread.signal(self._sweep_done)
 
         # Start the timer
         self.timer_status.start()
@@ -247,95 +260,167 @@ class soundcard():
         """
         When someone toggles "Sweep".
         """
-        if self.tab_demod.button_sweep():
-            si = self.tab_input.settings
-            so = self.tab_output.settings
-            sd = self.tab_demod.settings
-            pd = self.tab_demod.demodulator.plot_demod
+        # Start the process.
+        if self.tab_demod.button_sweep(): self.signal_sweep_iterate.emit(0)
 
-            # Clear the plot
-            pd.clear()
-
-            # Get the frequency list.
-            if sd['Sweep/Log']:
-                if sd['Sweep/Start'] == 0: sd['Sweep/Start'] = sd['Stop' ]*0.01
-                if sd['Sweep/Stop' ] == 0: sd['Sweep/Stop' ] = sd['Start']*0.01
-                if sd['Sweep/Start'] == 0: return
-                fs = _s.fun.erange(sd['Sweep/Start'], sd['Sweep/Stop'], int(sd['Sweep/Steps']))
-            else:
-                fs = _n.linspace  (sd['Sweep/Start'], sd['Sweep/Stop'], int(sd['Sweep/Steps']))
-
-            # Set the iterations
-            si['Iterations'] = sd['Sweep/Repeat']
-
-            # Start the stream
-            self.button_play(True)
-
-            # Loop over the frequencies.
-            for f_target in fs:
-
-                # Bonk out if we unchecked it.
-                if not self.tab_demod.button_sweep(): break
-
-                # Set up the output
-                if sd['Output/Signal_Channel'] == 'Left':
-                    out_signal  = 'Left'
-                    out_trigger = 'Right'
-                else:
-                    out_signal  = 'Right'
-                    out_trigger = 'Left'
-
-                so[out_signal+'/Waveform']      = 'Sine'
-                so[out_signal+'/Sine']          = f_target
-                so[out_signal+'/Sine/Phase']     = 90
-                so[out_signal+'/Sine/Amplitude'] = sd['Output/Signal_Amplitude']
-                self.window.process_events() # Let it calculate everything.
-
-                so[out_trigger+'/Waveform']      = 'Square'
-                so[out_trigger+'/Square/Cycles'] = 1
-                so[out_trigger+'/Square/High']   =  sd['Output/Trigger_Amplitude']
-                so[out_trigger+'/Square/Low']    = -sd['Output/Trigger_Amplitude']
-                so[out_trigger+'/Square/Width']  = 0.5
-
-                so['Left' ] = so['Left/Loop' ] = True
-                so['Right'] = so['Right/Loop'] = True
-
-                # Update the demod frequency
-                self.tab_demod.demodulator.number_frequency(so[out_signal+'/Sine'])
-
-                # Make the input settings match
-                if sd['Input/Signal_Channel'] == 'Left': in_trigger = 'Right'
-                else:                                    in_trigger = 'Left'
-
-                si['Samples'] = so['Left/Samples']
-                self.window.process_events()
-                si['Trigger'] = in_trigger
-                si['Trigger/Level'] = 0
-                si['Trigger/Mode']  = 'Rising Edge'
-                si['Trigger/Stay_Triggered'] = True
-                
-                # Wait for the thread to receive the waveform
-                self._wait_for_new_waveform()
-                
-
-            # Shut it down.
-            self.button_playrecord(False)
-            self.button_play(False)
-            self.button_record(False)
-            self.tab_demod.button_sweep(False)
-
-    def _wait_for_new_waveform(self, timeout=3):
+    def _sweep_iterate(self, n):
         """
-        Sends the message new_waveform = True to the thread and waits for it
-        to turn False.
+        Performs one iteration and increments the counter.
         """
+        # Get the current target frequency
+        f_target = self._get_sweep_frequency(n)
+
+        # If we're done.
+        if f_target is None or not self.tab_demod.button_sweep():
+            self.signal_sweep_done.emit(None)
+            return
+
+        # Shortcuts
+        pd = self.tab_demod.plot_raw
+        sd = self.tab_demod.settings
+        so = self.tab_out.settings
+        si = self.tab_in.settings
+
+        # Update the user
+        self.tab_demod.number_step(n+1)
+
+        # Set the number of iterations at each frequency
+        self.tab_in.settings['Iterations'] = self.tab_demod.settings['Sweep/Repeat']
+
+        # Clear the raw plot and start over.
+        pd.clear()
+
+        # Set up the output
+        if sd['Output/Signal_Channel'] == 'Left':
+            out_signal  = 'Left'
+            out_trigger = 'Right'
+        else:
+            out_signal  = 'Right'
+            out_trigger = 'Left'
+
+        so[out_signal+'/Waveform']      = 'Sine'
+        so[out_signal+'/Sine']          = f_target
+        so[out_signal+'/Sine/Phase']     = 90
+        so[out_signal+'/Sine/Amplitude'] = sd['Output/Signal_Amplitude']
+
+        so[out_trigger+'/Waveform']      = 'Square'
+        so[out_trigger+'/Square/Cycles'] = 1
+        so[out_trigger+'/Square/High']   =  sd['Output/Trigger_Amplitude']
+        so[out_trigger+'/Square/Low']    = -sd['Output/Trigger_Amplitude']
+        so[out_trigger+'/Square/Width']  = 0.5
+
+        # Set some enable flags.
+        so['Left' ] = so['Left/Loop' ] = True
+        so['Right'] = so['Right/Loop'] = True
+
+        # Let it calculate and update the rest of the settings.
+        self.window.process_events()
+
+        # Update the ACTUAL frequency
+        self.tab_demod.demodulator.number_frequency(so[out_signal+'/Sine'])
+        f = so[out_signal+'/Sine']
+
+        # Make the input settings match
+        if sd['Input/Signal_Channel'] == 'Left': in_trigger = 'Right'
+        else:                                    in_trigger = 'Left'
+
+        si['Samples'] = int(_n.round(sd['Sweep/Block']*float(si['Rate'])))
+        self.window.process_events()
+        si['Trigger'] = in_trigger
+        si['Trigger/Level'] = 0
+        si['Trigger/Mode']  = 'Rising Edge'
+        si['Trigger/Stay_Triggered'] = True
+
+        # If we haven't started yet, start playing
+        if not self.button_play(): self.button_play(True)
+
+        # Tell it to look for a new waveform. It will emit a signal when it gets this.
         self._set_shared(new_waveform = True)
-        t0 = _t.time()
-        while self._get_shared('new_waveform', bool) and _t.time()-t0 < timeout: 
-            self.window.sleep()
-           
-        # Return the timeout status.
-        return not self._get_shared('new_waveform', bool)
+
+
+    def _sweep_waveform_ok(self, a):
+        """
+        Signal emitted when the thread receives the new waveform and will begin
+        buffering it.
+        """
+
+        # Wait for the settle time
+        self.window.sleep(self.tab_demod.settings['Sweep/Settle'])
+
+        # Now start collecting until we have enough data.
+        self.button_record(True)
+
+        # When there is another data set, it will emit a signal connected to
+        # self._sweep_new_data
+
+    def _sweep_new_data(self, a):
+        """
+        Called when the input has new data to demodulate.
+        """
+        pr = self.tab_in.plot_raw
+        pd = self.tab_demod.plot_raw
+
+        # Clear and import the header
+        pd.clear()
+        pd.copy_headers_from(pr)
+
+        # Copy the columns in the right fashion (time-signal pairs)
+        for k in pr.ckeys[1:]:
+            pd['t_'+k] = pr['t']
+            pd[k]  = pr[k]
+
+        pd.plot()
+
+        # Turn off record and reset the trigger
+        self.button_record(False)
+        self.tab_in.settings['Trigger/Stay_Triggered'] = False
+
+        # Next step!
+        self.signal_sweep_iterate.emit(self.tab_demod.number_step())
+
+    def _sweep_done(self, a):
+        """
+        Called when the sweep is done.
+        """
+        # Shut it down.
+        self.button_playrecord(False)
+        self.button_play(False)
+        self.button_record(False)
+        self.tab_demod.button_sweep(False)
+
+    def _get_sweep_frequency(self, n):
+        """
+        Returns the nth sweep frequency.
+        """
+        sd = self.tab_demod.settings
+
+        # Get the frequency list.
+        if sd['Sweep/Log']:
+            if sd['Sweep/Start'] == 0: sd['Sweep/Start'] = sd['Stop' ]*0.01
+            if sd['Sweep/Stop' ] == 0: sd['Sweep/Stop' ] = sd['Start']*0.01
+            if sd['Sweep/Start'] == 0: return
+            fs = _s.fun.erange(sd['Sweep/Start'], sd['Sweep/Stop'], int(sd['Sweep/Steps']))
+        else:
+            fs = _n.linspace  (sd['Sweep/Start'], sd['Sweep/Stop'], int(sd['Sweep/Steps']))
+
+        if n < len(fs): return fs[n]
+        else:           return None
+
+    # def _wait_for_new_waveform(self, timeout=3):
+    #     """
+    #     Sends the message new_waveform = True to the thread and waits for it
+    #     to turn False.
+
+    #     Returns True if timeout.
+    #     """
+    #     self._set_shared(new_waveform = True)
+    #     t0 = _t.time()
+    #     while self._get_shared('new_waveform', bool) and _t.time()-t0 < timeout:
+    #         _t.sleep(0.25)
+    #         self.window.process_events()
+
+    #     # Return the timeout status.
+    #     return self._get_shared('new_waveform', bool)
 
     def _button_play_toggled(self, *a):
         """
@@ -368,18 +453,19 @@ class soundcard():
         # We do special stuff when the record button is turned on.
         if self.button_record():
 
-            # We're starting over, so clear the stream.
+            # We're starting over, so clear the stream if it exists.
             if self._shared['stream']:
                 self._shared['stream'].read(self._shared['stream'].read_available)
 
-            self.button_record.set_colors('white', 'red')
+            # Otherwise start the stream.
+            else: self._start_stream()
 
-            if not self._shared['stream']: self._start_stream()
+            self.button_record.set_colors('white', 'red')
 
         else: self.button_record.set_colors(None, None)
 
         self._thread_locker.unlock()
-        
+
         # let it finish on its own.
 
     def _button_playrecord_toggled(self, *a):
@@ -399,11 +485,11 @@ class soundcard():
 
         This will always be called between threads, so should be safe.
         """
-        si = self.tab_input.settings
-        so = self.tab_output.settings
+        si = self.tab_in.settings
+        so = self.tab_out.settings
 
         # Update the state of the trigger button.
-        bt = self.tab_input.button_triggered
+        bt = self.tab_in.button_triggered
         if si['Trigger'] == 'Continuous':
             bt(True).set_text('Continuous').set_colors('white','blue')
         elif self._shared['triggered'] and stay_triggered:
@@ -413,13 +499,13 @@ class soundcard():
 
         # Store some thread variables
         self._shared.update(dict(
-            si            = self.tab_input.settings.get_dictionary(short_keys=True)[1],
-            triggered     = self.tab_input.button_triggered(),
+            si            = self.tab_in.settings.get_dictionary(short_keys=True)[1],
+            triggered     = self.tab_in.button_triggered(),
             trigger_type  = si['Trigger'],
             button_record = self.button_record(),
             button_play   = self.button_play(),
-            L         = _n.array(self.pd['Left'],  dtype=_n.float32) * (1 if so['Left']  and self.button_play() else 0),
-            R         = _n.array(self.pd['Right'], dtype=_n.float32) * (1 if so['Right'] and self.button_play() else 0),))
+            L         = _n.array(self.tab_out.plot_design['Left'],  dtype=_n.float32) * (1 if so['Left']  and self.button_play() else 0),
+            R         = _n.array(self.tab_out.plot_design['Right'], dtype=_n.float32) * (1 if so['Right'] and self.button_play() else 0),))
 
 
     def _thread_push_pull(self):
@@ -446,7 +532,9 @@ class soundcard():
         buffer_in = _n.zeros((Ni,2), dtype=_n.float32)
 
         # If we changed the waveform, let the world know we have it.
-        self._shared['new_waveform'] = False
+        if self._shared['new_waveform']:
+            self._shared['new_waveform'] = False
+            self.signal_waveform_ok.emit(None)
 
         self._thread_locker.unlock()
         # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -501,7 +589,9 @@ class soundcard():
                 if oops_in: self._signal_input_overflow.emit(None)
 
                 # If we're already triggered, collect the data
-                if self._shared['triggered'] or self._shared['trigger_type'] == 'Continuous':
+                if self._shared['triggered'] \
+                or self._shared['trigger_type'] == 'Continuous' \
+                or not button_record:
                     buffer_in[n1:n2] = data
                     data_kept = True
 
@@ -581,13 +671,14 @@ class soundcard():
         """
         A complete data set has been collected.
         """
+
         # Regardless of what we do with this data, we should fire off
         # a thread to collect more, because the buffers are hungry.
-        si = self.tab_input.settings
+        si = self.tab_in.settings
         if self.button_record.is_checked() or self.button_play.is_checked():
             self._before_thread_push_pull(
                 stay_triggered = si['Trigger/Stay_Triggered'] and self._shared['triggered'])
-            _s.thread.start(self._thread_push_pull, priority=1)
+            _s.thread.start(self._thread_push_pull, priority=2)
         else:
             self._shared['stream'].stop()
             self._shared['stream'] = None
@@ -599,34 +690,37 @@ class soundcard():
             self.button_playrecord.enable()
             self.button_record.set_colors(None, None)
             self.button_play  .set_colors(None, None)
-            self.tab_input.button_triggered(False).set_text('Idle').set_colors(None,None)
+            self.tab_in.button_triggered(False).set_text('Idle').set_colors(None,None)
 
         # Now, if we're ready to process this data, do so.
         # This will be happening in parallel with the thread, so
         # make sure it doesn't touch _thread_shared_data or stream
         if self._ready_for_more_data and not data is None:
+
             self._ready_for_more_data = False
 
-            self.tab_input.number_iteration.increment()
+            self.tab_in.number_iteration.increment()
 
             # Generate the time array
             Ni = len(data)
             R  = float(self.combo_rate.get_text())
-            self.pr['t']     = _n.linspace(0,(Ni-1)/R,Ni)
-            self.pr['Left']  = data[:,0]
-            self.pr['Right'] = data[:,1]
+            self.tab_in.plot_raw['t']     = _n.linspace(0,(Ni-1)/R,Ni)
+            self.tab_in.plot_raw['Left']  = data[:,0]
+            self.tab_in.plot_raw['Right'] = data[:,1]
 
             # Plot autosave and run the signal analysis chain.
-            self.pr.plot()
-            self.pr.autosave()
+            self.tab_in.plot_raw.plot()
+            self.tab_in.plot_raw.autosave()
             self.signal_chain.run()
+
+            # If we're running a sweep, send the data to the demodulation raw
+            if self.tab_demod.button_sweep(): self.signal_sweep_new_data.emit(None)
 
             # Reset the ready flag
             self._ready_for_more_data = True
 
         # Otherwise, we haven't finished processing the previous data yet.
-        else: self.tab_input.number_missed.increment()
-
+        else: self.tab_in.number_missed.increment()
 
 
     def _start_stream(self, *a):
@@ -642,8 +736,8 @@ class soundcard():
         self.checkbox_underflow.set_checked(False)
 
         self.t_start = _t.time()
-        self.tab_input.number_iteration(0)
-        self.tab_input.number_missed(0)
+        self.tab_in.number_iteration(0)
+        self.tab_in.number_missed(0)
 
         # Ready for more data
         self._ready_for_more_data = True
@@ -652,7 +746,7 @@ class soundcard():
         self._shared['no'] = 0
         self._shared['triggered'] = False
         self._shared['stream'] = self.api.Stream(
-                samplerate         = float(self.tab_input.settings['Rate']),
+                samplerate         = float(self.tab_in.settings['Rate']),
                 blocksize          = self.number_buffer(), # 0 for "optimal" latency
                 channels           = 2,)
 
@@ -668,7 +762,7 @@ class soundcard():
         # thread-safe variables. The thread should not be accessing GUI elements.
         self._before_thread_push_pull()
         self._shared['stream'].start()
-        _s.thread.start(self._thread_push_pull, priority=1)
+        _s.thread.start(self._thread_push_pull, priority=2)
 
 
     def _event_output_underflow(self, *a):
@@ -688,22 +782,22 @@ class soundcard():
         Called when the trigger state changes in the thread. Only updates the GUI.
         """
         # Update the GUI based on the incoming data from the thread.
-        if   a == 'Triggered'  : self.tab_input.button_triggered(True).set_text('Triggered') .set_colors('white', 'red')
-        elif a == 'Continuous' : self.tab_input.button_triggered(True).set_text('Continuous').set_colors('white', 'blue')
-        elif a == 'Waiting'    : self.tab_input.button_triggered(False).set_text('Waiting')   .set_colors('white', 'green')
-        elif a == 'Idle'       : self.tab_input.button_triggered(False).set_text('Idle')      .set_colors(None, None)
+        if   a == 'Triggered'  : self.tab_in.button_triggered(True).set_text('Triggered') .set_colors('white', 'red')
+        elif a == 'Continuous' : self.tab_in.button_triggered(True).set_text('Continuous').set_colors('white', 'blue')
+        elif a == 'Waiting'    : self.tab_in.button_triggered(False).set_text('Waiting')   .set_colors('white', 'green')
+        elif a == 'Idle'       : self.tab_in.button_triggered(False).set_text('Idle')      .set_colors(None, None)
 
     def _button_triggered_toggled(self, *a):
         """
         When someone toggles the trigger.
         """
-        self._set_shared(triggered = self.tab_input.button_triggered())
-        
+        self._set_shared(triggered = self.tab_in.button_triggered())
+
         # Update the GUI
-        si = self.tab_input.settings
-        if self.button_record() or self.button_play(): 
+        si = self.tab_in.settings
+        if self.button_record() or self.button_play():
             if   si['Trigger'] == 'Continuous': self._event_trigger_changed('Continuous')
-            elif self.tab_input.button_triggered(): self._event_trigger_changed('Triggered')
+            elif self.tab_in.button_triggered(): self._event_trigger_changed('Triggered')
             else:                                   self._event_trigger_changed('Waiting')
         else:
             self._event_trigger_changed('Idle')
@@ -718,8 +812,8 @@ class soundcard():
         """
         Called when someone changes the rate.
         """
-        self.tab_input.settings['Rate']       = self.combo_rate.get_text()
-        self.tab_output.settings['Left/Rate'] = self.combo_rate.get_text()
+        self.tab_in .settings['Rate']      = self.combo_rate.get_text()
+        self.tab_out.settings['Left/Rate'] = self.combo_rate.get_text()
 
     def _sync_rates_samples_time(self, key):
         """
@@ -727,7 +821,7 @@ class soundcard():
         """
         # If we get a Rate, Samples, or Time, update the others
         if key in ['Rate', 'Samples', 'Time']:
-            s = self.tab_input.settings
+            s = self.tab_in.settings
 
             # If Rate or Time changed, set the number of samples, rounding
             if key in ['Rate', 'Time']: s.set_value('Samples', _n.ceil(s['Time'] * float(s['Rate'])), block_key_signals=True)
@@ -748,18 +842,18 @@ class soundcard():
             if  a[0].name() == 'Trigger' \
             and self._shared['stream']:
                 if a[0].value() == 'Continuous':
-                    self.tab_input.button_triggered(True).set_text('Continuous').set_colors('white','blue')
+                    self.tab_in.button_triggered(True).set_text('Continuous').set_colors('white','blue')
                 else:
-                    self.tab_input.button_triggered(False).set_text('Waiting').set_colors('white', 'green')
+                    self.tab_in.button_triggered(False).set_text('Waiting').set_colors('white', 'green')
 
-        self._shared['si'] = self.tab_input.settings.get_dictionary(short_keys=True)[1]
+        self._shared['si'] = self.tab_in.settings.get_dictionary(short_keys=True)[1]
         self._thread_locker.unlock()
 
     def _settings_changed_demod(self, *a):
         """
         When someone changes a demod setting.
         """
-        
+
     def _set_shared(self, **kwargs):
         """
         Sets shared values in a thread-safe way.
@@ -771,14 +865,14 @@ class soundcard():
     def _get_shared(self, key, return_type):
         """
         Returns a copy of an object from self._shared in a thread-safe way.
-        
+
         return_type is the function that does the copying, e.g. int.
         """
         self._thread_locker.lock()
         x = return_type(self._shared[key])
         self._thread_locker.unlock()
         return x
-        
+
 
     def _timer_status_tick(self, *a):
         """

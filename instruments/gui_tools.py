@@ -258,7 +258,7 @@ class waveform_designer(_g.Window):
         """
         if len(a):
             name = a[0].name()
-            key = self.settings.get_full_key(a[0])
+            key = self.settings.get_key(a[0])
 
             # Update the other quantities for this channel
             self._sync_rates_samples_time(key)
@@ -351,6 +351,14 @@ class waveform_designer(_g.Window):
         """
         s = self.settings
         s.set_value(c+'/'+w, self.get_rate(c)/s[c+'/Samples']*s[c+'/'+w+'/Cycles'], block_key_signals=True)
+
+    def add_channels(self, *args, rates=None):
+        """
+        Adds multiple channels, one for each argument (str). See add_channel()
+        for more information.
+        """
+        for a in args: self.add_channel(a, rates=rates)
+        return self
 
     def add_channel(self, channel='Ch1', rates=None):
         """
@@ -616,8 +624,8 @@ if __name__ == '__main__':
     _egg.clear_egg_settings()
     # self = signal_chain()
 
-    # self = waveform_designer(sync_samples=True, sync_rates=True)
+    self = waveform_designer(sync_samples=True, sync_rates=True).add_channels('a', 'b')
     # self.add_channel('Ch1',7000).add_channel('Ch2',5000)
 
-    self = demodulator()
+    #self = demodulator()
     self.show()
