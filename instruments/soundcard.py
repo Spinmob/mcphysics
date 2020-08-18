@@ -49,14 +49,14 @@ class soundcard():
 
         # Main Layout
         self.window = _g.Window('Soundcard', autosettings_path=name+'.window')
-        self.grid_top = self.window.add(_g.GridLayout(margins=False))
+        self.grid_top = self.window.add(_g.GridLayout(margins=False), alignment=0)
         self.window.new_autorow()
         self.tabs = self.window.add(_g.TabArea(autosettings_path=name+'.tabs'), alignment=0)
 
         # Top controls
 
         # Combo device selector
-        device_names = self.get_device_names() + ['Simulation']
+        device_names = self.get_device_names()
         self.combo_device = self.grid_top.add(_g.ComboBox(device_names, autosettings_path=name+'.combo_device'))
         self.label_rate    = self.grid_top.add(_g.Label('Rate (Hz):'))
         self.combo_rate    = self.grid_top.add(_g.ComboBox(self._rates,  autosettings_path=name+'.combo_rate'))
@@ -74,24 +74,31 @@ class soundcard():
         self.number_buffer = self.grid_top.add(_g.NumberBox(0, int=True, bounds=(0,None), autosettings_path=name+'.number_buffer', tip='How big of an input / output buffer to use. Larger values increase latency, smaller values lead to discontinuities.\nZero means "optimal", which is different for different systems and sound cards.'))
 
         # Buttons
-        self.button_record     = self.grid_top.add(_g.Button('Record', checkable=True))
-        self.checkbox_overflow = self.grid_top.add(_g.CheckBox('Overflow      '))
-        self.button_play       = self.grid_top.add(_g.Button('Play',   checkable=True))
-        self.checkbox_underflow= self.grid_top.add(_g.CheckBox('Underflow     '))
-        self.button_playrecord = self.grid_top.add(_g.Button('Play+Record')).set_width(110)
-        self.button_stop       = self.grid_top.add(_g.Button('Stop')).disable()
-
+        self.button_record = self.grid_top.add(_g.Button(
+            'Record', checkable=True,
+            signal_toggled = self._button_record_toggled))
+        
+        self.checkbox_overflow = self.grid_top.add(_g.CheckBox('Overflow  '))
+        
+        self.button_play = self.grid_top.add(_g.Button(
+            'Play', checkable=True,
+            signal_toggled = self._button_play_toggled))
+        
+        self.checkbox_underflow= self.grid_top.add(_g.CheckBox('Underflow  '))
+        
+        self.button_playrecord = self.grid_top.add(_g.Button(
+            'Play+Record', checkable=True,
+            signal_toggled = self._button_playrecord_toggled)).set_width(110)
+        
+        self.grid_top.set_column_stretch(self.grid_top._auto_column)
+        self.grid_top._auto_column += 1
+        
         self.grid_top.add(_g.Label('    Status:'))
         self.button_stream  = self.grid_top.add(_g.Button('Stream').set_width(70))
         self.number_threads = self.grid_top.add(_g.NumberBox(int=True).set_width(50))
         self.timer_status  = _g.Timer(100, signal_tick=self._timer_status_tick)
 
-        self.button_record    .signal_toggled.connect(self._button_record_toggled)
-        self.button_play      .signal_toggled.connect(self._button_play_toggled)
-        self.button_playrecord.signal_clicked.connect(self._button_playrecord_clicked)
-        self.button_stop      .signal_clicked.connect(self._button_stop_clicked)
-
-
+        
 
         # AI tab
         self.tab_input = self.tabs.add_tab('Input')
@@ -106,10 +113,10 @@ class soundcard():
 
         self.tab_input.tab_settings.new_autorow()
         self.tab_input.grid_trigger     = self.tab_input.tab_settings.add(_g.GridLayout(margins=False), alignment=0)
-        self.tab_input.button_triggered = self.tab_input.grid_trigger.add(_g.Button('Idle', checkable=True), alignment=0)
-        self.tab_input.button_force     = self.tab_input.grid_trigger.add(_g.Button('Force'))
-        self.tab_input.button_force.signal_clicked.connect(self._button_force_clicked)
-
+        self.tab_input.button_triggered = self.tab_input.grid_trigger.add(_g.Button(
+            text = 'Idle', checkable=True,
+            signal_toggled = self._button_triggered_toggled), alignment=0)
+       
         self.tab_input.tab_settings.new_autorow()
         self.tab_input.settings = s = self.tab_input.tab_settings.add(_g.TreeDictionary(
             autosettings_path  = name+'.tab_input.settings',
@@ -185,7 +192,7 @@ class soundcard():
         self.tab_demod.button_sweep = self.tab_demod.grid_sweep.add(_g.Button(
             text            = 'Sweep Frequency',
             checkable       = True,
-            signal_toggled  = self._button_sweep_toggled).set_width(130))
+            signal_toggled  = self._button_sweep_frequency_toggled).set_width(130))
 
         # Add the sweep settings
         s = self.tab_demod.settings
@@ -236,7 +243,7 @@ class soundcard():
         # Show the window
         if show: self.window.show(block)
 
-    def _button_sweep_toggled(self, *a):
+    def _button_sweep_frequency_toggled(self, *a):
         """
         When someone toggles "Sweep".
         """
@@ -258,15 +265,14 @@ class soundcard():
             else:
                 fs = _n.linspace  (sd['Sweep/Start'], sd['Sweep/Stop'], int(sd['Sweep/Steps']))
 
-            # Set the iterations, but remember the old number
-            old_iterations = si['Iterations']
+            # Set the iterations
             si['Iterations'] = sd['Sweep/Repeat']
 
             # Start the stream
             self.button_play(True)
 
             # Loop over the frequencies.
-            for f in fs:
+            for f_target in fs:
 
                 # Bonk out if we unchecked it.
                 if not self.tab_demod.button_sweep(): break
@@ -280,7 +286,7 @@ class soundcard():
                     out_trigger = 'Left'
 
                 so[out_signal+'/Waveform']      = 'Sine'
-                so[out_signal+'/Sine']          = f
+                so[out_signal+'/Sine']          = f_target
                 so[out_signal+'/Sine/Phase']     = 90
                 so[out_signal+'/Sine/Amplitude'] = sd['Output/Signal_Amplitude']
                 self.window.process_events() # Let it calculate everything.
@@ -307,22 +313,29 @@ class soundcard():
                 si['Trigger/Level'] = 0
                 si['Trigger/Mode']  = 'Rising Edge'
                 si['Trigger/Stay_Triggered'] = True
+                
+                # Wait for the thread to receive the waveform
+                self._wait_for_new_waveform()
+                
 
             # Shut it down.
-            self.button_stop.click()
+            self.button_playrecord(False)
+            self.button_play(False)
+            self.button_record(False)
             self.tab_demod.button_sweep(False)
 
-
-
-
-    def _button_force_clicked(self, *a):
+    def _wait_for_new_waveform(self, timeout=3):
         """
-        Someone clicked "force" to force the trigger.
+        Sends the message new_waveform = True to the thread and waits for it
+        to turn False.
         """
-        # Update the GUI and thread.
-        self._thread_locker.lock()
-        self._shared['triggered'] = True
-        self._thread_locker.unlock()
+        self._set_shared(new_waveform = True)
+        t0 = _t.time()
+        while self._get_shared('new_waveform', bool) and _t.time()-t0 < timeout: 
+            self.window.sleep()
+           
+        # Return the timeout status.
+        return not self._get_shared('new_waveform', bool)
 
     def _button_play_toggled(self, *a):
         """
@@ -366,10 +379,20 @@ class soundcard():
         else: self.button_record.set_colors(None, None)
 
         self._thread_locker.unlock()
-
+        
         # let it finish on its own.
 
-    def _before_push_pull_thread(self, stay_triggered=False):
+    def _button_playrecord_toggled(self, *a):
+        """
+        Just pushes both.
+        """
+        self.button_play  (self.button_playrecord())
+        self.button_record(self.button_playrecord())
+
+        if self.button_playrecord(): self.button_playrecord.set_colors('white', 'red')
+        else:                        self.button_playrecord.set_colors(None, None)
+
+    def _before_thread_push_pull(self, stay_triggered=False):
         """
         Sets the appropriate state of things and pulls some data to thread-variables
         before starting the thread.
@@ -399,7 +422,7 @@ class soundcard():
             R         = _n.array(self.pd['Right'], dtype=_n.float32) * (1 if so['Right'] and self.button_play() else 0),))
 
 
-    def _push_pull_thread(self):
+    def _thread_push_pull(self):
         """
         Pushes the next block of data into the available output buffer, and
         pulls the next block of available data into the input buffer.
@@ -421,6 +444,9 @@ class soundcard():
         ni = 0
         Ni = int(self._shared['si']['Samples'])
         buffer_in = _n.zeros((Ni,2), dtype=_n.float32)
+
+        # If we changed the waveform, let the world know we have it.
+        self._shared['new_waveform'] = False
 
         self._thread_locker.unlock()
         # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -559,9 +585,9 @@ class soundcard():
         # a thread to collect more, because the buffers are hungry.
         si = self.tab_input.settings
         if self.button_record.is_checked() or self.button_play.is_checked():
-            self._before_push_pull_thread(
+            self._before_thread_push_pull(
                 stay_triggered = si['Trigger/Stay_Triggered'] and self._shared['triggered'])
-            _s.thread.start(self._push_pull_thread, priority=1)
+            _s.thread.start(self._thread_push_pull, priority=1)
         else:
             self._shared['stream'].stop()
             self._shared['stream'] = None
@@ -571,7 +597,6 @@ class soundcard():
             self.combo_device.enable()
             self.number_buffer.enable()
             self.button_playrecord.enable()
-            self.button_stop.disable()
             self.button_record.set_colors(None, None)
             self.button_play  .set_colors(None, None)
             self.tab_input.button_triggered(False).set_text('Idle').set_colors(None,None)
@@ -613,7 +638,6 @@ class soundcard():
         self.combo_rate.disable()
         self.combo_device.disable()
         self.number_buffer.disable()
-        self.button_stop.enable()
         self.checkbox_overflow.set_checked(False)
         self.checkbox_underflow.set_checked(False)
 
@@ -642,9 +666,9 @@ class soundcard():
         # This feeds hungry buffers and pulls into a buffer, so we set it on its own thread.
         # Before starting, update some gui stuff, and pull some data into
         # thread-safe variables. The thread should not be accessing GUI elements.
-        self._before_push_pull_thread()
+        self._before_thread_push_pull()
         self._shared['stream'].start()
-        _s.thread.start(self._push_pull_thread, priority=1)
+        _s.thread.start(self._thread_push_pull, priority=1)
 
 
     def _event_output_underflow(self, *a):
@@ -666,30 +690,29 @@ class soundcard():
         # Update the GUI based on the incoming data from the thread.
         if   a == 'Triggered'  : self.tab_input.button_triggered(True).set_text('Triggered') .set_colors('white', 'red')
         elif a == 'Continuous' : self.tab_input.button_triggered(True).set_text('Continuous').set_colors('white', 'blue')
-        elif a == 'Waiting'    : self.tab_input.button_triggered(True).set_text('Waiting')   .set_colors('white', 'green')
-        elif a == 'Idle'       : self.tab_input.button_triggered(True).set_text('Idle')      .set_colors(None, None)
+        elif a == 'Waiting'    : self.tab_input.button_triggered(False).set_text('Waiting')   .set_colors('white', 'green')
+        elif a == 'Idle'       : self.tab_input.button_triggered(False).set_text('Idle')      .set_colors(None, None)
 
-    def _button_playrecord_clicked(self, *a):
+    def _button_triggered_toggled(self, *a):
         """
-        Just pushes both.
+        When someone toggles the trigger.
         """
-        self.button_play(True)
-        self.button_record(True)
-
-
-    def _button_stop_clicked(self, *a):
-        """
-        Just stops both.
-        """
-        self.button_play(False)
-        self.button_record(False)
+        self._set_shared(triggered = self.tab_input.button_triggered())
+        
+        # Update the GUI
+        si = self.tab_input.settings
+        if self.button_record() or self.button_play(): 
+            if   si['Trigger'] == 'Continuous': self._event_trigger_changed('Continuous')
+            elif self.tab_input.button_triggered(): self._event_trigger_changed('Triggered')
+            else:                                   self._event_trigger_changed('Waiting')
+        else:
+            self._event_trigger_changed('Idle')
 
     def _combo_device_changed(self, *a):
         """
         Called when someone changes the device.
         """
-        if not self.combo_device.get_value() == 'Simulation':
-            self.set_devices(self.combo_device.get_index(), self.combo_device.get_index())
+        self.set_devices(self.combo_device.get_index(), self.combo_device.get_index())
 
     def _combo_rate_changed(self, *a):
         """
@@ -736,6 +759,26 @@ class soundcard():
         """
         When someone changes a demod setting.
         """
+        
+    def _set_shared(self, **kwargs):
+        """
+        Sets shared values in a thread-safe way.
+        """
+        self._thread_locker.lock()
+        self._shared.update(kwargs)
+        self._thread_locker.unlock()
+
+    def _get_shared(self, key, return_type):
+        """
+        Returns a copy of an object from self._shared in a thread-safe way.
+        
+        return_type is the function that does the copying, e.g. int.
+        """
+        self._thread_locker.lock()
+        x = return_type(self._shared[key])
+        self._thread_locker.unlock()
+        return x
+        
 
     def _timer_status_tick(self, *a):
         """
