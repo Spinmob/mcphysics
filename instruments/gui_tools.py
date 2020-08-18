@@ -448,12 +448,176 @@ class waveform_designer(_g.Window):
 
 
 
+class demodulator(_g.Window):
+    """
+    Tabs for demodulation and streaming.
+    """
+    def __init__(self, name='demodulator', margins=False):
+        _g.Window.__init__(self, title=name, margins=margins, autosettings_path=name)
 
+        # Internal variables
+        self.name = name
+
+        self.grid_top = self.add(_g.GridLayout(margins=False))
+
+        self.number_frequency = self.grid_top.add(_g.NumberBox(
+            1000, step=0.1, dec = True,
+            suffix='Hz', siPrefix = True,
+            autosettings_path = name+'.number_frequency',
+            tip = 'Frequency at which to demodulate.\nNote this frequency is not guaranteed to "fit" within the\nincoming data, and may not be part of its orthonormal basis.'
+            )).set_width(120)
+
+        self.button_get_data = self.grid_top.add(_g.Button(
+            text = 'Get Data',
+            signal_clicked = self._button_get_data_clicked,
+            tip  = 'Import the data using self.get_data(). This is a dummy function you must overload.'))
+
+        self.button_demodulate = self.grid_top.add(_g.Button(
+            text           = 'Demodulate',
+            signal_clicked = self._button_demodulate_clicked,
+            tip='Get the quadratures from the data source.'))
+
+        self.button_loop = self.grid_top.add(_g.Button(
+            text           = 'Loop',
+            signal_toggled = self._button_loop_toggled,
+            checkable      = True,
+            tip='Repeatedly click "Get Data" and "Run".'))
+
+        self.number_iteration = self.grid_top.add(_g.NumberBox(int=True))
+
+        self.new_autorow()
+
+        # Tabs for plot
+        self.tabs = self.add(_g.TabArea(autosettings_path=name+'.tabs'), alignment=0)
+
+        self.tab_raw   = self.tabs.add_tab('Raw')
+        self.tab_demod = self.tabs.add_tab('Demodulated')
+
+        self.plot_raw = self.tab_raw.add(_g.DataboxPlot(
+            file_type         = '*.raw',
+            autosettings_path = name+'.plot_raw',
+            name              = name+'.plot_raw',
+            autoscript        = 2), alignment=0)
+
+        self.tab_demod.add(_g.Label('History: '))
+        self.number_history = self.tab_demod.add(_g.NumberBox(
+            value  = 0,
+            step   = 10,
+            int    = True,
+            bounds = (0, None),
+            autosettings_path = name+'.number_history'))
+
+        self.tab_demod.new_autorow()
+
+        self.plot_demod = self.tab_demod.add(_g.DataboxPlot(
+            file_type         = '*.demod',
+            autosettings_path = name+'.plot_demod',
+            name              = name+'.plot_demod',
+            autoscript        = 1), alignment=0, column_span=3)
+        self.tab_demod.set_column_stretch(2)
+
+
+    def _button_demodulate_clicked(self, *a):
+        """
+        Called when someone clicks the Run button.
+        """
+        self.demodulate()
+
+
+    def _button_get_data_clicked(self, *a):
+        """
+        Called when someone clicks "Get Data".
+        """
+        d = self.get_data()
+        self.plot_raw.clear()
+        self.plot_raw.copy_all(d)
+        self.plot_raw.plot()
+
+    def _button_loop_toggled(self, *a):
+        """
+        When someone toggles the Loop button.
+        """
+        while self.button_loop():
+            self.button_get_data.click()
+            self.button_demodulate.click()
+            self.process_events()
+
+    def get_data(self):
+        """
+        Dummy function you must overload. It needs to return a databox or
+        DataboxPlot object having time-signal column pairs, e.g., t1, V1, t2, V2, ...
+        """
+        d = _s.data.databox()
+        t = _n.linspace(0,1,400)
+        f = self.number_frequency()
+        d['t1'] = t
+        d['V1'] = _n.random.normal(size=400)+_n.sin(2*_n.pi*f*t + 0.2)
+        d['t2'] = t
+        d['V2'] = _n.random.normal(size=400)+_n.cos(2*_n.pi*f*t + 0.2)
+        return d
+
+    def demodulate(self, f=None):
+        """
+        Perform a demodulation on the raw data at
+        frequency f.
+
+        Parameters
+        ----------
+        f=None : float
+            Frequency at which to perform the demodulation. If f=None, this will
+            use the current value in self.number_frequency.
+
+        Returns
+        -------
+        The row of data added to self.plot_demod
+        """
+        # Get or set the demod frequency.
+        if f==None: f = self.number_frequency()
+        else:           self.number_frequency(f)
+
+        # Increment
+        self.number_iteration.increment()
+
+        # Get the source databox and demod plotter
+        d = self.plot_raw
+        p = self.plot_demod
+        p.copy_headers(d)
+
+        # Assumed column pairs
+        row  = [self.number_iteration(), f]
+        keys = ['n', 'f(Hz)']
+        for n in range(0, len(d), 2):
+
+            # Get the time axis and the two quadratures
+            t = d[n]
+            X = _n.cos(2*_n.pi*f*t)
+            Y = _n.sin(2*_n.pi*f*t)
+
+            # Normalize
+            X = _n.nan_to_num(X/sum(X*X))
+            Y = _n.nan_to_num(Y/sum(Y*Y))
+
+            # Demodulate
+            VX = sum(d[n+1]*X)
+            VY = sum(d[n+1]*Y)
+
+            # Append to the row
+            row  = row  + [VX, VY]
+            keys = keys + [d.ckeys[n+1]+'_X', d.ckeys[n+1]+'_Y']
+
+        # Append the row
+        p.append_row(row, keys, self.number_history())
+
+        # Plot!
+        p.plot()
 
 if __name__ == '__main__':
 
     _egg.clear_egg_settings()
-    #self = signal_chain()
-    self = waveform_designer(sync_samples=True, sync_rates=True)
-    self.add_channel('Ch1',7000).add_channel('Ch2',5000)
+    # self = signal_chain()
+
+    # self = waveform_designer(sync_samples=True, sync_rates=True)
+    # self.add_channel('Ch1',7000).add_channel('Ch2',5000)
+
+    self = demodulator()
     self.show()

@@ -82,15 +82,16 @@ class soundcard():
         self.button_stop       = self.grid_top.add(_g.Button('Stop')).disable()
 
         self.grid_top.add(_g.Label('    Status:'))
-        self.button_stream  = self.grid_top.add(_g.Button('Stream'))
-        self.number_threads = self.grid_top.add(_g.NumberBox(int=True))
-        self.timer_status  = _g.Timer(100)
-        self.timer_status.signal_tick.connect(self._timer_status_tick)
+        self.button_stream  = self.grid_top.add(_g.Button('Stream').set_width(70))
+        self.number_threads = self.grid_top.add(_g.NumberBox(int=True).set_width(50))
+        self.timer_status  = _g.Timer(100, signal_tick=self._timer_status_tick)
 
         self.button_record    .signal_toggled.connect(self._button_record_toggled)
         self.button_play      .signal_toggled.connect(self._button_play_toggled)
         self.button_playrecord.signal_clicked.connect(self._button_playrecord_clicked)
         self.button_stop      .signal_clicked.connect(self._button_stop_clicked)
+
+
 
         # AI tab
         self.tab_input = self.tabs.add_tab('Input')
@@ -110,7 +111,10 @@ class soundcard():
         self.tab_input.button_force.signal_clicked.connect(self._button_force_clicked)
 
         self.tab_input.tab_settings.new_autorow()
-        self.tab_input.settings = s = self.tab_input.tab_settings.add(_g.TreeDictionary(autosettings_path=name+'.tab_input.settings', name=name+'.tab_input.settings'), alignment=0)
+        self.tab_input.settings = s = self.tab_input.tab_settings.add(_g.TreeDictionary(
+            autosettings_path  = name+'.tab_input.settings',
+            name               = name+'.tab_input.settings',
+            new_signal_changed = self._settings_changed_input), alignment=0)
         s.set_width(270)
 
         # AI Settings
@@ -135,6 +139,8 @@ class soundcard():
         self.B2       = self.tab_input.B2       = self.signal_chain.B2
         self.B3       = self.tab_input.B3       = self.signal_chain.B3
         self.tab_input.set_column_stretch(1)
+
+
 
         # AO tab
         self.tab_output = self.tabs.add_tab('Output')
@@ -161,13 +167,153 @@ class soundcard():
         # Sync everything
         self._sync_rates_samples_time('Samples')
 
-        # Connect signals
-        self.tab_input.settings.connect_any_signal_changed(self._settings_changed_input)
 
+
+        # Demodulation tab
+        self.tab_demod = self.tabs.add_tab('Demodulation')
+        self.tab_demod.grid_left  = self.tab_demod.add(_g.GridLayout(margins=False))
+
+        self.tab_demod.grid_sweep = self.tab_demod.grid_left.add(_g.GridLayout(margins=False))
+        self.tab_demod.grid_left.new_autorow()
+        self.tab_demod.settings = self.tab_demod.grid_left.add(_g.TreeDictionary(
+            autosettings_path  = name+'.tab_demod.settings',
+            name               = name+'.tab_demod.settings',
+            new_signal_changed = self._settings_changed_demod))
+        self.tab_demod.demodulator = self.tab_demod.add(_gt.demodulator(name+'.tab_demod.demodulator'), alignment=0)
+
+        # Add the sweep controls
+        self.tab_demod.button_sweep = self.tab_demod.grid_sweep.add(_g.Button(
+            text            = 'Sweep Frequency',
+            checkable       = True,
+            signal_toggled  = self._button_sweep_toggled).set_width(130))
+
+        # Add the sweep settings
+        s = self.tab_demod.settings
+        s.add_parameter('Output/Signal_Channel', ['Left', 'Right'],
+            tip = 'Which channel to use for the sinusoidal output. The other channel will serve as a trigger edge.')
+
+        s.add_parameter('Output/Signal_Amplitude', 0.1, step=0.01,
+            suffix = '', siPrefix = True,
+            tip = 'Amplitude of output sinusoid.')
+
+        s.add_parameter('Output/Trigger_Amplitude', 0.1, step=0.1,
+            suffix = '', siPrefix = True,
+            tip = 'Amplitude of output trigger.')
+
+        s.add_parameter('Input/Signal_Channel', ['Left', 'Right'],
+            tip = 'Which channel to use for the signal input. The other channel will be used to trigger.')
+
+        s.add_parameter('Sweep/Start', 100.0, dec=True,
+            suffix = 'Hz', siPrefix=True,
+            tip = 'Sweep start frequency.')
+
+        s.add_parameter('Sweep/Stop', 1000.0, dec=True,
+            suffix = 'Hz', siPrefix=True,
+            tip = 'Sweep stop frequency.')
+
+        s.add_parameter('Sweep/Steps', 10.0, dec=True,
+            tip = 'Number of steps from start to stop.')
+
+        s.add_parameter('Sweep/Settle', 0.05, dec=True,
+            suffix = 's', siPrefix = True,
+            tip = 'How long to settle after changing the frequency.')
+
+        s.add_parameter('Sweep/Collect', 0.2, dec=True,
+            suffix = 's', siPrefix = True,
+            tip = 'Minimum amount of data to collect (will be an integer number of periods).')
+
+        s.add_parameter('Sweep/Repeat', 1, dec=True,
+            suffix='reps', siPrefix=True,
+            tip = 'How many times to repeat the demod at each step after settling.')
+
+        s.add_parameter('Sweep/Log', False,
+            tip = 'Whether to use log-spaced steps between Start and Stop.')
+
+
+        # Start the timer
         self.timer_status.start()
 
         # Show the window
         if show: self.window.show(block)
+
+    def _button_sweep_toggled(self, *a):
+        """
+        When someone toggles "Sweep".
+        """
+        if self.tab_demod.button_sweep():
+            si = self.tab_input.settings
+            so = self.tab_output.settings
+            sd = self.tab_demod.settings
+            pd = self.tab_demod.demodulator.plot_demod
+
+            # Clear the plot
+            pd.clear()
+
+            # Get the frequency list.
+            if sd['Sweep/Log']:
+                if sd['Sweep/Start'] == 0: sd['Sweep/Start'] = sd['Stop' ]*0.01
+                if sd['Sweep/Stop' ] == 0: sd['Sweep/Stop' ] = sd['Start']*0.01
+                if sd['Sweep/Start'] == 0: return
+                fs = _s.fun.erange(sd['Sweep/Start'], sd['Sweep/Stop'], int(sd['Sweep/Steps']))
+            else:
+                fs = _n.linspace  (sd['Sweep/Start'], sd['Sweep/Stop'], int(sd['Sweep/Steps']))
+
+            # Set the iterations, but remember the old number
+            old_iterations = si['Iterations']
+            si['Iterations'] = sd['Sweep/Repeat']
+
+            # Start the stream
+            self.button_play(True)
+
+            # Loop over the frequencies.
+            for f in fs:
+
+                # Bonk out if we unchecked it.
+                if not self.tab_demod.button_sweep(): break
+
+                # Set up the output
+                if sd['Output/Signal_Channel'] == 'Left':
+                    out_signal  = 'Left'
+                    out_trigger = 'Right'
+                else:
+                    out_signal  = 'Right'
+                    out_trigger = 'Left'
+
+                so[out_signal+'/Waveform']      = 'Sine'
+                so[out_signal+'/Sine']          = f
+                so[out_signal+'/Sine/Phase']     = 90
+                so[out_signal+'/Sine/Amplitude'] = sd['Output/Signal_Amplitude']
+                self.window.process_events() # Let it calculate everything.
+
+                so[out_trigger+'/Waveform']      = 'Square'
+                so[out_trigger+'/Square/Cycles'] = 1
+                so[out_trigger+'/Square/High']   =  sd['Output/Trigger_Amplitude']
+                so[out_trigger+'/Square/Low']    = -sd['Output/Trigger_Amplitude']
+                so[out_trigger+'/Square/Width']  = 0.5
+
+                so['Left' ] = so['Left/Loop' ] = True
+                so['Right'] = so['Right/Loop'] = True
+
+                # Update the demod frequency
+                self.tab_demod.demodulator.number_frequency(so[out_signal+'/Sine'])
+
+                # Make the input settings match
+                if sd['Input/Signal_Channel'] == 'Left': in_trigger = 'Right'
+                else:                                    in_trigger = 'Left'
+
+                si['Samples'] = so['Left/Samples']
+                self.window.process_events()
+                si['Trigger'] = in_trigger
+                si['Trigger/Level'] = 0
+                si['Trigger/Mode']  = 'Rising Edge'
+                si['Trigger/Stay_Triggered'] = True
+
+            # Shut it down.
+            self.button_stop.click()
+            self.tab_demod.button_sweep(False)
+
+
+
 
     def _button_force_clicked(self, *a):
         """
@@ -471,7 +617,7 @@ class soundcard():
         self.checkbox_overflow.set_checked(False)
         self.checkbox_underflow.set_checked(False)
 
-        self.t_start     = _t.time()
+        self.t_start = _t.time()
         self.tab_input.number_iteration(0)
         self.tab_input.number_missed(0)
 
@@ -585,6 +731,11 @@ class soundcard():
 
         self._shared['si'] = self.tab_input.settings.get_dictionary(short_keys=True)[1]
         self._thread_locker.unlock()
+
+    def _settings_changed_demod(self, *a):
+        """
+        When someone changes a demod setting.
+        """
 
     def _timer_status_tick(self, *a):
         """
