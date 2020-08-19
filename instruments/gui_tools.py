@@ -469,11 +469,11 @@ class waveform_designer(_g.Window):
         if name in ['Rate', 'Samples', 'Time', 'Sine', 'Square']: self._sync_channels(parent)
 
         
-class demodulator(_g.Window):
+class quadratures(_g.Window):
     """
-    Tabs for demodulation and streaming.
+    Tabs for calculating quadratures.
     """
-    def __init__(self, name='demodulator', margins=False):
+    def __init__(self, name='quadratures', margins=False):
         _g.Window.__init__(self, title=name, margins=margins, autosettings_path=name)
 
         # Internal variables
@@ -485,26 +485,27 @@ class demodulator(_g.Window):
             1000, step=0.1, dec = True,
             suffix='Hz', siPrefix = True,
             autosettings_path = name+'.number_frequency',
-            tip = 'Frequency at which to demodulate.\nNote this frequency is not guaranteed to "fit" within the\nincoming data, and may not be part of its orthonormal basis.'
+            tip = 'Frequency at which to calculate the quadratures.\nNote this frequency is not guaranteed to "fit" within the\nincoming data, and may not be part of its orthonormal basis.'
             )).set_width(120)
 
-        self.button_get_data = self.grid_top.add(_g.Button(
-            text = 'Get Data',
-            signal_clicked = self._button_get_data_clicked,
-            tip  = 'Import the data using self.get_data(). This is a dummy function you must overload.'))
+        self.button_get_raw = self.grid_top.add(_g.Button(
+            text = 'Get Raw',
+            signal_clicked = self._button_get_raw_clicked,
+            tip  = 'Import the data using self.get_raw(). This is a dummy function you must overload.'))
 
-        self.button_demodulate = self.grid_top.add(_g.Button(
-            text           = 'Demodulate',
-            signal_clicked = self._button_demodulate_clicked,
-            tip='Get the quadratures from the data source.'))
+        self.button_get_quad = self.grid_top.add(_g.Button(
+            text           = 'Get Quadratures',
+            signal_clicked = self._button_get_quad_clicked,
+            tip='Get the quadratures from the data source.').set_width(120))
 
         self.button_loop = self.grid_top.add(_g.Button(
             text           = 'Loop',
             signal_toggled = self._button_loop_toggled,
             checkable      = True,
-            tip='Repeatedly click "Get Data" and "Run".'))
+            tip='Repeatedly clicks "Get Raw" and "Get Quadratures".'))
 
-        self.number_iteration = self.grid_top.add(_g.NumberBox(int=True))
+        self.number_iteration = self.grid_top.add(_g.NumberBox(
+            0, int=True, tip='Loop iteration (zero\'th column in Quadratures plot.'))
 
         self.new_autorow()
 
@@ -512,7 +513,7 @@ class demodulator(_g.Window):
         self.tabs = self.add(_g.TabArea(autosettings_path=name+'.tabs'), alignment=0)
 
         self.tab_raw   = self.tabs.add_tab('Raw')
-        self.tab_demod = self.tabs.add_tab('Demodulated')
+        self.tab_quad = self.tabs.add_tab('Quadratures')
 
         self.plot_raw = self.tab_raw.add(_g.DataboxPlot(
             file_type         = '*.raw',
@@ -520,54 +521,56 @@ class demodulator(_g.Window):
             name              = name+'.plot_raw',
             autoscript        = 2), alignment=0)
 
-        self.tab_demod.add(_g.Label('History: '))
-        self.number_history = self.tab_demod.add(_g.NumberBox(
+        self.tab_quad.add(_g.Label('History: '))
+        self.number_history = self.tab_quad.add(_g.NumberBox(
             value  = 0,
             step   = 10,
             int    = True,
             bounds = (0, None),
             autosettings_path = name+'.number_history'))
 
-        self.tab_demod.new_autorow()
+        self.tab_quad.new_autorow()
 
-        self.plot_demod = self.tab_demod.add(_g.DataboxPlot(
-            file_type         = '*.demod',
-            autosettings_path = name+'.plot_demod',
-            name              = name+'.plot_demod',
+        self.plot_quad = self.tab_quad.add(_g.DataboxPlot(
+            file_type         = '*.quad',
+            autosettings_path = name+'.plot_quad',
+            name              = name+'.plot_quad',
             autoscript        = 1), alignment=0, column_span=3)
-        self.tab_demod.set_column_stretch(2)
+        self.tab_quad.set_column_stretch(2)
 
 
-    def _button_demodulate_clicked(self, *a):
+    def _button_get_quad_clicked(self, *a):
         """
         Called when someone clicks the Run button.
         """
-        self.demodulate()
+        self.get_quadratures()
 
 
-    def _button_get_data_clicked(self, *a):
+    def _button_get_raw_clicked(self, *a):
         """
-        Called when someone clicks "Get Data".
+        Called when someone clicks "Get Raw".
         """
-        d = self.get_data()
-        self.plot_raw.clear()
-        self.plot_raw.copy_all(d)
-        self.plot_raw.plot()
+        d = self.get_raw()
+        if d:
+            self.plot_raw.clear()
+            self.plot_raw.copy_all(d)
+            self.plot_raw.plot()
 
     def _button_loop_toggled(self, *a):
         """
         When someone toggles the Loop button.
         """
         while self.button_loop():
-            self.button_get_data.click()
-            self.button_demodulate.click()
+            self.button_get_raw.click()
+            self.button_get_quad.click()
             self.process_events()
 
-    def get_data(self):
+    def get_raw(self):
         """
         Dummy function you must overload. It needs to return a databox or
         DataboxPlot object having time-signal column pairs, e.g., t1, V1, t2, V2, ...
         """
+        print('WARNING: quadratures.get_raw() is currently a dummy function that produces simulated data.')
         d = _s.data.databox()
         t = _n.linspace(0,1,400)
         f = self.number_frequency()
@@ -577,31 +580,30 @@ class demodulator(_g.Window):
         d['V2'] = _n.random.normal(size=400)+_n.cos(2*_n.pi*f*t + 0.2)
         return d
 
-    def demodulate(self, f=None):
+    def get_quadratures(self, f=None):
         """
-        Perform a demodulation on the raw data at
-        frequency f.
+        Calculates the quadratures from the raw data at frequency f.
 
         Parameters
         ----------
         f=None : float
-            Frequency at which to perform the demodulation. If f=None, this will
+            Frequency at which to perform the quadrature calculation. If f=None, this will
             use the current value in self.number_frequency.
 
         Returns
         -------
-        The row of data added to self.plot_demod
+        The row of data added to self.plot_quad
         """
-        # Get or set the demod frequency.
+        # Get or set the quadrature frequency.
         if f==None: f = self.number_frequency()
         else:           self.number_frequency(f)
 
         # Increment
         self.number_iteration.increment()
 
-        # Get the source databox and demod plotter
+        # Get the source databox and quadrature plotter
         d = self.plot_raw
-        p = self.plot_demod
+        p = self.plot_quad
         p.copy_headers(d)
 
         # Assumed column pairs
@@ -618,7 +620,7 @@ class demodulator(_g.Window):
             X = _n.nan_to_num(X/sum(X*X))
             Y = _n.nan_to_num(Y/sum(Y*Y))
 
-            # Demodulate
+            # Get quadratures
             VX = sum(d[n+1]*X)
             VY = sum(d[n+1]*Y)
 
@@ -640,5 +642,5 @@ if __name__ == '__main__':
     self = waveform_designer(sync_samples=True, sync_rates=True).add_channels('a', 'b')
     # self.add_channel('Ch1',7000).add_channel('Ch2',5000)
 
-    #self = demodulator()
+    #self = quadratures()
     self.show()

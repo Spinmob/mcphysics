@@ -93,9 +93,11 @@ class soundcard():
         self.grid_top.set_column_stretch(self.grid_top._auto_column)
         self.grid_top._auto_column += 1
 
-        self.grid_top.add(_g.Label('    Status:'))
-        self.button_stream  = self.grid_top.add(_g.Button('Stream').set_width(70))
-        self.number_threads = self.grid_top.add(_g.NumberBox(int=True).set_width(50))
+        self.grid_top.add(_g.Label('  Status:'))
+        self.button_stream  = self.grid_top.add(_g.Button(
+            'Stream', tip='Whether the audio stream is active.').set_width(70))
+        self.number_threads = self.grid_top.add(_g.NumberBox(
+            0, int=True, tip='Number of running threads.').set_width(40))
         self.timer_status  = _g.Timer(100, signal_tick=self._timer_status_tick)
 
 
@@ -137,7 +139,7 @@ class soundcard():
 #        s.add_parameter('Trigger/Delay',      0.0,  suffix='s', siPrefix=True, tip='How long to wait after the trigger before keeping the data. Negative number means it will keep that much data before the trigger.')
 
         # Aliases and shortcuts
-        self.signal_chain = self.sc = self.tab_in.add(_gt.signal_chain(name+'.tabs_ai_plots'), alignment=0)
+        self.signal_chain    = self.tab_in.signal_chain = self.tab_in.add(_gt.signal_chain(name+'.tabs_ai_plots'), alignment=0)
         self.tab_in.plot_raw = self.signal_chain.plot_raw
         self.tab_in.A1       = self.tab_in.A1       = self.signal_chain.A1
         self.tab_in.A2       = self.tab_in.A2       = self.signal_chain.A2
@@ -149,7 +151,7 @@ class soundcard():
 
         # AO tab
         self.tab_out = self.tabs.add_tab('Output')
-        self.waveform_designer = self.wd = self.tab_out.add(
+        self.waveform_designer = self.tab_out.waveform_designer = self.tab_out.add(
             _gt.waveform_designer(channels=['L','R'],
                                   rates=self._rates,
                                   name=name+'.waveform_designer',
@@ -174,28 +176,37 @@ class soundcard():
 
 
 
-        # Demodulation tab
-        self.tab_demod = self.tabs.add_tab('Demodulation')
-        self.tab_demod.grid_left  = self.tab_demod.add(_g.GridLayout(margins=False))
-        self.tab_demod.grid_sweep = self.tab_demod.grid_left.add(_g.GridLayout(margins=False))
-        self.tab_demod.grid_left.new_autorow()
-        self.tab_demod.settings = self.tab_demod.grid_left.add(_g.TreeDictionary(
-            autosettings_path  = name+'.tab_demod.settings',
-            name               = name+'.tab_demod.settings',
-            new_signal_changed = self._settings_changed_demod))
-        self.tab_demod.demodulator = self.tab_demod.add(_gt.demodulator(name+'.tab_demod.demodulator'), alignment=0)
+        # Quadratures tab
+        self.tab_quad = self.tabs.add_tab('Quadratures')
+        self.tab_quad.grid_left   = self.tab_quad.add(_g.GridLayout(margins=False))
+        self.tab_quad.grid_sweep  = self.tab_quad.grid_left.add(_g.GridLayout(margins=False), alignment=0)
+        self.tab_quad.grid_left.new_autorow()
+        self.tab_quad.settings = self.tab_quad.grid_left.add(_g.TreeDictionary(
+            autosettings_path  = name+'.tab_quad.settings',
+            name               = name+'.tab_quad.settings',
+            new_signal_changed = self._settings_changed_quad))
+        self.quadratures = self.tab_quad.quadratures = self.tab_quad.add(_gt.quadratures(name+'.tab_quad.quadratures'), alignment=0)
 
         # Add the sweep controls
-        self.tab_demod.button_sweep = self.tab_demod.grid_sweep.add(_g.Button(
-            text            = 'Sweep Frequency',
+        self.tab_quad.button_sweep = self.tab_quad.grid_sweep.add(_g.Button(
+            text            = 'Sweep',
             checkable       = True,
-            signal_toggled  = self._button_sweep_frequency_toggled).set_width(130))
+            signal_toggled  = self._button_sweep_frequency_toggled), 0,1)
 
-        self.tab_demod.number_step = self.tab_demod.grid_sweep.add(_g.NumberBox(
-            0, int=True, bounds=(0,None), tip='Current step number.'))
+        self.tab_quad.grid_sweep.add(_g.Label('Step:'), 2,0, alignment=2)
+        self.tab_quad.number_step = self.tab_quad.grid_sweep.add(_g.NumberBox(
+            0, int=True, bounds=(0,None), tip='Current step number.'), 3, 0)
+        self.tab_quad.grid_sweep.set_column_stretch(1)
+        
+        self.tab_quad.grid_sweep.add(_g.Label('Iteration:'), 2,1, alignment=2)
+        self.tab_quad.number_iteration = self.tab_quad.grid_sweep.add(_g.NumberBox(
+            0, int=True, bounds=(0,None), tip='Iteration at this frequency.'), 3,1)
+        
+
+        
 
         # Add the sweep settings
-        s = self.tab_demod.settings
+        s = self.tab_quad.settings
 
         s.add_parameter('Output/Left_Amplitude', 0.1, step=0.01,
             suffix = '', siPrefix = True,
@@ -219,28 +230,33 @@ class soundcard():
         s.add_parameter('Sweep/Steps', 10.0, dec=True,
             tip = 'Number of steps from start to stop.')
 
-        s.add_parameter('Sweep/Settle', 0.2, dec=True,
+        s.add_parameter('Sweep/Settle', 0.1, dec=True,
             suffix = 's', siPrefix = True,
             tip = 'How long to settle after changing the frequency.')
 
-        s.add_parameter('Sweep/Collect', 0.2, dec=True,
+        s.add_parameter('Sweep/Collect', 0.1, dec=True,
             suffix = 's', siPrefix = True,
             tip = 'Minimum amount of data to collect (will be an integer number of periods).')
 
-        s.add_parameter('Sweep/Repeat', 1, dec=True,
-            suffix='reps', siPrefix=True,
-            tip = 'How many times to repeat the demod at each step after settling.')
+        s.add_parameter('Sweep/Iterations', 1.0, dec=True,
+            suffix='reps', bounds=(1,None), siPrefix=True,
+            tip = 'How many times to repeat the quadrature measurement at each step after settling.')
 
         s.add_parameter('Sweep/Log', False,
             tip = 'Whether to use log-spaced steps between Start and Stop.')
 
-        self.tab_demod.plot_raw   = self.tab_demod.demodulator.plot_raw
-        self.tab_demod.plot_demod = self.tab_demod.demodulator.plot_demod
+        self.tab_quad.plot_raw  = self.tab_quad.quadratures.plot_raw
+        self.tab_quad.plot_quad = self.tab_quad.quadratures.plot_quad
 
+        # Modify the existing buttons because this system is so weird.
+        self.tab_quad.quadratures.button_get_raw.set_checkable(True).set_text('Get Data')
+        self.tab_quad.quadratures.button_get_raw.signal_toggled.connect(self._button_quad_get_raw_toggled)
+        self.tab_quad.quadratures.get_raw = lambda *a : None  # Kill the fake data.
+        
         # Sweep signals
         self.signal_sweep_iterate  = _s.thread.signal(self._sweep_iterate)
         self.signal_waveform_ok    = _s.thread.signal(self._sweep_waveform_ok)
-        self.signal_sweep_new_data = _s.thread.signal(self._sweep_new_data)
+        self.signal_quad_new_data = _s.thread.signal(self._quad_new_data)
         self.signal_sweep_done     = _s.thread.signal(self._sweep_done)
 
         # Start the timer
@@ -249,37 +265,55 @@ class soundcard():
         # Show the window
         if show: self.window.show(block)
 
+    def _button_quad_get_raw_toggled(self, *a):
+        """
+        Someone toggles the get_raw button.
+        """
+        # Make sure the record button is clicked.
+        self.button_record(self.quadratures.button_get_raw())
+        
     def _button_sweep_frequency_toggled(self, *a):
         """
         When someone toggles "Sweep".
         """
         # Start the process.
-        if self.tab_demod.button_sweep(): self.signal_sweep_iterate.emit(0)
-        else:                             self.signal_sweep_done.emit(None)
+        if self.tab_quad.button_sweep(): self.signal_sweep_iterate.emit((0,0))
+        else:                            self.signal_sweep_done.emit(None)
 
-    def _sweep_iterate(self, n):
+    def _sweep_iterate(self, a):
         """
         Performs one iteration and increments the counter.
+        
+        n is the zero-referenced step, and i is the zero-referenced
+        iteration at this step.
+        
         """
-        # Get the current target frequency
-        f_target = self._get_sweep_frequency(n)
-
+        # Unpack the data
+        n, i = a
+        
         # If we're done.
-        if f_target is None or not self.tab_demod.button_sweep(): 
-            self.tab_demod.button_sweep(False)
+        if n >= self.tab_quad.settings['Sweep/Steps'] or not self.tab_quad.button_sweep(): 
+            self.tab_quad.button_sweep(False)
             return
 
+        # Update the user; we do iteration after data comes in.
+        self.tab_quad.number_step(n+1)
+        self.tab_quad.number_iteration(i+1)
+        
+        # We only have to set up the output and let it settle 
+        # if we're starting a new frequency
+        if i > 0: 
+            self.quadratures.button_get_raw(True)
+            return
+        
+        # Get the current target frequency
+        f_target = self._get_sweep_frequency(n)
+        
         # Shortcuts
-        pd = self.tab_demod.plot_raw
-        sd = self.tab_demod.settings
+        pd = self.tab_quad.plot_raw
+        sd = self.tab_quad.settings
         so = self.tab_out.settings
         si = self.tab_in.settings
-
-        # Update the user
-        self.tab_demod.number_step(n+1)
-
-        # Set the number of iterations at each frequency
-        self.tab_in.settings['Iterations'] = self.tab_demod.settings['Sweep/Repeat']
 
         # Clear the raw plot and start over.
         pd.clear()
@@ -311,9 +345,9 @@ class soundcard():
         self.waveform_designer.update_design()
         self._thread_locker.unlock()
 
-        # Update the ACTUAL demod frequency
+        # Update the ACTUAL quadrature frequency
         f = so['Left/Sine']
-        self.tab_demod.demodulator.number_frequency(f)
+        self.tab_quad.quadratures.number_frequency(f)
         
         # Figure out how many samples we need to have a integer number of periods AND be larger
         # than our collect time.
@@ -324,48 +358,47 @@ class soundcard():
         else:
             samples = _n.round(float(self.combo_rate.get_text())*sd['Sweep/Collect'])
        
+        si['Iterations'] = 0
         si['Samples'] = samples
-        self.window.process_events()
         si['Trigger'] = 'Continuous'
         
         # If we haven't started yet, start playing
-        if not self.button_play(): self.button_play(True)
+        self.button_play(True)
 
         # Tell it to look for a new waveform. It will emit a signal when it gets this.
         self._set_shared(new_waveform = True)
-
+        
 
     def _sweep_waveform_ok(self, a):
         """
         Signal emitted when the thread receives the new waveform and will begin
         buffering it.
         """
+        # Wait for the settle time, but only on the first iteration
+        self.window.sleep(self.tab_quad.settings['Sweep/Settle'])
 
-        # Wait for the settle time
-        self.window.sleep(self.tab_demod.settings['Sweep/Settle'])
+        # Now start collecting.
+        self.quadratures.button_get_raw(True)
 
-        # Now start collecting until we have enough data.
-        self.button_record(True)
-
-        # When there is another data set, it will emit a signal connected to
-        # self._sweep_new_data
-
-    def _sweep_new_data(self, a):
+    def _quad_new_data(self, a):
         """
-        Called when the input has new data to demodulate.
+        Called when the input has new data to get the quadratures from.
         """
-        data, underflow, overflow = a
-        
-        print(self.tab_demod.number_step()-1, underflow, overflow)
+        data, underflow, overflow, get_quadratures = a
         
         # If there was an error, retry the point.
         if underflow or overflow:
-            self.signal_sweep_iterate.emit(self.tab_demod.number_step()-1)
+            self.signal_sweep_iterate.emit(
+                (self.tab_quad.number_step()-1, self.tab_quad.number_iteration()-1))
             return
         
         # Otherwise, it's valid, so analyze.
+
+        # Shortcuts
         pr = self.tab_in.plot_raw
-        pd = self.tab_demod.plot_raw
+        pd = self.tab_quad.plot_raw
+        I  = self.tab_quad.number_iteration
+        S  = self.tab_quad.number_step
 
         # Clear and import the header
         pd.clear()
@@ -378,22 +411,26 @@ class soundcard():
 
         pd.plot().autosave()
         
-        # Run the demodulation
-        self.tab_demod.demodulator.button_demodulate.click()
+        # Run the quadrature calculation
+        if get_quadratures: self.tab_quad.quadratures.button_get_quad.click()
 
         # Turn off record and reset the trigger
-        self.button_record(False)
+        self.quadratures.button_get_raw(False)
 
-        # Next step!
-        self.signal_sweep_iterate.emit(self.tab_demod.number_step())
+        # Next frequency
+        if I() >= self.tab_quad.settings['Sweep/Iterations']:
+            I(0)
+            self.signal_sweep_iterate.emit((S(), I()))
+        
+        # Next iteration
+        else: self.signal_sweep_iterate.emit((S()-1, I()))
 
     def _sweep_done(self, a):
         """
         Called when the sweep is done.
         """
-        print('Sweep Done')
         # Shut it down.
-        self.tab_demod.button_sweep(False)
+        self.tab_quad.button_sweep(False)
         self.button_playrecord(False)
         self.button_play(False)
         self.button_record(False)
@@ -402,7 +439,7 @@ class soundcard():
         """
         Returns the nth sweep frequency.
         """
-        sd = self.tab_demod.settings
+        sd = self.tab_quad.settings
 
         # Get the frequency list.
         if sd['Sweep/Log']:
@@ -447,7 +484,7 @@ class soundcard():
             if not self._shared['stream']: self._start_stream()
 
         else: self.button_play.set_colors(None, None)
-
+                
         self._thread_locker.unlock()
         # Otherwise we let it finish on its own.
 
@@ -739,11 +776,22 @@ class soundcard():
             self.tab_in.plot_raw.autosave()
             self.signal_chain.run()
 
-            # If we're running a sweep, send the data to the demodulation raw
-            if self.tab_demod.button_sweep(): self.signal_sweep_new_data.emit((data, underflow, overflow))
+            # If we're running a sweep, send the data to the quadratures raw
+            # We also send the sweep state to indicate whether that function
+            # should automatically get the quadratures.
+            if self.quadratures.button_get_raw(): 
+                self.signal_quad_new_data.emit(
+                    (data, underflow, overflow, self.tab_quad.button_sweep()))
 
-            # Reset the ready flag
-            self._ready_for_more_data = True
+            # If we've hit the iteration limit, uncheck record
+            if self.tab_in.number_iteration() >= self.tab_in.settings['Iterations'] \
+            and not self.tab_in.settings['Iterations'] == 0:
+                self.button_playrecord(False)
+                self.button_record(False)
+                self.button_play(False)
+                
+            # Otherwise get the next data.
+            else: self._ready_for_more_data = True
 
         # Otherwise, we haven't finished processing the previous data yet.
         else: self.tab_in.number_missed.increment()
@@ -875,9 +923,9 @@ class soundcard():
         self._shared['si'] = self.tab_in.settings.get_dictionary(short_keys=True)[1]
         self._thread_locker.unlock()
 
-    def _settings_changed_demod(self, *a):
+    def _settings_changed_quad(self, *a):
         """
-        When someone changes a demod setting.
+        When someone changes a quad setting.
         """
 
     def _set_shared(self, **kwargs):
