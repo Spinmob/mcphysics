@@ -144,24 +144,34 @@ class waveform_designer(_g.Window):
 
     Parameters
     ----------
-    channels=['Ch1','Ch2']
-        Names of available channels.
+    
     rates=1000
         Can be a list of available output rates (Hz, numbers or strings), or number (Hz).
         You are responsible for overloading self.get_rate if you use a list of strings!
+    
     name='waveform_designer'
         Unique identifier for autosettings. Make sure it is unique!
+    
     sync_rates=False
         Set to True to automatically synchronize the rates between channels.
+    
     sync_samples=False
         Set to True to automatically synchronize the number of output samples between channels.
+    
     margins=False
         Whether to include margins around this.
+        
+    get_rate=None
+        Optional function to overload the default self.get_rate()
 
     **kwargs are sent to the waveform DataboxPlot.
     """
-    def __init__(self, channels=['Ch1','Ch2'], rates=1000, name='waveform_designer', sync_rates=False, sync_samples=False, margins=False, **kwargs):
+    def __init__(self, rates=1000, name='waveform_designer', 
+                 sync_rates=False, sync_samples=False, margins=False, get_rate=None, **kwargs):
         _g.Window.__init__(self, title=name, margins=margins, autosettings_path=name)
+
+        # Overload
+        if get_rate: self.get_rate = get_rate
 
         # Remember these specifications
         self.name=name
@@ -169,7 +179,6 @@ class waveform_designer(_g.Window):
         self.sync_samples = sync_samples
         self._rates = rates
         self._channels = []
-
 
         # Settings tabs
         self.new_autorow()
@@ -185,6 +194,7 @@ class waveform_designer(_g.Window):
         self.tab_design.new_autorow()
         self.plot_design = self.tab_design.add(_g.DataboxPlot(file_type='*.w', autosettings_path=name+'.plot_design', autoscript=2, **kwargs), alignment=0)
 
+        
     def _get_nearest_frequency_settings(self, key):
         """
         Finds the closest frequency possible for the current settings, then
@@ -498,6 +508,11 @@ class quadratures(_g.Window):
             signal_clicked = self._button_get_quad_clicked,
             tip='Get the quadratures from the data source.').set_width(120))
 
+        self.checkbox_auto = self.grid_top.add(_g.CheckBox(
+            text              = 'Auto',
+            autosettings_path = name+'.checkbox_auto',
+            tip='Automatically get quadratures for all incoming data.'))
+
         self.button_loop = self.grid_top.add(_g.Button(
             text           = 'Loop',
             signal_toggled = self._button_loop_toggled,
@@ -512,7 +527,7 @@ class quadratures(_g.Window):
         # Tabs for plot
         self.tabs = self.add(_g.TabArea(autosettings_path=name+'.tabs'), alignment=0)
 
-        self.tab_raw   = self.tabs.add_tab('Raw')
+        self.tab_raw   = self.tabs.add_tab('Quadratures Raw Data')
         self.tab_quad = self.tabs.add_tab('Quadratures')
 
         self.plot_raw = self.tab_raw.add(_g.DataboxPlot(

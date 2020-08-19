@@ -5,7 +5,8 @@ import numpy       as _n
 import time        as _t
 import os          as _os
 _g  = _egg.gui
-_gt = _mp.instruments._gui_tools
+try:    from . import gui_tools as _gt
+except: _gt = _mp.instruments._gui_tools
 _p  = _mp._p
 
 _debug=True
@@ -152,14 +153,12 @@ class soundcard():
         # AO tab
         self.tab_out = self.tabs.add_tab('Output')
         self.waveform_designer = self.tab_out.waveform_designer = self.tab_out.add(
-            _gt.waveform_designer(channels=['L','R'],
-                                  rates=self._rates,
+            _gt.waveform_designer(rates=self._rates,
                                   name=name+'.waveform_designer',
                                   sync_rates=True,
                                   sync_samples=True),
             alignment=0)
-        self.waveform_designer.add_channel('Left')
-        self.waveform_designer.add_channel('Right')
+        self.waveform_designer.add_channels('Left','Right')
 
         # aliases and shortcuts
         self.tab_out.plot_design = self.waveform_designer.plot_design
@@ -361,6 +360,9 @@ class soundcard():
         si['Iterations'] = 0
         si['Samples'] = samples
         si['Trigger'] = 'Continuous'
+        
+        # Uncheck auto mode (handled by Get Raw button)
+        self.quadratures.checkbox_auto(False)
         
         # If we haven't started yet, start playing
         self.button_play(True)
@@ -779,9 +781,9 @@ class soundcard():
             # If we're running a sweep, send the data to the quadratures raw
             # We also send the sweep state to indicate whether that function
             # should automatically get the quadratures.
-            if self.quadratures.button_get_raw(): 
+            if self.quadratures.button_get_raw() or self.quadratures.checkbox_auto(): 
                 self.signal_quad_new_data.emit(
-                    (data, underflow, overflow, self.tab_quad.button_sweep()))
+                    (data, underflow, overflow, self.tab_quad.button_sweep() or self.quadratures.checkbox_auto()))
 
             # If we've hit the iteration limit, uncheck record
             if self.tab_in.number_iteration() >= self.tab_in.settings['Iterations'] \
