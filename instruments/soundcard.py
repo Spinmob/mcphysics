@@ -131,7 +131,7 @@ class soundcard():
         s.add_parameter('Time',       0.0, bounds=(1e-9, None), dec=True, siPrefix=True, suffix='s', tip='Duration of recording (synced with Rate and Samples).')
         s.add_parameter('Trigger', ['Continuous', 'Left', 'Right'], tip='Trigger Mode')
         s.add_parameter('Trigger/Level',      0.0,  step=0.01, bounds=(-1,1), tip='Trigger level')
-        s.add_parameter('Trigger/Hysteresis', 0.01, step=0.01, bounds=(0,2), dec=True, tip='How far on the other side of the trigger the signal must go before retriggering is allowed.')
+        s.add_parameter('Trigger/Hysteresis', 0.0, step=0.01, bounds=(0,2), tip='How far on the other side of the trigger the signal must go before retriggering is allowed.')
         s.add_parameter('Trigger/Mode', ['Rising Edge', 'Falling Edge'], tip='Trigger on the rising or falling edge.')
         s.add_parameter('Trigger/Stay_Triggered', False, tip='After triggering, remain triggered to collect continuous data thereafter.')
 #        s.add_parameter('Trigger/Delay',      0.0,  suffix='s', siPrefix=True, tip='How long to wait after the trigger before keeping the data. Negative number means it will keep that much data before the trigger.')
@@ -177,7 +177,6 @@ class soundcard():
         # Demodulation tab
         self.tab_demod = self.tabs.add_tab('Demodulation')
         self.tab_demod.grid_left  = self.tab_demod.add(_g.GridLayout(margins=False))
-
         self.tab_demod.grid_sweep = self.tab_demod.grid_left.add(_g.GridLayout(margins=False))
         self.tab_demod.grid_left.new_autorow()
         self.tab_demod.settings = self.tab_demod.grid_left.add(_g.TreeDictionary(
@@ -197,16 +196,14 @@ class soundcard():
 
         # Add the sweep settings
         s = self.tab_demod.settings
-        s.add_parameter('Output/Signal_Channel', ['Left', 'Right'],
-            tip = 'Which channel to use for the sinusoidal output. The other channel will serve as a trigger edge.')
 
-        s.add_parameter('Output/Signal_Amplitude', 0.1, step=0.01,
+        s.add_parameter('Output/Left_Amplitude', 0.1, step=0.01,
             suffix = '', siPrefix = True,
-            tip = 'Amplitude of output sinusoid.')
+            tip = 'Amplitude of left channel output cosine.')
 
-        s.add_parameter('Output/Trigger_Amplitude', 0.1, step=0.1,
+        s.add_parameter('Output/Right_Amplitude', 1.0, step=0.1,
             suffix = '', siPrefix = True,
-            tip = 'Amplitude of output trigger.')
+            tip = 'Amplitude of right channel output cosine.')
 
         s.add_parameter('Input/Signal_Channel', ['Left', 'Right'],
             tip = 'Which channel to use for the signal input. The other channel will be used to trigger.')
@@ -222,17 +219,13 @@ class soundcard():
         s.add_parameter('Sweep/Steps', 10.0, dec=True,
             tip = 'Number of steps from start to stop.')
 
-        s.add_parameter('Sweep/Settle', 0.05, dec=True,
+        s.add_parameter('Sweep/Settle', 0.2, dec=True,
             suffix = 's', siPrefix = True,
             tip = 'How long to settle after changing the frequency.')
 
         s.add_parameter('Sweep/Collect', 0.2, dec=True,
             suffix = 's', siPrefix = True,
             tip = 'Minimum amount of data to collect (will be an integer number of periods).')
-
-        s.add_parameter('Sweep/Block', 0.05, dec=True,
-            suffix = 's', siPrefix = True,
-            tip = 'While waiting and collecting, chop the incoming data into blocks of this length.')
 
         s.add_parameter('Sweep/Repeat', 1, dec=True,
             suffix='reps', siPrefix=True,
@@ -262,6 +255,7 @@ class soundcard():
         """
         # Start the process.
         if self.tab_demod.button_sweep(): self.signal_sweep_iterate.emit(0)
+        else:                             self.signal_sweep_done.emit(None)
 
     def _sweep_iterate(self, n):
         """
@@ -271,8 +265,8 @@ class soundcard():
         f_target = self._get_sweep_frequency(n)
 
         # If we're done.
-        if f_target is None or not self.tab_demod.button_sweep():
-            self.signal_sweep_done.emit(None)
+        if f_target is None or not self.tab_demod.button_sweep(): 
+            self.tab_demod.button_sweep(False)
             return
 
         # Shortcuts
@@ -290,47 +284,50 @@ class soundcard():
         # Clear the raw plot and start over.
         pd.clear()
 
-        # Set up the output
-        if sd['Output/Signal_Channel'] == 'Left':
-            out_signal  = 'Left'
-            out_trigger = 'Right'
+        # Setup the output waveform without emitting signals.
+        output_settings = {
+            'Left/Waveform'        : 'Sine',
+            'Left/Sine'            : f_target,
+            'Left/Sine/Phase'      : 90,
+            'Left/Sine/Amplitude'  : sd['Output/Left_Amplitude'],
+            
+            'Right/Waveform'       : 'Sine',
+            'Right/Sine/Phase'     : 90,
+            'Right/Sine/Amplitude' : sd['Output/Right_Amplitude'],
+            
+            'Left' : True,
+            'Right': True,
+            'Left/Loop'  : True,
+            'Right/Loop' : True,
+            }
+        so.update(output_settings, block_key_signals=True)
+        
+        # Calculate and update the rest of the settings.
+        self.waveform_designer.update_other_quantities_based_on('Left/Sine')
+        so.set_value('Right/Sine/Cycles', so['Left/Sine/Cycles'], block_key_signals=True)
+
+        # Update the design and plot.
+        self._thread_locker.lock()
+        self.waveform_designer.update_design()
+        self._thread_locker.unlock()
+
+        # Update the ACTUAL demod frequency
+        f = so['Left/Sine']
+        self.tab_demod.demodulator.number_frequency(f)
+        
+        # Figure out how many samples we need to have a integer number of periods AND be larger
+        # than our collect time.
+        if f:
+            periods            = _n.ceil(sd['Sweep/Collect']*f) # Number of periods to span our collection time.
+            samples_per_period = float(self.combo_rate.get_text())/f
+            samples = _n.round(periods*samples_per_period)
         else:
-            out_signal  = 'Right'
-            out_trigger = 'Left'
-
-        so[out_signal+'/Waveform']      = 'Sine'
-        so[out_signal+'/Sine']          = f_target
-        so[out_signal+'/Sine/Phase']     = 90
-        so[out_signal+'/Sine/Amplitude'] = sd['Output/Signal_Amplitude']
-
-        so[out_trigger+'/Waveform']      = 'Square'
-        so[out_trigger+'/Square/Cycles'] = 1
-        so[out_trigger+'/Square/High']   =  sd['Output/Trigger_Amplitude']
-        so[out_trigger+'/Square/Low']    = -sd['Output/Trigger_Amplitude']
-        so[out_trigger+'/Square/Width']  = 0.5
-
-        # Set some enable flags.
-        so['Left' ] = so['Left/Loop' ] = True
-        so['Right'] = so['Right/Loop'] = True
-
-        # Let it calculate and update the rest of the settings.
+            samples = _n.round(float(self.combo_rate.get_text())*sd['Sweep/Collect'])
+       
+        si['Samples'] = samples
         self.window.process_events()
-
-        # Update the ACTUAL frequency
-        self.tab_demod.demodulator.number_frequency(so[out_signal+'/Sine'])
-        f = so[out_signal+'/Sine']
-
-        # Make the input settings match
-        if sd['Input/Signal_Channel'] == 'Left': in_trigger = 'Right'
-        else:                                    in_trigger = 'Left'
-
-        si['Samples'] = int(_n.round(sd['Sweep/Block']*float(si['Rate'])))
-        self.window.process_events()
-        si['Trigger'] = in_trigger
-        si['Trigger/Level'] = 0
-        si['Trigger/Mode']  = 'Rising Edge'
-        si['Trigger/Stay_Triggered'] = True
-
+        si['Trigger'] = 'Continuous'
+        
         # If we haven't started yet, start playing
         if not self.button_play(): self.button_play(True)
 
@@ -357,6 +354,16 @@ class soundcard():
         """
         Called when the input has new data to demodulate.
         """
+        data, underflow, overflow = a
+        
+        print(self.tab_demod.number_step()-1, underflow, overflow)
+        
+        # If there was an error, retry the point.
+        if underflow or overflow:
+            self.signal_sweep_iterate.emit(self.tab_demod.number_step()-1)
+            return
+        
+        # Otherwise, it's valid, so analyze.
         pr = self.tab_in.plot_raw
         pd = self.tab_demod.plot_raw
 
@@ -369,11 +376,13 @@ class soundcard():
             pd['t_'+k] = pr['t']
             pd[k]  = pr[k]
 
-        pd.plot()
+        pd.plot().autosave()
+        
+        # Run the demodulation
+        self.tab_demod.demodulator.button_demodulate.click()
 
         # Turn off record and reset the trigger
         self.button_record(False)
-        self.tab_in.settings['Trigger/Stay_Triggered'] = False
 
         # Next step!
         self.signal_sweep_iterate.emit(self.tab_demod.number_step())
@@ -382,12 +391,13 @@ class soundcard():
         """
         Called when the sweep is done.
         """
+        print('Sweep Done')
         # Shut it down.
+        self.tab_demod.button_sweep(False)
         self.button_playrecord(False)
         self.button_play(False)
         self.button_record(False)
-        self.tab_demod.button_sweep(False)
-
+        
     def _get_sweep_frequency(self, n):
         """
         Returns the nth sweep frequency.
@@ -454,8 +464,9 @@ class soundcard():
         if self.button_record():
 
             # We're starting over, so clear the stream if it exists.
-            if self._shared['stream']:
+            if self._shared['stream']: 
                 self._shared['stream'].read(self._shared['stream'].read_available)
+                self._shared['abort'] = True
 
             # Otherwise start the stream.
             else: self._start_stream()
@@ -499,6 +510,9 @@ class soundcard():
 
         # Store some thread variables
         self._shared.update(dict(
+            underflow     = False,
+            overflow      = False,
+            abort         = False,
             si            = self.tab_in.settings.get_dictionary(short_keys=True)[1],
             triggered     = self.tab_in.button_triggered(),
             trigger_type  = si['Trigger'],
@@ -530,9 +544,14 @@ class soundcard():
         ni = 0
         Ni = int(self._shared['si']['Samples'])
         buffer_in = _n.zeros((Ni,2), dtype=_n.float32)
+        underflow = False
+        overflow  = False
+        
+        # Prevent slowdown for large index
+        self._shared['no'] = self._shared['no'] % len(self._shared['L'])
 
         # If we changed the waveform, let the world know we have it.
-        if self._shared['new_waveform']:
+        if 'new_waveform' in self._shared.keys() and self._shared['new_waveform']:
             self._shared['new_waveform'] = False
             self.signal_waveform_ok.emit(None)
 
@@ -561,7 +580,7 @@ class soundcard():
                 n1 = self._shared['no']
                 n2 = self._shared['no']+self._shared['stream'].write_available
 
-                # Get the arrays to send out
+                # Wrap slows down for big indices. 
                 L = _n.take(self._shared['L'], range(n1,n2), mode='wrap')
                 R = _n.take(self._shared['R'], range(n1,n2), mode='wrap')
 
@@ -569,7 +588,9 @@ class soundcard():
                 oops_out = self._shared['stream'].write(
                     _n.ascontiguousarray(
                         _n.array([L, R], dtype=_n.float32).transpose() ) )
-                if oops_out: self._signal_output_underflow.emit(None)
+                if oops_out: 
+                    underflow = self._shared['underflow'] = True
+                    self._signal_output_underflow.emit(None)
 
                 # Update the current index
                 self._shared['no'] = n2
@@ -586,7 +607,9 @@ class soundcard():
 
                 # Get what's available
                 data, oops_in = self._shared['stream'].read(n2-n1)
-                if oops_in: self._signal_input_overflow.emit(None)
+                if oops_in: 
+                    overflow = self._shared['overflow'] = True
+                    self._signal_input_overflow.emit(None)
 
                 # If we're already triggered, collect the data
                 if self._shared['triggered'] \
@@ -646,7 +669,8 @@ class soundcard():
 
                     # If we're full or have stopped, break out; emits signal_done
                     if n2 == Ni:
-                        self._signal_push_pull_done.emit(buffer_in if button_record else None)
+                        self._signal_push_pull_done.emit(
+                            (buffer_in, underflow, overflow) if button_record and not self._shared['abort'] else None)
                         self._thread_locker.unlock()
                         return
 
@@ -667,7 +691,7 @@ class soundcard():
         self._signal_push_pull_done.emit(None)
         return
 
-    def _push_pull_done(self, data):
+    def _push_pull_done(self, a):
         """
         A complete data set has been collected.
         """
@@ -695,7 +719,9 @@ class soundcard():
         # Now, if we're ready to process this data, do so.
         # This will be happening in parallel with the thread, so
         # make sure it doesn't touch _thread_shared_data or stream
-        if self._ready_for_more_data and not data is None:
+        if self._ready_for_more_data and not a is None:
+
+            (data, underflow, overflow) = a            
 
             self._ready_for_more_data = False
 
@@ -714,7 +740,7 @@ class soundcard():
             self.signal_chain.run()
 
             # If we're running a sweep, send the data to the demodulation raw
-            if self.tab_demod.button_sweep(): self.signal_sweep_new_data.emit(None)
+            if self.tab_demod.button_sweep(): self.signal_sweep_new_data.emit((data, underflow, overflow))
 
             # Reset the ready flag
             self._ready_for_more_data = True
@@ -865,11 +891,13 @@ class soundcard():
     def _get_shared(self, key, return_type):
         """
         Returns a copy of an object from self._shared in a thread-safe way.
+        
+        Returns None if the key doesn't exist.
 
         return_type is the function that does the copying, e.g. int.
         """
         self._thread_locker.lock()
-        x = return_type(self._shared[key])
+        x = return_type(self._shared[key]) if key in self._shared.keys() else None
         self._thread_locker.unlock()
         return x
 

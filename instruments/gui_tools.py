@@ -51,14 +51,20 @@ def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=20
     # How close each option is to an integer.
     residuals = _n.minimum(abs(options-_n.ceil(options)), abs(options-_n.floor(options)))
 
-    # Now we can get the number of cycles
-    c = _n.where(residuals==min(residuals))[0][0]
-
-    # Now we can get the number of samples
-    N = int(_n.round(N1*(c+min_cycles)))
-
-    # If this is below the minimum value, set it to the minimum
-    if N < min_samples: N = min_samples
+    # Find the best fit.
+    if len(residuals): 
+        
+        # Now we can get the number of cycles
+        c = _n.where(residuals==min(residuals))[0][0]
+    
+        # Now we can get the number of samples
+        N = int(_n.round(N1*(c+min_cycles)))
+    
+        # If this is below the minimum value, set it to the minimum
+        if N < min_samples: N = min_samples
+    
+    # Single period does not fit. Use the maximum number of samples to get the lowest possible frequency.
+    else: N = max_samples
 
     # Now, given this number of points, which might include several oscillations,
     # calculate the actual closest frequency
@@ -193,8 +199,8 @@ class waveform_designer(_g.Window):
             max_samples = self.settings[channel+'/Samples/Max'])
 
         # Now update the settings
-        self.settings[channel+'/Samples'] = samples
-        self.settings[key+'/Cycles']      = cycles
+        self.settings.set_value(channel+'/Samples', samples, block_key_signals=True)
+        self.settings.set_value(key    +'/Cycles' , cycles,  block_key_signals=True)
 
     def _generate_waveform(self, channel='Ch1'):
         """
@@ -257,24 +263,14 @@ class waveform_designer(_g.Window):
         When someone changes the ao settings, update the waveform.
         """
         if len(a):
-            name = a[0].name()
-            key = self.settings.get_key(a[0])
-
-            # Update the other quantities for this channel
-            self._sync_rates_samples_time(key)
-
-            # Sync the other settings if we're supposed to.
-            if name in ['Rate', 'Samples', 'Time']:
-                self._sync_channels(a[0].parent().name())
-
-            # If it's a frequency, we have to calculate the closest possible
-            elif name in ['Sine', 'Square']: self._get_nearest_frequency_settings(key)
+            # Update the other quantities in the settings
+            self.update_other_quantities_based_on(self.settings.get_key(a[0]))
 
         # Select the appropriate waveform
         for c in self._channels: self._settings_select_waveform(c)
 
         # Update the other parameters and generate waveforms
-        self._update_design()
+        self.update_design()
 
         # After settings changed
         self.after_settings_changed(*a)
@@ -326,7 +322,7 @@ class waveform_designer(_g.Window):
                     self.settings.set_value(c+'/Time',    self.settings[channel+'/Time'],    block_key_signals=True)
 
 
-    def _update_design(self):
+    def update_design(self):
         """
         Updates the design waveform based on the current settings.
         """
@@ -454,8 +450,25 @@ class waveform_designer(_g.Window):
         """
         return float(self.settings[channel+'/Rate'])
 
+    def update_other_quantities_based_on(self, key):
+        """
+        Given the "master" key, (e.g. 'Rate'), calculate and update all other
+        dependent quantities, and sync channels if we're supposed to.
+        """
+        
+        # Update the other quantities for this channel
+        self._sync_rates_samples_time(key)
+        
+        name   = key.split('/')[-1]
+        parent = key.split('/')[-2]
+        
+        # If it's a frequency, we have to calculate the closest possible
+        if name in ['Sine', 'Square']: self._get_nearest_frequency_settings(key)
 
+        # Sync the other channel settings if we're supposed to.
+        if name in ['Rate', 'Samples', 'Time', 'Sine', 'Square']: self._sync_channels(parent)
 
+        
 class demodulator(_g.Window):
     """
     Tabs for demodulation and streaming.
