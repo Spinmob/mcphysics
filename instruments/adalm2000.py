@@ -12,7 +12,7 @@ import mcphysics as _mp
 import spinmob   as _s
 import spinmob.egg as _egg
 _g = _egg.gui
-try: from . import gui_tools as _gt 
+try: from . import gui_tools as _gt
 except: _gt = _mp.instruments._gui_tools
 
 import traceback as _traceback
@@ -885,7 +885,7 @@ class adalm2000():
         self.tab_ao =self.tabs.add_tab('Analog Out')
 
         wd = self.waveform_designer = self.tab_ao.waveform_designer = self.tab_ao.add(_gt.waveform_designer(
-            rates = ['75 MHz', '7.5 MHz', '750 kHz', '75 kHz', '7.5 kHz', '750 Hz'], 
+            rates = ['75 MHz', '7.5 MHz', '750 kHz', '75 kHz', '7.5 kHz', '750 Hz'],
             name = self.name+'.waveform_designer',
             sync_rates=False,
             sync_samples=False,
@@ -897,24 +897,24 @@ class adalm2000():
 
         to.tab_sent  = wd.tabs_plots.add_tab('Last Sent Waveform')
         to.plot_sent = wd.plot_sent = to.tab_sent.add(_g.DataboxPlot(
-            '*.w', autosettings_path=self.name+'.waveform_designer.plot_sent', 
+            '*.w', autosettings_path=self.name+'.waveform_designer.plot_sent',
             autoscript=2), alignment=0)
         to.plot_design = wd.plot_design
-        
+
         wd.grid_controls = wd.tab_settings.add(_g.GridLayout(margins=False), 0,0, alignment=0)
-        
+
         to.button_send = wd.grid_controls.add(_g.Button(
             'Send', checkable=True,
             signal_clicked=self._ao_button_send_clicked,
             tip='Send the designed waveform to the actual analog outputs.'))
-        
+
         to.checkbox_auto = wd.grid_controls.add(_g.CheckBox(
             'Auto', autosettings_path=self.name+'.tab_ao.checkbox_auto',
             signal_toggled=self._ao_after_settings_changed,
             tip='Automatically send the designed waveform whenever it changes.'))
-        
+
         to.button_stop = wd.grid_controls.add(_g.Button(
-            'Stop', 
+            'Stop',
             signal_clicked=self._ao_button_stop_clicked,
             tip='Stop the output and set it to zero.'))
 
@@ -938,7 +938,7 @@ class adalm2000():
         tl.settings     = s  = ts.add(_g.TreeDictionary(self.name+'.tab_quad.tab_settings.settings', name='LI'), column_span=4)
         ts.set_column_stretch(3)
 
-        
+
         # Lock-in settings
         s.add_parameter('Iterations',  1, bounds=(0,None), tip='How many iterations to take at each frequency.')
         s.add_parameter('Output/Rate', ['75 MHz', '7.5 MHz', '750 kHz', '75 kHz', '7.5 kHz', '750 Hz', 'Automatic'], default_list_index=6, tip='Analog output sampling rate for both channels.')
@@ -953,7 +953,7 @@ class adalm2000():
 
         s.add_parameter('Sweep/Start',  1e4, suffix='Hz', siPrefix=True, dec=True, bounds=(0,None), tip='Approximate start frequency. Be careful with low frequencies and high sample rates. Too many samples will crash this thing.')
         s.add_parameter('Sweep/Stop',   1e6, suffix='Hz', siPrefix=True, dec=True, bounds=(0,None), tip='Approximate start frequency. Be careful with low frequencies and high sample rates. Too many samples will crash this thing.')
-        s.add_parameter('Sweep/Steps',  100, dec=True, bounds=(2,None), tip='How many steps to take between f1 and f2')
+        s.add_parameter('Sweep/Steps',  10,  dec=True, bounds=(2,None), tip='How many steps to take between f1 and f2')
         s.add_parameter('Sweep/Log_Scale',         False, tip='Log frequency steps?')
         s.add_parameter('Sweep/Auto_Script', False, tip='Whether to load the "appropriate" script into the plotter.')
 
@@ -1087,7 +1087,7 @@ class adalm2000():
 
         # If iterations is zero, set it to 1 to prevent an infinite loop
         if s['Iterations'] < 1: s['Iterations'] = 1
-        
+
         # Don't throw away data!
         self.quadratures.number_history(0)
 
@@ -1134,7 +1134,7 @@ class adalm2000():
     def _quad_get_frequency_cycles_samples_rate_rateindex(self, cs):
         """
         cs is the channel to do this for.
-        
+
         Returns the
         nearest frequency,
         number of cycles for this frequency,
@@ -1208,12 +1208,12 @@ class adalm2000():
 
         # Set auto mode.
         self.tab_ao.checkbox_auto.set_checked(False)
-        
+
         # Set them both to loop mode.
         so['Ch1/Loop'] = so['Ch2/Loop'] = True
-        
+
         # Set the frequency of the signal channel
-    
+
         # Get the frequency, number of cycles, buffer size, output rate, and
         # output rate index.
         f, c, N, ro, no = self._quad_get_frequency_cycles_samples_rate_rateindex(cs)
@@ -1297,10 +1297,10 @@ class adalm2000():
         so = self.tab_ao  .settings
         if s['Output/Trigger_Out'] == 'Ch2': cs = 'Ch1'
         else:                                cs = 'Ch2'
-        
+
         if s['Output/Rate'] == 'Automatic':
 
-            
+
             # Goal number of points, frequency and rate
             N = so[cs+'/Samples/Min']
             F = self.tab_quad.number_ao_frequency.get_value()
@@ -1771,24 +1771,24 @@ class adalm2000():
                 self.process_data()
 
                 # Send it to the demodulator
-                if self.tab_quad.checkbox_enable.is_checked(): 
-                    
+                if self.tab_quad.checkbox_enable.is_checked():
+
                     # Shortcuts
                     pd = self.quadratures.plot_raw
-                    
+
                     # Clear and import the header
                     pd.clear()
                     pd.copy_headers_from(p)
-            
+
                     # Copy the columns in the right fashion (time-signal pairs)
                     for k in p.ckeys[1:]:
                         pd['t_'+k] = p['t']
                         pd[k]  = p[k]
-            
+
                     pd.plot().autosave()
-        
+
                     # Run the quadrature calculation
-                    if self.quadratures.checkbox_auto(): 
+                    if self.quadratures.checkbox_auto():
                         self.quadratures.button_get_quad.click()
 
                 # Increment, update move on.
@@ -1854,7 +1854,6 @@ class adalm2000():
 
 if __name__ == '__main__':
     _m = _mp._libm2k
+    _g.clear_egg_settings()
     self = adalm2000()
     self.button_connect.click()
-    self.tab_ao.button_send.click()
-    self.tab_quad.button_sweep.click()
