@@ -35,6 +35,8 @@ class soundcard():
         self.name = name
         self._rates = [8000, 11025, 22050, 32000, 44100, 48000, 96000, 192000]
 
+        self._exception_timer = _g.ExceptionTimer()
+
         # All data accessed by the push-pull thread lives in this dictionary.
         # If you're using this dictionary, make sure to lock the thread!
         self._shared = dict()
@@ -58,17 +60,10 @@ class soundcard():
 
         # Combo device selector
         device_names = self.get_device_names()
-        self.combo_device = self.grid_top.add(_g.ComboBox(device_names, autosettings_path=name+'.combo_device'))
-        self.label_rate    = self.grid_top.add(_g.Label('Rate (Hz):'))
-        self.combo_rate    = self.grid_top.add(_g.ComboBox(self._rates,  autosettings_path=name+'.combo_rate'))
-
-        # Match the input and output devices and update the list.
-        self.set_output_device(self.get_selected_input_device_index())
-        self.combo_device.set_index(self.get_selected_input_device_index())
-
-        # Link the signal
-        self.combo_device.signal_changed.connect(self._combo_device_changed)
-        self.combo_rate   .signal_changed.connect(self._combo_rate_changed)
+        self.grid_top.add(_g.Label('Input:'))
+        self.combo_device_in = self.grid_top.add(_g.ComboBox(device_names, autosettings_path=name+'.combo_device_in'))
+        self.grid_top.add(_g.Label('Rate (Hz):'))
+        self.combo_rate_in = self.grid_top.add(_g.ComboBox(self._rates,  autosettings_path=name+'.combo_rate_in'))
 
         # Buffer
         self.grid_top.add(_g.Label('Buffer: '))
@@ -101,7 +96,24 @@ class soundcard():
             0, int=True, tip='Number of running threads.').set_width(40))
         self.timer_status  = _g.Timer(100, signal_tick=self._timer_status_tick)
 
+        # Next row
+        self.grid_top.new_autorow()
+        self.grid_top.add(_g.Label('Output: '))
+        self.combo_device_out = self.grid_top.add(_g.ComboBox(device_names, autosettings_path=name+'.combo_device_out'))
+        self.grid_top.add(_g.Label('Rate (Hz):'))
+        self.combo_rate_out = self.grid_top.add(_g.ComboBox(self._rates,  autosettings_path=name+'.combo_rate_out'))
 
+        # Link the signals
+        self.combo_device_out.signal_changed.connect(self._combo_device_changed)
+        self.combo_rate_out  .signal_changed.connect(self._combo_rate_changed)
+        self.combo_device_in .signal_changed.connect(self._combo_device_changed)
+        self.combo_rate_in   .signal_changed.connect(self._combo_rate_changed)
+
+        # # Match the input and output devices and update the list.
+        # self.set_output_device(self.get_selected_input_device_index())
+        # self.combo_device_out.set_index(self.get_selected_input_device_index())
+
+        
 
         # AI tab
         self.tab_in = self.tabs.add_tab('Input')
@@ -165,10 +177,11 @@ class soundcard():
         self.tab_out.settings    = self.waveform_designer.settings
 
         # Hide the Rates (they're controlled by the top combo) and sync
-        self.tab_in .settings.hide_parameter('Rate')
-        self.tab_out.settings.hide_parameter('Left/Rate')
-        self.tab_out.settings.hide_parameter('Right/Rate')
+        # self.tab_in .settings.hide_parameter('Rate')
+        # self.tab_out.settings.hide_parameter('Left/Rate')
+        # self.tab_out.settings.hide_parameter('Right/Rate')
         self._combo_rate_changed()
+        self._combo_device_changed()
 
         # Sync everything
         self._sync_rates_samples_time('Samples')
@@ -301,10 +314,10 @@ class soundcard():
         # than our collect time.
         if f:
             periods            = _n.ceil(sd['Input/Collect']*f) # Number of periods to span our collection time.
-            samples_per_period = float(self.combo_rate.get_text())/f
+            samples_per_period = float(self.combo_rate_in.get_text())/f
             samples = _n.round(periods*samples_per_period)
         else:
-            samples = _n.round(float(self.combo_rate.get_text())*sd['Input/Collect'])
+            samples = _n.round(float(self.combo_rate_in.get_text())*sd['Input/Collect'])
        
         si['Iterations'] = 0
         si['Samples'] = samples
@@ -679,14 +692,8 @@ class soundcard():
             self._shared['stream'].stop()
             self._shared['stream'] = None
 
-            # Enable the sample rate again
-            self.combo_rate.enable()
-            self.combo_device.enable()
-            self.number_buffer.enable()
-            self.button_playrecord.enable()
-            self.button_record.set_colors(None, None)
-            self.button_play  .set_colors(None, None)
-            self.tab_in.button_triggered(False).set_text('Idle').set_colors(None,None)
+            self._unlock_controls()
+
 
         # Now, if we're ready to process this data, do so.
         # This will be happening in parallel with the thread, so
@@ -701,7 +708,7 @@ class soundcard():
 
             # Generate the time array
             Ni = len(data)
-            R  = float(self.combo_rate.get_text())
+            R  = float(self.combo_rate_in.get_text())
             self.tab_in.plot_raw['t']     = _n.linspace(0,(Ni-1)/R,Ni)
             self.tab_in.plot_raw['Left']  = data[:,0]
             self.tab_in.plot_raw['Right'] = data[:,1]
@@ -731,15 +738,31 @@ class soundcard():
         # Otherwise, we haven't finished processing the previous data yet.
         else: self.tab_in.number_missed.increment()
 
-
+    def _unlock_controls(self):
+        """
+        Reenables buttons etc.
+        """
+        # Enable the sample rate again
+        self.combo_rate_in.enable()
+        self.combo_rate_out.enable()
+        self.combo_device_out.enable()
+        self.combo_device_in.enable()
+        self.number_buffer.enable()
+        self.tab_in.button_triggered(False, block_events=True).set_text('Idle').set_colors(None,None)
+        self.button_playrecord(False)
+        self.button_record(False)
+        self.button_play  (False)
+        
     def _start_stream(self, *a):
         """
         Someone clicked "record".
         """
 
         # First run setup.
-        self.combo_rate.disable()
-        self.combo_device.disable()
+        self.combo_rate_in.disable()
+        self.combo_rate_out.disable()
+        self.combo_device_out.disable()
+        self.combo_device_in.disable()
         self.number_buffer.disable()
         self.checkbox_overflow.set_checked(False)
         self.checkbox_underflow.set_checked(False)
@@ -754,10 +777,15 @@ class soundcard():
         # Create and start the stream
         self._shared['no'] = 0
         self._shared['triggered'] = False
-        self._shared['stream'] = self.api.Stream(
-                samplerate         = float(self.tab_in.settings['Rate']),
-                blocksize          = self.number_buffer(), # 0 for "optimal" latency
-                channels           = 2,)
+        try:
+            self._shared['stream'] = self.api.Stream(
+                    samplerate         = float(self.tab_in.settings['Rate']),
+                    blocksize          = self.number_buffer(), # 0 for "optimal" latency
+                    channels           = 2,)
+        except Exception as e:
+            print(e)
+            self._unlock_controls()
+            return
 
         # Create some signals the thread can send back to the GUI.
         self._signal_output_underflow = _s.thread.signal(self._event_output_underflow)
@@ -815,14 +843,16 @@ class soundcard():
         """
         Called when someone changes the device.
         """
-        self.set_devices(self.combo_device.get_index(), self.combo_device.get_index())
+        self.set_devices(
+            self.combo_device_in .get_index(), 
+            self.combo_device_out.get_index())
 
     def _combo_rate_changed(self, *a):
         """
         Called when someone changes the rate.
         """
-        self.tab_in .settings['Rate']      = self.combo_rate.get_text()
-        self.tab_out.settings['Left/Rate'] = self.combo_rate.get_text()
+        self.tab_in .settings['Rate']      = self.combo_rate_in .get_text()
+        self.tab_out.settings['Left/Rate'] = self.combo_rate_out.get_text()
 
     def _sync_rates_samples_time(self, key):
         """
@@ -959,10 +989,14 @@ class soundcard():
         Sets both input and output to the same device.
         """
         self.set_devices(device,device)
-
+        
 
 if __name__ == '__main__':
     #_g.clear_egg_settings()
+    import sys
+    def my_hook(*a):
+        print('PANTS', a)
+    sys.excepthook = my_hook
     self = soundcard()
 
 
