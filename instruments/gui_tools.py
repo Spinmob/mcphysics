@@ -1,6 +1,7 @@
 import spinmob.egg as _egg
 import spinmob     as _s
 import numpy       as _n
+import os          as _os
 
 # Shortcuts
 _g = _egg.gui
@@ -38,7 +39,8 @@ def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=20
     """
 
     # Now, given this rate, calculate the number of points needed to make one cycle.
-    N1 = rate / f_target # This is a float with a remainder
+    if f_target: N1 = rate / f_target # This is a float with a remainder
+    else:        N1 = min_samples
 
     # The goal now is to add an integer number of these cycles up to the
     # max_samples and look for the one with the smallest remainder.
@@ -483,52 +485,122 @@ class quadratures(_g.Window):
     """
     Tabs for calculating quadratures.
     """
-    def __init__(self, name='quadratures', margins=False):
+    def __init__(self, channels=['Ch1','Ch2'], name='quadratures', margins=False):
         _g.Window.__init__(self, title=name, margins=margins, autosettings_path=name)
 
         # Internal variables
         self.name = name
 
-        self.grid_top = self.add(_g.GridLayout(margins=False))
+        self.grid_left  = self.add(_g.GridLayout(margins=False))
+        self.grid_right = self.add(_g.GridLayout(margins=False), alignment=0)
+        
+        # # GRID LEFT
+        self.grid_left_top  = self.grid_left.add(_g.GridLayout(margins=False), alignment=0)
+        self.grid_left.new_autorow()
+        self.settings = self.grid_left.add(_g.TreeDictionary(
+            autosettings_path  = name+'.settings',
+            name               = name+'.settings')).set_width(240)
+        
+        # Add the sweep controls
+        self.button_sweep = self.grid_left_top.add(_g.Button(
+            text            = 'Sweep',
+            checkable       = True,
+            signal_toggled  = self._button_sweep_toggled_pre), 0,0)
 
-        self.number_frequency = self.grid_top.add(_g.NumberBox(
+        self.grid_left_top.add(_g.Label('Step:'), 2,0, alignment=2)
+        self.number_step = self.grid_left_top.add(_g.NumberBox(
+            0, int=True, bounds=(0,None), tip='Current step number.'), 3, 0)
+        self.grid_left_top.set_column_stretch(1)
+        
+        self.grid_left_top.add(_g.Label('Iteration:'), 2,1, alignment=2)
+        self.number_iteration_sweep = self.grid_left_top.add(_g.NumberBox(
+            0, int=True, bounds=(0,None), tip='Iteration at this frequency.'), 3,1)
+        
+        # Add the sweep settings
+        s = self.settings
+
+        for c in channels:
+            s.add_parameter('Output/'+c+'_Amplitude', 0.1, step=0.01,
+                suffix = '', siPrefix = True,
+                tip = 'Amplitude of '+c+' output cosine.')
+        
+        s.add_parameter('Input/Settle', 0.1, dec=True,
+            suffix = 's', siPrefix = True,
+            tip = 'How long to settle after changing the frequency.')
+
+        s.add_parameter('Input/Collect', 0.1, dec=True,
+            suffix = 's', siPrefix = True,
+            tip = 'Minimum amount of data to collect (will be an integer number of periods).')
+        
+        s.add_parameter('Input/Max_Samples', 100000.0, dec=True,
+            suffix='S', siPrefix=True, bounds=(100,None),
+            tip = 'Maximum allowed input samples (to avoid very long runs, e.g.).')
+
+        s.add_parameter('Input/Iterations', 1.0, dec=True,
+            suffix='reps', bounds=(1,None), siPrefix=True,
+            tip = 'How many times to repeat the quadrature measurement at each step after settling.')
+
+        s.add_parameter('Sweep/Clear', False, 
+            tip = 'Clear the Quadratures plot before starting.')
+        
+        s.add_parameter('Sweep/Start', 100.0, dec=True,
+            suffix = 'Hz', siPrefix=True,
+            tip = 'Sweep start frequency.')
+
+        s.add_parameter('Sweep/Stop', 1000.0, dec=True,
+            suffix = 'Hz', siPrefix=True,
+            tip = 'Sweep stop frequency.')
+
+        s.add_parameter('Sweep/Steps', 10.0, dec=True,
+            tip = 'Number of steps from start to stop.')
+
+        s.add_parameter('Sweep/Log_Scale', False,
+            tip = 'Whether to use log-spaced steps between Start and Stop.')
+
+
+
+        # GRID RIGHT
+
+        self.grid_right_top  = self.grid_right.add(_g.GridLayout(margins=False))        
+        self.number_frequency = self.grid_right_top.add(_g.NumberBox(
             1000, step=0.1, dec = True,
             suffix='Hz', siPrefix = True,
             autosettings_path = name+'.number_frequency',
             tip = 'Frequency at which to calculate the quadratures.\nNote this frequency is not guaranteed to "fit" within the\nincoming data, and may not be part of its orthonormal basis.'
             )).set_width(120)
 
-        self.button_get_raw = self.grid_top.add(_g.Button(
+        self.button_get_raw = self.grid_right_top.add(_g.Button(
             text = 'Get Raw',
             signal_clicked = self._button_get_raw_clicked,
             tip  = 'Import the data using self.get_raw(). This is a dummy function you must overload.'))
 
-        self.button_get_quad = self.grid_top.add(_g.Button(
+        self.button_get_quadratures = self.grid_right_top.add(_g.Button(
             text           = 'Get Quadratures',
-            signal_clicked = self._button_get_quad_clicked,
+            signal_clicked = self._button_get_quadratures_clicked,
             tip='Get the quadratures from the data source.').set_width(120))
 
-        self.checkbox_auto = self.grid_top.add(_g.CheckBox(
+        self.checkbox_auto = self.grid_right_top.add(_g.CheckBox(
             text              = 'Auto',
             autosettings_path = name+'.checkbox_auto',
             tip='Automatically get quadratures for all incoming data.'))
 
-        self.button_loop = self.grid_top.add(_g.Button(
+        self.button_loop = self.grid_right_top.add(_g.Button(
             text           = 'Loop',
             signal_toggled = self._button_loop_toggled,
             checkable      = True,
             tip='Repeatedly clicks "Get Raw" and "Get Quadratures".'))
 
-        self.number_iteration = self.grid_top.add(_g.NumberBox(
+        self.number_iteration_total = self.grid_right_top.add(_g.NumberBox(
             0, int=True, tip='Loop iteration (zero\'th column in Quadratures plot.'))
 
-        self.new_autorow()
+        
 
-        # Tabs for plot
-        self.tabs = self.add(_g.TabArea(autosettings_path=name+'.tabs'), alignment=0)
+        # # Tabs for plot
+        self.grid_right.new_autorow()
+        self.tabs = self.grid_right.add(_g.TabArea(autosettings_path=name+'.tabs'), alignment=0)
 
         self.tab_raw   = self.tabs.add_tab('Quadratures Raw Data')
-        self.tab_quad = self.tabs.add_tab('Quadratures')
+        self.tab_quad  = self.tabs.add_tab('Quadratures')
 
         self.plot_raw = self.tab_raw.add(_g.DataboxPlot(
             file_type         = '*.raw',
@@ -543,18 +615,23 @@ class quadratures(_g.Window):
             int    = True,
             bounds = (0, None),
             autosettings_path = name+'.number_history'))
+        
+        # self.combo_autoscript = self.tab_quad.add(_g.ComboBox(
+        #     ['Autoscript Disabled', 'Magnitude-Phase'],
+        #     autosettings_path = name+'.combo_autoscript',
+        #     signal_changed = self._combo_autoscript_changed))
 
         self.tab_quad.new_autorow()
 
-        self.plot_quad = self.tab_quad.add(_g.DataboxPlot(
+        self.plot_quadratures = self.tab_quad.add(_g.DataboxPlot(
             file_type         = '*.quad',
-            autosettings_path = name+'.plot_quad',
-            name              = name+'.plot_quad',
+            autosettings_path = name+'.plot_quadratures',
+            name              = name+'.plot_quadratures',
             autoscript        = 1), alignment=0, column_span=3)
         self.tab_quad.set_column_stretch(2)
 
 
-    def _button_get_quad_clicked(self, *a):
+    def _button_get_quadratures_clicked(self, *a):
         """
         Called when someone clicks the Run button.
         """
@@ -575,10 +652,18 @@ class quadratures(_g.Window):
         """
         When someone toggles the Loop button.
         """
+        self.button_loop.set_colors(None, 'Red')
         while self.button_loop():
             self.button_get_raw.click()
-            self.button_get_quad.click()
+            self.button_get_quadratures.click()
             self.process_events()
+        self.button_loop.set_colors(None, None)
+
+    def _button_sweep_toggled_pre(self, *a):
+        """
+        When someone toggles the sweep, clear.
+        """
+        if self.settings['Sweep/Clear']: self.plot_quadratures.clear()
 
     def get_raw(self):
         """
@@ -607,22 +692,22 @@ class quadratures(_g.Window):
 
         Returns
         -------
-        The row of data added to self.plot_quad
+        The row of data added to self.plot_quadratures
         """
         # Get or set the quadrature frequency.
         if f==None: f = self.number_frequency()
         else:           self.number_frequency(f)
 
         # Increment
-        self.number_iteration.increment()
+        self.number_iteration_total.increment()
 
         # Get the source databox and quadrature plotter
         d = self.plot_raw
-        p = self.plot_quad
+        p = self.plot_quadratures
         p.copy_headers(d)
 
         # Assumed column pairs
-        row  = [self.number_iteration(), f]
+        row  = [self.number_iteration_total(), f]
         keys = ['n', 'f(Hz)']
         for n in range(0, len(d), 2):
 
@@ -648,14 +733,38 @@ class quadratures(_g.Window):
 
         # Plot!
         p.plot()
+        
+    def get_sweep_step_frequency(self, step):
+        """
+        Returns the frequency at the specified step. Note this step is indexed
+        relative to 1 (matching the GUI), so it goes from 1 to 
+        self.settings['Sweep/Steps'].
+        
+        Returns None otherwise.
+        """
+        step = int(step)
+        sd = self.settings
+        if step < 1 or step > sd['Sweep/Steps']: return None
 
+        # Get the frequency list.
+        if sd['Sweep/Log_Scale']:
+            if sd['Sweep/Start'] == 0: sd['Sweep/Start'] = sd['Stop' ]*0.01
+            if sd['Sweep/Stop' ] == 0: sd['Sweep/Stop' ] = sd['Start']*0.01
+            if sd['Sweep/Start'] == 0: return
+            fs = _s.fun.erange(sd['Sweep/Start'], sd['Sweep/Stop'], int(sd['Sweep/Steps']))
+        else:
+            fs = _n.linspace  (sd['Sweep/Start'], sd['Sweep/Stop'], int(sd['Sweep/Steps']))
+
+        return fs[step-1]
+
+    
 if __name__ == '__main__':
 
     _egg.clear_egg_settings()
     # self = signal_chain()
 
-    self = waveform_designer(sync_samples=True, sync_rates=True).add_channels('a', 'b')
+    #self = waveform_designer(sync_samples=True, sync_rates=True).add_channels('a', 'b')
     # self.add_channel('Ch1',7000).add_channel('Ch2',5000)
 
-    #self = quadratures()
+    self = quadratures()
     self.show()

@@ -639,8 +639,8 @@ class adalm2000():
         Shuts off acquisitions and other loops, turns off outputs.
         """
         self.tab_ai.button_acquire.set_checked(False)
-        self.tab_ao.button_stop.click()
-        self.tab_quad.button_sweep.set_checked(False)
+        self.waveform_designer.button_stop.click()
+        self.quadratures.button_sweep.set_checked(False)
         self.tab_power.button_enable_Vm.set_checked(False)
         self.tab_power.button_enable_Vp.set_checked(False)
 
@@ -775,7 +775,7 @@ class adalm2000():
         self.tab_ai.tab_controls.new_autorow()
         s = self.tab_ai.settings  = self.tab_ai.tab_controls.add(_g.TreeDictionary(self.name+'.tab_ai.settings', name='AI'), column_span=4)
         s.add_parameter('Iterations', 0, tip='How many acquisitions to perform.')
-        s.add_parameter('Samples', 1000, bounds=(2,None), siPrefix=True, suffix='S', dec=True, tip='How many samples to acquire. 1-8192 guaranteed. \nLarger values possible, depending on USB bandwidth.')
+        s.add_parameter('Samples', 1000.0, bounds=(2,None), siPrefix=True, suffix='S', dec=True, tip='How many samples to acquire. 1-8192 guaranteed. \nLarger values possible, depending on USB bandwidth.')
         s.add_parameter('Rate', ['100 MHz', '10 MHz', '1 MHz', '100 kHz', '10 kHz', '1 kHz'], tip='How fast to sample voltages.')
         s.add_parameter('Timeout', 0.2, bounds=(0.1,None), suffix='s', siPrefix=True, dec=True, tip='How long to wait for a trigger before giving up. 0 means "forever"; be careful with that setting ;).')
         s.add_parameter('Timeout/Then_What', ['Immediate', 'Wait Again', 'Quit'], bounds=(0,None), suffix='s', siPrefix=True, dec=True, tip='How long to wait for a trigger before giving up. 0 means "forever"; be careful with that setting ;).')
@@ -787,7 +787,6 @@ class adalm2000():
 
         s.add_parameter('Ch1_Range', ['25V', '2.5V'], tip='Range of accepted voltages.')
         s.add_parameter('Ch2_Range', ['25V', '2.5V'], tip='Range of accepted voltages.')
-
 
         # Note these lists MUST be in this order; their indices are
         # constants defined by libm2k: https://analogdevicesinc.github.io/libm2k/enums_8hpp.html
@@ -884,7 +883,7 @@ class adalm2000():
         # DAC Tab
         self.tab_ao =self.tabs.add_tab('Analog Out')
 
-        wd = self.waveform_designer = self.tab_ao.waveform_designer = self.tab_ao.add(_gt.waveform_designer(
+        wd = self.waveform_designer = self.tab_ao.add(_gt.waveform_designer(
             rates = ['75 MHz', '7.5 MHz', '750 kHz', '75 kHz', '7.5 kHz', '750 Hz'],
             name = self.name+'.waveform_designer',
             sync_rates=False,
@@ -895,25 +894,25 @@ class adalm2000():
         to = self.tab_ao
         to.settings = wd.settings
 
-        to.tab_sent  = wd.tabs_plots.add_tab('Last Sent Waveform')
-        to.plot_sent = wd.plot_sent = to.tab_sent.add(_g.DataboxPlot(
+        wd.tab_sent  = wd.tabs_plots.add_tab('Last Sent Waveform')
+        wd.plot_sent = wd.tab_sent.add(_g.DataboxPlot(
             '*.w', autosettings_path=self.name+'.waveform_designer.plot_sent',
             autoscript=2), alignment=0)
-        to.plot_design = wd.plot_design
+        wd.plot_design = wd.plot_design
 
         wd.grid_controls = wd.tab_settings.add(_g.GridLayout(margins=False), 0,0, alignment=0)
 
-        to.button_send = wd.grid_controls.add(_g.Button(
+        wd.button_send = wd.grid_controls.add(_g.Button(
             'Send', checkable=True,
             signal_clicked=self._ao_button_send_clicked,
             tip='Send the designed waveform to the actual analog outputs.'))
 
-        to.checkbox_auto = wd.grid_controls.add(_g.CheckBox(
-            'Auto', autosettings_path=self.name+'.tab_ao.checkbox_auto',
+        wd.checkbox_auto = wd.grid_controls.add(_g.CheckBox(
+            'Enabled', autosettings_path=self.name+'.tab_ao.checkbox_auto',
             signal_toggled=self._ao_after_settings_changed,
             tip='Automatically send the designed waveform whenever it changes.'))
 
-        to.button_stop = wd.grid_controls.add(_g.Button(
+        wd.button_stop = wd.grid_controls.add(_g.Button(
             'Stop',
             signal_clicked=self._ao_button_stop_clicked,
             tip='Stop the output and set it to zero.'))
@@ -924,50 +923,38 @@ class adalm2000():
         """
         Populates the lockin tab.
         """
-        self.tab_quad = tl = self.tabs.add_tab('Quadratures')
+        self.tab_quadratures = tl = self.tabs.add_tab('Quadratures')
 
-        # Settings Tab
-        tl.tabs_settings     = tl.add(_g.TabArea(self.name+'.tab_quad.tabs_settings'))
-        tl.tab_settings = ts = tl.tabs_settings.add_tab('Quadrature Settings')
-        tl.number_ao_frequency = ts.add(_g.NumberBox(1e5, suffix='Hz', siPrefix=True, dec=True, bounds=(0, None), autosettings_path=self.name+'.tab_quad.number_ao_frequency', tip='Target output frequency.')).set_width(80)
-        tl.label_samples     = ts.add(_g.Label(''))
-        ts.new_autorow()
-        tl.button_go         = ts.add(_g.Button('Go!',   checkable=True, tip='Set the frequency, acquire data, and demodulate it.'))
-        tl.button_sweep      = ts.add(_g.Button('Sweep', checkable=True, tip='Step the frequency according to the sweep below, pressing the "Go!" button at each step.'))
-        ts.new_autorow()
-        tl.settings     = s  = ts.add(_g.TreeDictionary(self.name+'.tab_quad.tab_settings.settings', name='LI'), column_span=4)
-        ts.set_column_stretch(3)
+        self.quadratures = tl.quadratures = tl.add(_gt.quadratures(
+            channels=['Ch1','Ch2'], name=self.name+'.quadratures'), alignment=0)
 
-
-        # Lock-in settings
-        s.add_parameter('Iterations',  1, bounds=(0,None), tip='How many iterations to take at each frequency.')
-        s.add_parameter('Output/Rate', ['75 MHz', '7.5 MHz', '750 kHz', '75 kHz', '7.5 kHz', '750 Hz', 'Automatic'], default_list_index=6, tip='Analog output sampling rate for both channels.')
-        s.add_parameter('Output/Amplitude', 0.1, suffix='V', siPrefix=True, dec=True, tip='Amplitude of output sinusoid.')
-        s.add_parameter('Output/Trigger_Out', ['Ch1', 'Ch2'], default_list_index=1, tip='Which channel to use as the trigger output. You can set the square wave attributes in the Analog Out tab.')
-
-        s.add_parameter('Input/Rate', ['100 MHz', '10 MHz', '1 MHz', '100 kHz', '10 kHz', '1 kHz', 'Automatic'], default_list_index=6, tip='Analog input samping rate for both channels.')
-        s.add_parameter('Input/Max_Buffer',100000, bounds=(10,None), dec=True, tip='Maximum input buffer you will tolerate to try and achieve Tau.')
-        s.add_parameter('Input/Settle',  50e-6, suffix='s', siPrefix=True, dec=True, bounds=(0,   None), tip='How long to let it settle after starting the analog output before acquiring.')
-        s.add_parameter('Input/Trigger_In', ['Ch1', 'Ch2', 'External (TI)'], default_list_index=1, tip='Which channel to use as a trigger. "External" refers to the TI port.')
-        s.add_parameter('Input/Measure', 50e-6, suffix='s', siPrefix=True, dec=True, bounds=(1e-6,None), tip='How long to take data. This will be limited by Max_Buffer.')
-
-        s.add_parameter('Sweep/Start',  1e4, suffix='Hz', siPrefix=True, dec=True, bounds=(0,None), tip='Approximate start frequency. Be careful with low frequencies and high sample rates. Too many samples will crash this thing.')
-        s.add_parameter('Sweep/Stop',   1e6, suffix='Hz', siPrefix=True, dec=True, bounds=(0,None), tip='Approximate start frequency. Be careful with low frequencies and high sample rates. Too many samples will crash this thing.')
-        s.add_parameter('Sweep/Steps',  10,  dec=True, bounds=(2,None), tip='How many steps to take between f1 and f2')
-        s.add_parameter('Sweep/Log_Scale',         False, tip='Log frequency steps?')
-        s.add_parameter('Sweep/Auto_Script', False, tip='Whether to load the "appropriate" script into the plotter.')
-
-        self.quadratures = self.tab_quad.quadratures = tl.add(_gt.quadratures(self.name+'.quadratures'), alignment=0)
-        tl.checkbox_enable = self.quadratures.checkbox_auto
-
-        # Link signals to functions
-        tl.button_go.signal_toggled          .connect(self._quad_button_go_toggled)
-        tl.button_sweep.signal_toggled       .connect(self._quad_button_sweep_toggled)
-
-        # tl.number_ao_frequency.signal_changed.connect(self._quad_settings_changed)
-        # s.connect_any_signal_changed                 (self._quad_settings_changed)
-
-        #self._quad_settings_changed()
+        s = self.quadratures.settings
+        
+        s.add_parameter(
+            'Output/Rate', 
+            ['75 MHz', '7.5 MHz', '750 kHz', '75 kHz', '7.5 kHz', '750 Hz', 'Automatic'], 
+            default_list_index=6, dec=True, suffix='S', siPrefix=True,
+            tip='Maximum allowed input buffer, to prevent some crazy computer freeze.')
+        
+        # Add the "Go" button
+        self.quadratures.button_go = self.quadratures.grid_left_top.add(_g.Button(
+            text='Go', checkable=True,
+            tip='Set up the outputs and inputs, collect data, and get the quadratures.',
+            signal_toggled=self._quad_button_go_toggled).set_width(50), 0,1, alignment=2)
+        
+        # Overload the existing dummy function
+        self.quadratures.get_raw = self._quad_get_raw
+        
+        # Not needed with auto checkbox.
+        self.quadratures.button_loop.hide()
+        
+        # Link other signals to functions
+        self.quadratures.button_sweep.signal_toggled.connect(self._quad_button_sweep_toggled)
+        self.quadratures.number_step.signal_changed.connect(self._quad_number_step_changed)
+        self.quadratures.number_frequency.signal_changed.connect(self._quad_number_frequency_changed)
+        # Signal for when it's time to send data to the quad
+        #self.quadratures.signal_new_data = _s.thread.signal(self._quad_got_new_data)
+        
 
     # def demodulate(self, f=None):
     #     """
@@ -990,7 +977,7 @@ class adalm2000():
 
     #     # Get the source databox and demod plotter
     #     d = self.tab_ai.plot_raw
-    #     p = self.tab_quad.plot
+    #     p = self.tab_quadratures.plot
 
     #     # Get the time axis and the two quadratures
     #     t = d[0]
@@ -1017,63 +1004,89 @@ class adalm2000():
     #     # Update the header
     #     d.copy_headers_to(p)
     #     self.tab_ao.settings.send_to_databox_header(p)
-    #     self.tab_quad.settings.send_to_databox_header(p)
+    #     self.tab_quadratures.settings.send_to_databox_header(p)
 
     #     # Plot!
     #     p.plot()
+    def _quad_get_raw(self, *a):
+        """
+        Overloads the get_raw() function in the gui_tools. Just imports the data
+        from the AI tab.
+        """
+        # Get data
+        # Shortcuts
+        pd = self.quadratures.plot_raw
+        pr = self.tab_ai.plot_raw
+
+        # Clear and import the header
+        pd.clear()
+        pd.copy_headers_from(pr)
+
+        # Copy the columns in the right fashion (time-signal pairs)
+        for k in pr.ckeys[1:]:
+            pd['t_'+k] = pr['t']
+            pd[k]  = pr[k]
+
+        pd.plot().autosave()
+    
+    def _quad_number_step_changed(self, *a):
+        """
+        Updates the frequency
+        """
+        q = self.quadratures
+        q.number_frequency(q.get_sweep_step_frequency(q.number_step()-1))
+
+    def _quad_number_frequency_changed(self, *a):
+        """
+        Updates the waveform designer and input.
+        """
+        self._quad_configure_ao_ai()
 
     def _quad_button_go_toggled(self, *a):
         """
         Take single demodulations for the specified iterations, without stepping frequency.
         Appends them to the LI Demodulation plot.
         """
+        q = self.quadratures
+        
         # If we just turned it off, poop out instead of starting another loop.
-        if not self.tab_quad.button_go.is_checked(): return
+        if not q.button_go.is_checked(): return
 
         # Reset the button colors (they turn red when it's not locked / triggered)
-        self.tab_quad.button_go.set_colors(None, None)
+        q.button_go.set_colors('white', 'blue')
 
         # Enable demodulation analysis
-        self.tab_quad.checkbox_enable.set_checked(True)
+        q.checkbox_auto.set_checked(True)
 
-        # Make sure the first iteration gets set correctly
-        self._quad_needs_configure_ao_ai = True
+        # Configure the output and start the AO
+        self._quad_configure_ao_ai()
+        self.waveform_designer.button_send.click()
 
-        # Now start the single-frequency loop!
-        n=0
-        while (n < self.tab_quad.settings['Iterations'] or self.tab_quad.settings['Iterations'] <= 0) \
-        and self.tab_quad.button_go.is_checked():
-
-            # Reconfigure
-            self._quad_configure_ao_ai() # This is just GUI updates; it resets the trigger if it failed, e.g.
-            if self._quad_needs_configure_ao_ai:
-
-                # Reset the flag and send the analog out data at the same time
-                # If someone changes the frequency it will trigger a redo
-                self._quad_needs_configure_ao_ai = False
-                self.tab_ao.button_send.click()
-
-                # Wait for the send to finish
-                while self.tab_ao.button_send.is_checked(): self.window.sleep(0.01)
-
-                # Settle
-                self.window.sleep(self.tab_quad.settings['Input/Settle'])
-
+        # Wait for the send to finish
+        while self.waveform_designer.button_send.is_checked(): self.window.sleep(0.01)
+        
+        # Settle into steady state.
+        self.window.sleep(q.settings['Input/Settle'])
+        
+        # reset the counter
+        I = q.number_iteration_sweep
+        I(0)
+        while I() < q.settings['Input/Iterations'] \
+        and   q.button_go():
+            I.increment()
+            
             # Acquire
-            self.tab_ai.button_acquire.click()
-
-            # Wait for this to complete
-            while self.tab_ai.button_acquire.is_checked(): self.window.sleep()
-
-            # Increment and display
-            n += 1
-
-            # Update GUI
+            self.tab_ai.button_acquire(True)
+            while self.tab_ai.button_acquire(): self.window.sleep()
             self.window.process_events()
+            
+        q.button_go(False).set_colors(None, None)
+        q.checkbox_auto(False)
 
-        # All done!
-        self.tab_quad.button_go    .set_checked(False)
-        self.tab_quad.checkbox_enable.set_checked(False)
+            
+        
+        
+        
 
 
 
@@ -1081,43 +1094,33 @@ class adalm2000():
         """
         Starts a sweep.
         """
+        q  = self.quadratures
+
         # If we just unchecked it, let the loop poop itself out.
-        if not self.tab_quad.button_sweep.is_checked(): return
-        s = self.tab_quad.settings
-
-        # If iterations is zero, set it to 1 to prevent an infinite loop
-        if s['Iterations'] < 1: s['Iterations'] = 1
-
+        if not q.button_sweep.is_checked(): return
+        q.button_sweep.set_colors('white', 'green')
+        
+        # Shortcuts
+        sq = q.settings
+        S  = q.number_step
+        
         # Don't throw away data!
-        self.quadratures.number_history(0)
-
-        # Load the plot script if we're supposed to
-        if s['Sweep/Auto_Script']:
-
-            if s['Sweep/Log_Scale']: self.tab_quad.plot.load_script(_os.path.join(_mp.__path__[0], 'plot_scripts', 'ADALM2000', 'li_sweep_magphase_log.py'))
-            else:                    self.tab_quad.plot.load_script(_os.path.join(_mp.__path__[0], 'plot_scripts', 'ADALM2000', 'li_sweep_magphase.py'))
-
-        # Get the frequency list
-        if s['Sweep/Log_Scale']: fs = _s.fun.erange(s['Sweep/Start'], s['Sweep/Stop'], s['Sweep/Steps'])
-        else:              fs = _n.linspace  (s['Sweep/Start'], s['Sweep/Stop'], s['Sweep/Steps'])
+        q.number_history(0)
 
         # Do the loop
-        for f in fs:
-
-            # If we've aborted
-            if not self.tab_quad.button_sweep.is_checked(): break
-
-            # Set the frequency
-            self.tab_quad.number_ao_frequency.set_value(f)
-
-            # Go for this frequency!
-            self.tab_quad.button_go.click()
-
-            # Update the GUI
+        S(0)
+        while S() < sq['Sweep/Steps'] and q.button_sweep():
+            
+            # Increment the step and frequency
+            S.increment() # Updates the frequency
             self.window.process_events()
+            
+            # Go for this frequency!
+            q.button_go.click()
 
         # Uncheck it when done
-        self.tab_quad.button_sweep.set_checked(False)
+        q.button_sweep.set_checked(False)
+        q.button_sweep.set_colors(None, None)
 
     # def _quad_settings_changed(self, *a):
     #     """
@@ -1126,28 +1129,28 @@ class adalm2000():
     #     f, c, N, r, n = self._quad_get_frequency_cycles_samples_rate_rateindex()
 
     #     # Update the frequency
-    #     self.tab_quad.number_ao_frequency.set_value(f,block_events=True)
+    #     self.quadratures.number_frequency.set_value(f,block_events=True)
 
     #     # Trigger a reconfigure on the next demod
     #     self._quad_needs_configure_ao_ai = True
 
     def _quad_get_frequency_cycles_samples_rate_rateindex(self, cs):
         """
-        cs is the channel to do this for.
-
+        cs is the channel to calculate for
+        
         Returns the
         nearest frequency,
         number of cycles for this frequency,
         number of samples to generate it,
         the rate, and the rate's index.
         """
-        so = self.tab_ao.settings
+        so = self.waveform_designer.settings
 
-        # Calculate best / lowest allowed rate
+        # Calculate lowest allowed rate
         ro, no = self._quad_get_output_rate_and_index()
 
         # Target period
-        f_target = self.tab_quad.number_ao_frequency.get_value()
+        f_target = self.quadratures.number_frequency.get_value()
 
         # If zero, it's simple
         if not f_target: return f_target, 1, so[cs+'/Samples/Min'], ro, no
@@ -1176,155 +1179,127 @@ class adalm2000():
         if N < so[cs+'/Samples/Min']: N = so[cs+'/Samples/Min']
 
         # Update the GUI
-        self.tab_quad.label_samples.set_text('AO Buffer: '+str(N))
+        #self.tab_quadratures.label_samples.set_text('AO Buffer: '+str(N))
 
         # Now, given this number of points, which might include several oscillations,
         # calculate the actual closest frequency
         df = ro/N # Frequency step
-        n  = int(_n.round(self.tab_quad.number_ao_frequency.get_value()/df)) # Number of cycles
+        n  = int(_n.round(self.quadratures.number_frequency()/df)) # Number of cycles
         f  = n*df # Actual frequency that fits.
 
         return f, n, N, ro, no
 
     def _quad_configure_ao_ai(self):
         """
-        Configures the output and input for lock-in.
+        Configures the output and input for lock-in, choosing the highest frequency
+        possible, given the maximum input buffer.
         """
         ### Remember the settings
 
-        self._pre_quad_ao_settings = self.tab_ao.settings.send_to_databox_header()
-        self._pre_quad_ai_settings = self.tab_ai.settings.send_to_databox_header()
-
-        ### Set up the AO tab.
-
         # Shortcuts
-        so = self.tab_ao.settings
-        sl = self.tab_quad.settings
+        si = self.tab_ai.settings
+        so = self.waveform_designer.settings
+        q = self.quadratures
+        sq = q.settings
+        
+        ### Set up the AO. We "intelligently" choose the output rate to get
+        # Disable auto waveform update.
+        self.waveform_designer.checkbox_auto.set_checked(False)
 
-        # Use one channel for triggering and one for output
-        ct = sl['Output/Trigger_Out']
-        if ct == 'Ch1': cs = 'Ch2'
-        else:           cs = 'Ch1'
+        # close to the desired frequency
+        rate_index = self._quad_get_best_ao_rate_index('Ch1', q.number_frequency())
 
-        # Set auto mode.
-        self.tab_ao.checkbox_auto.set_checked(False)
-
-        # Set them both to loop mode.
-        so['Ch1/Loop'] = so['Ch2/Loop'] = True
-
-        # Set the frequency of the signal channel
-
-        # Get the frequency, number of cycles, buffer size, output rate, and
-        # output rate index.
-        f, c, N, ro, no = self._quad_get_frequency_cycles_samples_rate_rateindex(cs)
-        so['Ch1']         = so['Ch2']         = True
-        so['Ch1/Samples'] = so['Ch2/Samples'] = N
-        so.set_list_index('Ch1/Rate', no)
-        so.set_list_index('Ch2/Rate', no)
-
-
-        # Signal out channel
-        so[cs+'/Waveform']       = 'Sine'
-        so[cs+'/Sine/Amplitude'] = sl['Output/Amplitude']
-        so[cs+'/Sine/Cycles']    = c
-        so[cs+'/Sine/Offset']    = 0
-        so[cs+'/Sine/Phase']     = 90
-
-        # Trigger out channel
-        so[ct+'/Waveform']     = 'Square'
-        so[ct+'/Square/Start'] = 0
-
+        # Set up the output channels
+        d = dict()
+        for c in ['Ch1','Ch2']:
+            d[c+'/Waveform']       = 'Sine'
+            d[c+'/Sine/Amplitude'] = sq['Output/'+c+'_Amplitude']
+            d[c+'/Sine/Offset']    = 0
+            d[c+'/Sine/Phase']     = 90
+        
+            so.update(d, block_key_signals=True)
+            so.set_list_index(c+'/Rate', rate_index, block_key_signals=True)
+            so.set_value(c+'/Sine', self.quadratures.number_frequency(), block_key_signals=True)
+        
+            # Update the actual frequency etc
+            self.waveform_designer.update_other_quantities_based_on(c+'/Sine')
+            
+        self.waveform_designer.update_design()
+        f = so['Ch1/Sine'] 
+         
         ### Set up the AI tab.
 
-        si = self.tab_ai.settings
-
-        # Just match the analog out
-        si.set_list_index('Rate', no)
-
-        # Get the input rate number
+        # Set the rates to match and get the input rate
+        si.set_list_index('Rate', rate_index)
         ri = self._ai_get_rate()
 
-        # Calcualte how many samples to record after the delay
+        # Calculate how many samples to record after the delay
         # If f is nonzero, we need an integer number of cycles * time per cycle * the rate
-        if f: samples = _n.ceil(sl['Input/Measure']*f) / f * ri
-
+        if f: 
+            samples = _n.ceil(sq['Input/Collect']*f) / f * ri
+            
+            # If we have too many samples, calculate the max possible within bounds
+            if samples > sq['Input/Max_Samples']:
+                samples = _n.floor(sq['Input/Max_Samples']/f)*f
+                print('samples ', samples)
+                
+                # If we got a zero back, we can't even fit one period in the
+                # input buffer. We should never get here, but raise a flag!
+                if samples <= 0: 
+                    print('ERROR: Max input buffer cannot hold even a single period!')
+                    self.window.set_colors(None, 'pink')
+                    samples = sq['Input/Max_Samples']
+        
         # Otherwise, we just use the time.
-        else: samples = sl['Input/Measure'] * ri
+        else: samples = min(sq['Input/Max_Samples'], _n.round(sq['Sweep/Collect'] * ri))
 
-        # Figure out the max buffer length that is an integer number of periods
-        #                floor( max time * frequency ) * rate
-        max_buffer = int(_n.floor(sl['Input/Max_Buffer']/ri*f)*ri/f)
-
-        # Don't go over budget!
-        si['Samples'] = min(samples, max_buffer)
-
-        # How long to delay after the trigger
-        si['Trigger/Delay'] = 0
+        # Finally.
+        si['Samples'] = samples
 
         # Set the timeout to something reasonable
         si['Timeout'] = max(5*(si['Samples']/ri + si['Trigger/Delay']), 1)
 
         # Other settings
-        si['Iterations'] = 1
-
-        if sl['Input/Trigger_In'] == 'Ch1':
-            si['Trigger/In']            = 'Ch1'
-            si['Trigger/Ch1']           = 'Analog'
-            si['Trigger/Ch1/Condition'] = 'Rising'
-
-        elif sl['Input/Trigger_In'] == 'Ch2':
-            si['Trigger/In']            = 'Ch2'
-            si['Trigger/Ch2']           = 'Analog'
-            si['Trigger/Ch2/Condition'] = 'Rising'
-
-        # Otherwise it's external
-        else:
-            si['Trigger/In']            = 'Ch1'
-            si['Trigger/Ch1']           = 'External (TI)'
-            si['Trigger/Ch1/Condition'] = 'Rising'
+        si['Iterations']    = 1
+        si['Trigger/In']    = 'Ch1'
+        si['Trigger/Ch1']   = 'Immediate'
+        si['Trigger/Delay'] = 0 # We manually delay.
 
         # Also update the demod frequency
-        self.quadratures.number_frequency(f)
+        self.quadratures.number_frequency(f, block_events=True)
 
         # Make sure everything updates!
         self.window.process_events()
 
-    def _quad_get_output_rate_and_index(self):
+    def _quad_get_best_ao_rate_index(self, channel, f_target, min_samples_per_period=20):
         """
-        Returns the rate and index of the best rate.
+        Returns the rate and index of the best rate for the specified 
+        channel and target frequency, respecting the buffer mins and maxes.
+        
+        We get the minimum rate, because that allows for the finest frequency
+        resolution.
+        
+        min_samples_per_period is the minimum number of cycles per period.
         """
-        s  = self.tab_quad.settings
-        so = self.tab_ao  .settings
-        if s['Output/Trigger_Out'] == 'Ch2': cs = 'Ch1'
-        else:                                cs = 'Ch2'
+        sq = self.quadratures.settings
+        
+        if sq['Output/Rate'] == 'Automatic':
 
-        if s['Output/Rate'] == 'Automatic':
-
-
-            # Goal number of points, frequency and rate
-            N = so[cs+'/Samples/Min']
-            F = self.tab_quad.number_ao_frequency.get_value()
-            R = F*N
+            # Minimum rate
+            if f_target: rate_min = min_samples_per_period*f_target
+            else:        rate_min = sq['Input/Max_Samples']/sq['Sweep/Collect']
 
             # Now find the first rate higher than this
             for n in range(len(self._ao_rates)):
                 r = self._ao_rates[-n-1]
-                if r > R: break
+                if r > rate_min: break
 
             # Now get the actual frequency associated with this number of steps
-            return r, self._ao_rates.index(r)
+            return self._ao_rates.index(r)
 
         # Rate is specified by the user
-        else:
-            n = s.get_list_index('Output/Rate')
-            return self._ao_rates[n], n
-
-    def _quad_get_output_rate(self):
-        """
-        Returns the "best" rate for the given settings.
-        """
-        return self._quad_get_output_rate_and_index()[0]
-
+        else: return sq.get_list_index('Output/Rate')
+            
     def _ao_button_stop_clicked(self, *a):
         """
         Stop the ao.
@@ -1335,10 +1310,10 @@ class adalm2000():
         """
         Sends the current design waveform to
         """
-        if not self.tab_ao.button_send.is_checked(): return
+        if not self.waveform_designer.button_send.is_checked(): return
         self.window.process_events()
 
-        s = self.tab_ao.settings
+        s = self.waveform_designer.settings
         p = self.waveform_designer.plot_design
 
         # Enable / disable outputs
@@ -1368,7 +1343,7 @@ class adalm2000():
         ps.copy_all(p)
         ps.plot(); self.window.process_events()
 
-        self.tab_ao.button_send.set_checked(False)
+        self.waveform_designer.button_send.set_checked(False)
         self.window.process_events()
 
     def _ao_after_plot_design_load(self):
@@ -1376,21 +1351,21 @@ class adalm2000():
         Do stuff after the plot is loaded. Update sample rate, samples, switch
         to custom mode, etc.
         """
-        s = self.tab_ao.settings
-        p = self.tab_ao.plot_design
+        s = self.waveform_designer.settings
+        p = self.waveform_designer.plot_design
         s.update(p)
 
     def _ao_get_rate(self, c):
         """
         Returns the rate for the specified channel ('Ch1', or 'Ch2').
         """
-        return self._ao_rates[self.tab_ao.settings.get_list_index(c+'/Rate')]
+        return self._ao_rates[self.waveform_designer.settings.get_list_index(c+'/Rate')]
 
     def _ao_update_waveform_frequency(self, c, w):
         """
         Returns the frequency for the settings under the specified root (e.g. c='Ch1', w='Sine')
         """
-        s = self.tab_ao.settings
+        s = self.waveform_designer.settings
         s.set_value(c+'/'+w, self._ao_get_rate(c)/s[c+'/Samples']*s[c+'/'+w+'/Cycles'],
             block_all_signals=True)
 
@@ -1398,7 +1373,7 @@ class adalm2000():
     #     """
     #     Adds everything for the specified channel ('Ch1' or 'Ch2') to the tab_ao.settings.
     #     """
-    #     s = self.tab_ao.settings
+    #     s = self.waveform_designer.settings
 
     #     s.add_parameter(c, True, tip='Enable analog output 1')
     #     s.add_parameter(c+'/Rate', ['75 MHz', '7.5 MHz', '750 kHz', '75 kHz', '7.5 kHz', '750 Hz'], tip='How fast to output voltages.')
@@ -1431,7 +1406,7 @@ class adalm2000():
         """
         When someone changes the ao settings, update the waveform.
         """
-        if self.tab_ao.checkbox_auto(): self.tab_ao.button_send.click()
+        if self.waveform_designer.checkbox_auto(): self.waveform_designer.button_send.click()
 
     # def _ao_settings_select_waveform(self, c):
     #     """
@@ -1439,14 +1414,14 @@ class adalm2000():
     #     c = 'Ch1' or 'Ch2'.
     #     """
     #     # Show and hide waveform designers
-    #     s = self.tab_ao.settings
+    #     s = self.waveform_designer.settings
     #     for w in ['Sine', 'Square', 'Pulse_Decay']: s.hide_parameter(c+'/'+w, w == s[c+'/Waveform'])
 
     # def _ao_update_design(self):
     #     """
     #     Updates the design waveform based on the current settings.
     #     """
-    #     s = self.tab_ao.settings
+    #     s = self.waveform_designer.settings
 
     #     # Calculate the frequencies from the Repetitions etc
     #     for w in ['Sine', 'Square']:
@@ -1454,7 +1429,7 @@ class adalm2000():
     #         self._ao_update_waveform_frequency('Ch2', w)
 
     #     # Overwrite what's in there.
-    #     p = self.tab_ao.plot_design
+    #     p = self.waveform_designer.plot_design
     #     s.send_to_databox_header(p)
     #     self._ao_generate_waveform('Ch1')
     #     self._ao_generate_waveform('Ch2')
@@ -1467,8 +1442,8 @@ class adalm2000():
     #     Generates the waveform in settings channel c (can be 'Ch1' or 'Ch2'), and
     #     sends this to the design plotter.
     #     """
-    #     s = self.tab_ao.settings    # Shortcut to settings
-    #     p = self.tab_ao.plot_design # Shortcut to plotter
+    #     s = self.waveform_designer.settings    # Shortcut to settings
+    #     p = self.waveform_designer.plot_design # Shortcut to plotter
     #     w = s[c+'/Waveform']        # Waveform string, e.g. 'Sine'
     #     N = s[c+'/Samples']         # Number of samples
     #     R = self._ao_get_rate(c)    # Sampling rate in Hz
@@ -1596,11 +1571,20 @@ class adalm2000():
         """
         Called whenever someone changes a setting in the power tab.
         """
-        if self.tab_power.button_enable_Vp.is_checked(): Vp = self.tab_power.number_set_Vp.get_value()
-        else: Vp = 0
+        tp = self.tab_power
+        if tp.button_enable_Vp(): 
+            Vp = tp.number_set_Vp()
+            tp.button_enable_Vp.set_colors('white', 'green')
+        else: 
+            Vp = 0
+            tp.button_enable_Vp.set_colors(None, None)
 
-        if self.tab_power.button_enable_Vm.is_checked(): Vm = self.tab_power.number_set_Vm.get_value()
-        else: Vm = 0
+        if tp.button_enable_Vm(): 
+            Vm = tp.number_set_Vm()
+            tp.button_enable_Vm.set_colors('white', 'green')
+        else: 
+            Vm = 0
+            tp.button_enable_Vm.set_colors(None, None)
 
         self.api.power.set_Vp(Vp)
         self.api.power.set_Vm(Vm)
@@ -1696,7 +1680,9 @@ class adalm2000():
         """
         # If we just turned it off, poop out instead of starting another loop.
         if not self.tab_ai.button_acquire.is_checked(): return
-
+        
+        self.tab_ai.button_acquire.set_colors('white', 'blue')
+        
         # Easy coding
         s  = self.tab_ai.settings
         p  = self.tab_ai.plot_raw
@@ -1716,7 +1702,7 @@ class adalm2000():
             if s['Trigger/In'] == 'Ch2' and s['Trigger/Ch2'] == 'External (TI)':
                 s['Trigger/In'] = 'Ch1'
                 s['Trigger/Ch1'] = 'External (TI)'
-
+            
             # Set the timeout
             self.api.set_timeout(int(s['Timeout']*1000));
 
@@ -1728,7 +1714,6 @@ class adalm2000():
             self.ai.set_range_big(s['Ch1_Range']=='25V', s['Ch2_Range']=='25V')
 
             # Set the trigger source, out, conditions, and levels
-
             self.ai.set_trigger_in  (s.get_list_index('Trigger/In'))
             self.ai.set_trigger_out (s.get_list_index('Trigger/Out'))
             t_delay = self.ai.set_trigger_delay(s['Trigger/Delay'])
@@ -1743,20 +1728,24 @@ class adalm2000():
                                            s['Trigger/Ch2/Hysteresis'])
 
             # Get the time array
-            ts = _n.linspace(t_delay, t_delay + (s['Samples']-1)/rate, s['Samples'])
+            ts = _n.linspace(t_delay, t_delay + (int(s['Samples'])-1)/rate, int(s['Samples']))
 
             # Get the data
-            self.tab_ai.button_onair.set_checked(True).set_colors('red', 'pink'); self.window.process_events();
-            vs = self.ai.get_samples(s['Samples'])
-            self.tab_ai.button_onair.set_checked(False).set_colors(None, None); self.window.process_events();
-
+            self.tab_ai.button_onair(True).set_colors('red', 'pink'); 
+            self.window.process_events();
+            
+            vs = self.ai.get_samples(int(s['Samples']))
+            
+            self.tab_ai.button_onair(False).set_colors(None, None); 
+            self.window.process_events();
+            
             # If vs==None it's a timeout
             if vs:
                 # Clear and send the current settings to plotter
                 p.clear()
                 s.send_to_databox_header(p)
-                self.tab_ao.settings.send_to_databox_header(p)
-                self.tab_quad.settings.send_to_databox_header(p)
+                self.waveform_designer.settings.send_to_databox_header(p)
+                self.quadratures.settings.send_to_databox_header(p)
                 p.h(t=_t.time()-self.t0, t0=self.t0)
 
                 # Add columns
@@ -1769,28 +1758,19 @@ class adalm2000():
 
                 # External analysis
                 self.process_data()
-
-                # Send it to the demodulator
-                if self.tab_quad.checkbox_enable.is_checked():
-
-                    # Shortcuts
-                    pd = self.quadratures.plot_raw
-
-                    # Clear and import the header
-                    pd.clear()
-                    pd.copy_headers_from(p)
-
-                    # Copy the columns in the right fashion (time-signal pairs)
-                    for k in p.ckeys[1:]:
-                        pd['t_'+k] = p['t']
-                        pd[k]  = p[k]
-
-                    pd.plot().autosave()
-
-                    # Run the quadrature calculation
-                    if self.quadratures.checkbox_auto():
-                        self.quadratures.button_get_quad.click()
-
+                
+                # If quad is enabled, send it over and process it
+                q = self.quadratures
+                if q.checkbox_auto():
+                    
+                    # Import the data
+                    q.button_get_raw.click()
+                    self.window.process_events()
+                    
+                    # Get the quadratures
+                    q.button_get_quadratures.click()
+                    self.window.process_events()
+                
                 # Increment, update move on.
                 n += 1
                 self.tab_ai.label_info.set_text('Iteration: '+str(n))
@@ -1808,14 +1788,15 @@ class adalm2000():
                 self.tab_ai.settings['Trigger/Ch2'] = 'Immediate'
 
                 # Warn the demodders know it's not triggered.
-                if self.tab_quad.button_go.is_checked():
-                    self.tab_quad.button_go.set_colors('white', 'red')
+                if self.quadratures.button_get_raw.is_checked():
+                    self.quadratures.button_get_raw.set_colors('white', 'red')
 
             # Let the user interact
             self.window.process_events()
 
         # Pop the button when we're done.
         self.tab_ai.button_acquire.set_checked(False)
+        self.tab_ai.button_acquire.set_colors('white','blue')
 
     def after_load_ai_plot_raw(self):
         """
@@ -1854,6 +1835,6 @@ class adalm2000():
 
 if __name__ == '__main__':
     _m = _mp._libm2k
-    _g.clear_egg_settings()
+    #_g.clear_egg_settings()
     self = adalm2000()
     self.button_connect.click()
