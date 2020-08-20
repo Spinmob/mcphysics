@@ -54,17 +54,17 @@ def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=20
     residuals = _n.minimum(abs(options-_n.ceil(options)), abs(options-_n.floor(options)))
 
     # Find the best fit.
-    if len(residuals): 
-        
+    if len(residuals):
+
         # Now we can get the number of cycles
         c = _n.where(residuals==min(residuals))[0][0]
-    
+
         # Now we can get the number of samples
         N = int(_n.round(N1*(c+min_cycles)))
-    
+
         # If this is below the minimum value, set it to the minimum
         if N < min_samples: N = min_samples
-    
+
     # Single period does not fit. Use the maximum number of samples to get the lowest possible frequency.
     else: N = max_samples
 
@@ -146,29 +146,29 @@ class waveform_designer(_g.Window):
 
     Parameters
     ----------
-    
+
     rates=1000
         Can be a list of available output rates (Hz, numbers or strings), or number (Hz).
         You are responsible for overloading self.get_rate if you use a list of strings!
-    
+
     name='waveform_designer'
         Unique identifier for autosettings. Make sure it is unique!
-    
+
     sync_rates=False
         Set to True to automatically synchronize the rates between channels.
-    
+
     sync_samples=False
         Set to True to automatically synchronize the number of output samples between channels.
-    
+
     margins=False
         Whether to include margins around this.
-        
+
     get_rate=None
         Optional function to overload the default self.get_rate()
 
     **kwargs are sent to the waveform DataboxPlot.
     """
-    def __init__(self, rates=1000, name='waveform_designer', 
+    def __init__(self, rates=1000, name='waveform_designer',
                  sync_rates=False, sync_samples=False, margins=False, get_rate=None, **kwargs):
         _g.Window.__init__(self, title=name, margins=margins, autosettings_path=name)
 
@@ -196,7 +196,7 @@ class waveform_designer(_g.Window):
         self.tab_design.new_autorow()
         self.plot_design = self.tab_design.add(_g.DataboxPlot(file_type='*.w', autosettings_path=name+'.plot_design', autoscript=2, **kwargs), alignment=0)
 
-        
+
     def _get_nearest_frequency_settings(self, key):
         """
         Finds the closest frequency possible for the current settings, then
@@ -467,20 +467,20 @@ class waveform_designer(_g.Window):
         Given the "master" key, (e.g. 'Rate'), calculate and update all other
         dependent quantities, and sync channels if we're supposed to.
         """
-        
+
         # Update the other quantities for this channel
         self._sync_rates_samples_time(key)
-        
+
         name   = key.split('/')[-1]
         parent = key.split('/')[-2]
-        
+
         # If it's a frequency, we have to calculate the closest possible
         if name in ['Sine', 'Square']: self._get_nearest_frequency_settings(key)
 
         # Sync the other channel settings if we're supposed to.
         if name in ['Rate', 'Samples', 'Time', 'Sine', 'Square']: self._sync_channels(parent)
 
-        
+
 class quadratures(_g.Window):
     """
     Tabs for calculating quadratures.
@@ -493,14 +493,14 @@ class quadratures(_g.Window):
 
         self.grid_left  = self.add(_g.GridLayout(margins=False))
         self.grid_right = self.add(_g.GridLayout(margins=False), alignment=0)
-        
+
         # # GRID LEFT
         self.grid_left_top  = self.grid_left.add(_g.GridLayout(margins=False), alignment=0)
         self.grid_left.new_autorow()
         self.settings = self.grid_left.add(_g.TreeDictionary(
             autosettings_path  = name+'.settings',
             name               = name+'.settings')).set_width(240)
-        
+
         # Add the sweep controls
         self.button_sweep = self.grid_left_top.add(_g.Button(
             text            = 'Sweep',
@@ -511,11 +511,11 @@ class quadratures(_g.Window):
         self.number_step = self.grid_left_top.add(_g.NumberBox(
             0, int=True, bounds=(0,None), tip='Current step number.'), 3, 0)
         self.grid_left_top.set_column_stretch(1)
-        
+
         self.grid_left_top.add(_g.Label('Iteration:'), 2,1, alignment=2)
         self.number_iteration_sweep = self.grid_left_top.add(_g.NumberBox(
             0, int=True, bounds=(0,None), tip='Iteration at this frequency.'), 3,1)
-        
+
         # Add the sweep settings
         s = self.settings
 
@@ -523,7 +523,7 @@ class quadratures(_g.Window):
             s.add_parameter('Output/'+c+'_Amplitude', 0.1, step=0.01,
                 suffix = '', siPrefix = True,
                 tip = 'Amplitude of '+c+' output cosine.')
-        
+
         s.add_parameter('Input/Settle', 0.1, dec=True,
             suffix = 's', siPrefix = True,
             tip = 'How long to settle after changing the frequency.')
@@ -531,7 +531,7 @@ class quadratures(_g.Window):
         s.add_parameter('Input/Collect', 0.1, dec=True,
             suffix = 's', siPrefix = True,
             tip = 'Minimum amount of data to collect (will be an integer number of periods).')
-        
+
         s.add_parameter('Input/Max_Samples', 100000.0, dec=True,
             suffix='S', siPrefix=True, bounds=(100,None),
             tip = 'Maximum allowed input samples (to avoid very long runs, e.g.).')
@@ -540,9 +540,9 @@ class quadratures(_g.Window):
             suffix='reps', bounds=(1,None), siPrefix=True,
             tip = 'How many times to repeat the quadrature measurement at each step after settling.')
 
-        s.add_parameter('Sweep/Clear', False, 
+        s.add_parameter('Sweep/Clear', False,
             tip = 'Clear the Quadratures plot before starting.')
-        
+
         s.add_parameter('Sweep/Start', 100.0, dec=True,
             suffix = 'Hz', siPrefix=True,
             tip = 'Sweep start frequency.')
@@ -561,7 +561,7 @@ class quadratures(_g.Window):
 
         # GRID RIGHT
 
-        self.grid_right_top  = self.grid_right.add(_g.GridLayout(margins=False))        
+        self.grid_right_top  = self.grid_right.add(_g.GridLayout(margins=False))
         self.number_frequency = self.grid_right_top.add(_g.NumberBox(
             1000, step=0.1, dec = True,
             suffix='Hz', siPrefix = True,
@@ -593,7 +593,7 @@ class quadratures(_g.Window):
         self.number_iteration_total = self.grid_right_top.add(_g.NumberBox(
             0, int=True, tip='Loop iteration (zero\'th column in Quadratures plot.'))
 
-        
+
 
         # # Tabs for plot
         self.grid_right.new_autorow()
@@ -615,7 +615,7 @@ class quadratures(_g.Window):
             int    = True,
             bounds = (0, None),
             autosettings_path = name+'.number_history'))
-        
+
         # self.combo_autoscript = self.tab_quad.add(_g.ComboBox(
         #     ['Autoscript Disabled', 'Magnitude-Phase'],
         #     autosettings_path = name+'.combo_autoscript',
@@ -733,13 +733,13 @@ class quadratures(_g.Window):
 
         # Plot!
         p.plot()
-        
+
     def get_sweep_step_frequency(self, step):
         """
         Returns the frequency at the specified step. Note this step is indexed
-        relative to 1 (matching the GUI), so it goes from 1 to 
+        relative to 1 (matching the GUI), so it goes from 1 to
         self.settings['Sweep/Steps'].
-        
+
         Returns None otherwise.
         """
         step = int(step)
@@ -757,14 +757,34 @@ class quadratures(_g.Window):
 
         return fs[step-1]
 
-    
+
 if __name__ == '__main__':
 
-    _egg.clear_egg_settings()
+    #_egg.clear_egg_settings()
     # self = signal_chain()
 
-    #self = waveform_designer(sync_samples=True, sync_rates=True).add_channels('a', 'b')
-    # self.add_channel('Ch1',7000).add_channel('Ch2',5000)
+    self = waveform_designer(sync_samples=True, sync_rates=True).add_channels('a', 'b')
 
-    self = quadratures()
+    #self = quadratures()
     self.show()
+
+    # Set up the output channels
+    so = self.settings
+    p  = self.plot_design
+    d = dict()
+    c = 'a'
+    so[c+'/Waveform'] = 'Sine'
+    d[c+'/Sine/Offset']    = 0
+    d[c+'/Sine/Phase']     = 90
+
+    so.update(d, block_key_signals=True)
+    so.set_value(c+'/Rate', 750000.0, block_key_signals=True)
+    so.set_value(c+'/Sine', 2000.0, block_key_signals=True)
+
+    # Update the actual frequency etc
+    self.update_other_quantities_based_on(c+'/Sine')
+
+    self.update_design()
+
+    print(so[c+'/Sine'])
+
