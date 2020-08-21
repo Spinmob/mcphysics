@@ -89,20 +89,20 @@ def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=20
     f  = n*df                       # Actual frequency that fits.
     return f, n, N
 
-class signal_chain(_g.Window):
+class data_processor(_g.Window):
     """
     Tab area containing a raw data tab and signal processing tabs.
 
     Parameters
     ----------
-    name='signal_chain'
+    name='data_processor'
         Unique identifier for autosettings. Make sure it is unique!
     margins=False
         Whether to include margins around this.
 
     **kwargs are sent to the raw databox plot.
     """
-    def __init__(self, name='signal_chain', margins=False, **kwargs):
+    def __init__(self, name='data_processor', margins=False, **kwargs):
 
         # Initialize the tabarea
         _g.Window.__init__(self, title=name, margins=margins, autosettings_path=name)
@@ -798,7 +798,7 @@ class quadratures(_g.Window):
 if __name__ == '__main__':
 
     _egg.clear_egg_settings()
-    # self = signal_chain()
+    # self = data_processor()
 
     self = waveform_designer(sync_samples=True, sync_rates=True,
                              buffer_increment=4).add_channels('a', 'b')

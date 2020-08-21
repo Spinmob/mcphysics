@@ -157,14 +157,14 @@ class soundcard():
 #        s.add_parameter('Trigger/Delay',      0.0,  suffix='s', siPrefix=True, tip='How long to wait after the trigger before keeping the data. Negative number means it will keep that much data before the trigger.')
 
         # Aliases and shortcuts
-        self.signal_chain    = self.tab_in.signal_chain = self.tab_in.add(_gt.signal_chain(name+'.tabs_ai_plots'), alignment=0)
-        self.tab_in.plot_raw = self.signal_chain.plot_raw
-        self.tab_in.A1       = self.tab_in.A1       = self.signal_chain.A1
-        self.tab_in.A2       = self.tab_in.A2       = self.signal_chain.A2
-        self.tab_in.A3       = self.tab_in.A3       = self.signal_chain.A3
-        self.tab_in.B1       = self.tab_in.B1       = self.signal_chain.B1
-        self.tab_in.B2       = self.tab_in.B2       = self.signal_chain.B2
-        self.tab_in.B3       = self.tab_in.B3       = self.signal_chain.B3
+        self.data_processor    = self.tab_in.data_processor = self.tab_in.add(_gt.data_processor(name+'.tabs_ai_plots'), alignment=0)
+        self.tab_in.plot_raw = self.data_processor.plot_raw
+        self.tab_in.A1       = self.tab_in.A1       = self.data_processor.A1
+        self.tab_in.A2       = self.tab_in.A2       = self.data_processor.A2
+        self.tab_in.A3       = self.tab_in.A3       = self.data_processor.A3
+        self.tab_in.B1       = self.tab_in.B1       = self.data_processor.B1
+        self.tab_in.B2       = self.tab_in.B2       = self.data_processor.B2
+        self.tab_in.B3       = self.tab_in.B3       = self.data_processor.B3
         self.tab_in.set_column_stretch(1)
 
         # AO tab
@@ -721,7 +721,7 @@ class soundcard():
             # Plot autosave and run the signal analysis chain.
             self.tab_in.plot_raw.plot()
             self.tab_in.plot_raw.autosave()
-            self.signal_chain.run()
+            self.data_processor.run()
 
             # If we're running a sweep, send the data to the quadratures raw
             # We also send the sweep state to indicate whether that function
@@ -997,7 +997,7 @@ class soundcard():
         
 
 if __name__ == '__main__':
-    _g.clear_egg_settings()
+    #_g.clear_egg_settings()
     import sys
     def my_hook(*a):
         print('PANTS', a)
