@@ -68,7 +68,7 @@ The McPhysics library is organized heirarchically, and you should use Spyder's c
   * __keithley_dmm_api():__ Lower level, non-graphical interface for the DMM.
   * __[sillyscope()](https://github.com/Spinmob/mcphysics/wiki/instruments.sillyscope()):__ Semi-unified graphical interface for interacting with an assortment of Rigol and Tektronix sillyscopes.
   * __sillyscope_api():__ Lower level, non-graphical interface for the same sillyscopes.
-  * __[soundcard()](https://github.com/Spinmob/mcphysics/wiki/instruments.auber_syl53x2p():__ Scriptable graphical interface for interacting with sound cards.
+  * __[soundcard()](https://github.com/Spinmob/mcphysics/wiki/instruments.auber_syl53x2p()):__ Scriptable graphical interface for interacting with sound cards.
   
  ### mcphysics.playground
   * __fitting_statistics_demo():__ Graphical fake data generator and fitter. Useful for visualizing fit statistics.
