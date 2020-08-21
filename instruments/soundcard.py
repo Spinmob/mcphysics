@@ -61,9 +61,12 @@ class soundcard():
         # Combo device selector
         device_names = self.get_device_names()
         self.grid_top.add(_g.Label('Input:'))
-        self.combo_device_in = self.grid_top.add(_g.ComboBox(device_names, autosettings_path=name+'.combo_device_in'))
+        self.combo_device_in = self.grid_top.add(_g.ComboBox(
+            device_names, autosettings_path=name+'.combo_device_in'))
         self.grid_top.add(_g.Label('Rate (Hz):'))
-        self.combo_rate_in = self.grid_top.add(_g.ComboBox(self._rates,  autosettings_path=name+'.combo_rate_in'))
+        self.combo_rate_in = self.grid_top.add(_g.ComboBox(
+            self._rates,  autosettings_path=name+'.combo_rate_in',
+            default_index=4))
 
         # Buffer
         self.grid_top.add(_g.Label('Buffer: '))
@@ -101,7 +104,9 @@ class soundcard():
         self.grid_top.add(_g.Label('Output: '))
         self.combo_device_out = self.grid_top.add(_g.ComboBox(device_names, autosettings_path=name+'.combo_device_out'))
         self.grid_top.add(_g.Label('Rate (Hz):'))
-        self.combo_rate_out = self.grid_top.add(_g.ComboBox(self._rates,  autosettings_path=name+'.combo_rate_out'))
+        self.combo_rate_out = self.grid_top.add(_g.ComboBox(
+            self._rates,  autosettings_path=name+'.combo_rate_out',
+            default_index=4))
 
         # Link the signals
         self.combo_device_out.signal_changed.connect(self._combo_device_changed)
@@ -143,7 +148,7 @@ class soundcard():
         s.add_parameter('Iterations', 0, tip='Number of times to repeat the measurement. Set to 0 for infinite repetitions.')
         s.add_parameter('Rate', self._rates, default_list_index=4, tip='Sampling rate (Hz, synced with Samples and Time).')
         s.add_parameter('Samples', 1000.0, bounds=(1,    None), dec=True, siPrefix=True, suffix='S', tip='How many samples to record (synced with Rate and Time).')
-        s.add_parameter('Time',       0.0, bounds=(1e-9, None), dec=True, siPrefix=True, suffix='s', tip='Duration of recording (synced with Rate and Samples).')
+        s.add_parameter('Time',       0.1, bounds=(1e-9, None), dec=True, siPrefix=True, suffix='s', tip='Duration of recording (synced with Rate and Samples).')
         s.add_parameter('Trigger', ['Continuous', 'Left', 'Right'], tip='Trigger Mode')
         s.add_parameter('Trigger/Level',      0.0,  step=0.01, bounds=(-1,1), tip='Trigger level')
         s.add_parameter('Trigger/Hysteresis', 0.0, step=0.01, bounds=(0,2), tip='How far on the other side of the trigger the signal must go before retriggering is allowed.')
@@ -992,7 +997,7 @@ class soundcard():
         
 
 if __name__ == '__main__':
-    #_g.clear_egg_settings()
+    _g.clear_egg_settings()
     import sys
     def my_hook(*a):
         print('PANTS', a)
