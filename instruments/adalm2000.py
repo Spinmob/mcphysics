@@ -911,7 +911,7 @@ class adalm2000():
             tip='Send the designed waveform to the actual analog outputs.'))
 
         wd.checkbox_auto = wd.grid_controls.add(_g.CheckBox(
-            'Enabled', autosettings_path=self.name+'.tab_ao.checkbox_auto',
+            'Auto', autosettings_path=self.name+'.tab_ao.checkbox_auto',
             signal_toggled=self._ao_after_settings_changed,
             tip='Automatically send the designed waveform whenever it changes.'))
 
