@@ -326,14 +326,23 @@ class waveform_designer(_g.Window):
         # If we get a Rate, Samples, or Time, update the others
         if x[1] in ['Rate', 'Samples', 'Time']:
             s = self.settings
+            
+            # Catch an infinite loop
+            if s[x[0]+'/Samples/Max'] <= s[x[0]+'/Samples/Min']:  s.set_value(x[0]+'/Samples/Max', 2*s[x[0]+'/Samples/Min'], block_key_signals=True)
+            
+            # If samples is out of range, do the whole process again.
+            if x[1] in ['Samples']:
+                if   s[x[0]+'/Samples'] > s[x[0]+'/Samples/Max']: s[x[0]+'/Samples'] = s[x[0]+'/Samples/Max']
+                elif s[x[0]+'/Samples'] < s[x[0]+'/Samples/Min']: s[x[0]+'/Samples'] = s[x[0]+'/Samples/Min']
 
             # If Rate or Time changed, set the number of samples, rounding
-            if x[1] in ['Rate', 'Time']: s.set_value(x[0]+'/Samples', _n.ceil(s[x[0]+'/Time'] * self.get_rate(x[0])), block_key_signals=True)
+            if x[1] in ['Rate', 'Time']: s.set_value(x[0]+'/Samples', _n.ceil(s[x[0]+'/Time'] * self.get_rate(x[0])), block_key_signals=False)
 
             # Make sure the time matches the rounded samples (or changed samples!)
             s.set_value(x[0]+'/Time', s[x[0]+'/Samples'] / self.get_rate(x[0]), block_key_signals=True)
 
-
+            
+            
     def _sync_channels(self, channel):
         """
         Syncs them up if we're supposed to, using channel as the example.
@@ -418,7 +427,7 @@ class waveform_designer(_g.Window):
 
         # If we got a single value, it should be a floating point number
         if not _s.fun.is_iterable(rates):
-            s.add_parameter(c+'/Rate', rates, bounds=(1e-9, None), dec=True, siPrefix=True, suffix='Hz', tip='Output sampling rate (synced with Samples and Time).')
+            s.add_parameter(c+'/Rate', float(rates), bounds=(1e-9, None), dec=True, siPrefix=True, suffix='Hz', tip='Output sampling rate (synced with Samples and Time).')
         else:
             rate_strings = []
             for a in rates: rate_strings.append(str(a))
@@ -859,10 +868,10 @@ if __name__ == '__main__':
     _egg.clear_egg_settings()
     # self = data_processor()
 
-    # self = waveform_designer(sync_samples=True, sync_rates=True,
-    #                          buffer_increment=4).add_channels('a', 'b')
+    self = waveform_designer(sync_samples=True, sync_rates=True,
+                             buffer_increment=4).add_channels('a', 'b')
 
-    self = quadratures()
+    #self = quadratures()
     self.show()
 
     # # Set up the output channels
