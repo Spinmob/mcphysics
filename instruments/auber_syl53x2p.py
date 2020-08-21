@@ -262,7 +262,7 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
             f.write('%.6f,%.1f,%.1f,%.1f\n' % (t,T,S,P))
             f.close()
 
-    def _after_button_connect_clicked(self):
+    def _after_button_connect_toggled(self):
         """
         Called after the connection or disconnection routine.
         """
