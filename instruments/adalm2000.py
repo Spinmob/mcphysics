@@ -1252,7 +1252,7 @@ class adalm2000():
         si['Trigger/Delay'] = 0 # We manually delay.
 
         # Also update the demod frequency
-        self.quadratures.number_frequency(f, block_events=True)
+        self.quadratures.number_frequency(f, block_signals=True)
 
         # Make sure everything updates!
         self.window.process_events()
