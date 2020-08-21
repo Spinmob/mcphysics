@@ -598,6 +598,8 @@ class quadratures(_g.Window):
         # GRID RIGHT
 
         self.grid_right_top  = self.grid_right.add(_g.GridLayout(margins=False))
+        
+        self.grid_right_top.add(_g.Label('Frequency:'))
         self.number_frequency = self.grid_right_top.add(_g.NumberBox(
             1000, step=0.1, dec = True,
             suffix='Hz', siPrefix = True,
