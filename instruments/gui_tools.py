@@ -541,6 +541,7 @@ class quadratures(_g.Window):
         self.button_sweep = self.grid_left_top.add(_g.Button(
             text            = 'Sweep',
             checkable       = True,
+            tip = 'Set outputs, collect data, and estimate quadratures at a variety of frequencies specified below.',
             signal_toggled  = self._button_sweep_toggled_pre), 0,0)
 
         self.grid_left_top.add(_g.Label('Step:'), 2,0, alignment=2)
