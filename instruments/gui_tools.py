@@ -618,9 +618,15 @@ class quadratures(_g.Window):
             tip='Get the quadratures from the data source.').set_width(120))
 
         self.checkbox_auto = self.grid_right_top.add(_g.CheckBox(
-            text              = 'Auto',
+            text              = 'Auto  ',
             autosettings_path = name+'.checkbox_auto',
             tip='Automatically get quadratures for all incoming data.'))
+
+        self.checkbox_truncate = self.grid_right_top.add(_g.CheckBox(
+            text              = 'Truncate  ',
+            checked           = True,
+            autosettings_path = name+'.checkbox_truncate',
+            tip='Automatically truncate the data to an integer number of oscillations.'))
 
         self.button_loop = self.grid_right_top.add(_g.Button(
             text           = 'Loop',
@@ -684,7 +690,9 @@ class quadratures(_g.Window):
         if d:
             self.plot_raw.clear()
             self.plot_raw.copy_all(d)
+            self.truncate_raw_data()
             self.plot_raw.plot()
+            
 
     def _button_loop_toggled(self, *a):
         """
@@ -710,13 +718,18 @@ class quadratures(_g.Window):
         DataboxPlot object having time-signal column pairs, e.g., t1, V1, t2, V2, ...
         """
         print('WARNING: quadratures.get_raw() is currently a dummy function that produces simulated data.')
+        self.button_get_raw.set_colors('white', 'red')
+        
+        N = _n.random.randint(700,1000)
+        
         d = _s.data.databox()
-        t = _n.linspace(0,1,400)
+        t = _n.linspace(0, (N-1)*1e-5, N)
         f = self.number_frequency()
         d['t1'] = t
-        d['V1'] = _n.random.normal(size=400)+_n.sin(2*_n.pi*f*t + 0.2)
+        d['V1'] = _n.random.normal(size=N)+4*_n.sin(2*_n.pi*f*t)
         d['t2'] = t
-        d['V2'] = _n.random.normal(size=400)+_n.cos(2*_n.pi*f*t + 0.2)
+        d['V2'] = _n.random.normal(size=N)+4*_n.cos(2*_n.pi*f*t)
+        
         return d
 
     def get_quadratures(self, f=None):
@@ -796,16 +809,59 @@ class quadratures(_g.Window):
 
         return fs[step-1]
 
+    def truncate_raw_data(self, override_checkbox=False):
+        """
+        Truncates the raw data to an integer number of periods for the shown
+        frequency. Assumes the data in the Raw tab is in time-signal column.
+        
+        By default, this function will only truncate if the Truncate checkbox
+        is enabled. Setting override_checkbox=True will truncate even if it's not.
+        """
+        if not override_checkbox and not self.checkbox_truncate(): return self
+        
+        # Shortcuts
+        d = self.plot_raw
+        f = self.number_frequency()
+
+        # Don't truncate if the frequency is zero.
+        if f==0: return self
+        
+        # Loop over the data.
+        for n in range(0, len(d), 2):
+            
+            # Get the time step and total time
+            dt = d[n][1] -d[n][0]
+            T  = d[n][-1]-d[n][0]
+            
+            # Get the number of periods that fits
+            N = int(_n.floor(f*T))
+            
+            # If it's zero, we're hosed
+            if N < 1: 
+                print('WARNING, quadratures.truncate_raw_data(): Not even one period at frequency',f,'fits within the supplied data; truncation aborted.')
+                return self
+        
+            # Get the truncated time and samples
+            T = N/f
+            samples = int(_n.round(T/dt))
+            
+            # Truncate.
+            d[n]   = d[n  ][0:samples]
+            d[n+1] = d[n+1][0:samples]
+         
+        return self
+            
+
 
 if __name__ == '__main__':
 
     _egg.clear_egg_settings()
     # self = data_processor()
 
-    self = waveform_designer(sync_samples=True, sync_rates=True,
-                             buffer_increment=4).add_channels('a', 'b')
+    # self = waveform_designer(sync_samples=True, sync_rates=True,
+    #                          buffer_increment=4).add_channels('a', 'b')
 
-    #self = quadratures()
+    self = quadratures()
     self.show()
 
     # # Set up the output channels
