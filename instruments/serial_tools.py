@@ -37,7 +37,10 @@ class serial_gui_base(_g.BaseObject):
 
         # Remebmer the name.
         self.name = name
-
+        
+        # Checks periodically for the last exception
+        self.timer_exceptions = _g.ExceptionTimer()
+       
         # Where the actual api will live after we connect.
         self.api = None
         self._api_class = api_class
@@ -150,5 +153,6 @@ class serial_gui_base(_g.BaseObject):
         Disconnects. When you close the window.
         """
         print('Window closed but not destroyed. Use show() to bring it back.')
-        print('  Disconnecting...')
-        self.button_connect(False)
+        if self.button_connect():
+            print('  Disconnecting...')
+            self.button_connect(False)

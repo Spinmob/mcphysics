@@ -195,6 +195,9 @@ class visa_gui_base(_g.BaseObject):
         self._write_sleep = write_sleep
         self._timeout     = timeout
 
+        # Periodically checks for an exception and prints it.
+        self.timer_exceptions = _g.ExceptionTimer()
+
         # No instrument selected yet
         self.api = None
         self._api_base = api
