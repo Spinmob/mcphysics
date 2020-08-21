@@ -269,7 +269,7 @@ class fitting_statistics_demo():
             s = s+']'
             
             # Set to manual script and update the text
-            self.plot_parameters.combo_autoscript.set_value(0, block_events=True)
+            self.plot_parameters.combo_autoscript.set_value(0, block_signals=True)
             self.plot_parameters.script.set_text(s)
             
             # HISTOGRAMS: Clear the figure and set up the histogram axes

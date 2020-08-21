@@ -748,7 +748,7 @@ class soundcard():
         self.combo_device_out.enable()
         self.combo_device_in.enable()
         self.number_buffer.enable()
-        self.tab_in.button_triggered(False, block_events=True).set_text('Idle').set_colors(None,None)
+        self.tab_in.button_triggered(False, block_signals=True).set_text('Idle').set_colors(None,None)
         self.button_playrecord(False)
         self.button_record(False)
         self.button_play  (False)

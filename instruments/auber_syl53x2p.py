@@ -156,32 +156,48 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         _serial_tools.serial_gui_base.__init__(self, api_class=auber_syl53x2p_api, name=name, show=False, window_size=window_size)
 
         # Add GUI stuff to the bottom grid
-        self.tabs = self.grid_bot.add(_g.TabArea(autosettings_path=name+'.tabs'), alignment=0)
-        self.tab_stream = self.tabs.add_tab('Stream')
-
-        self.label_temperature = self.tab_stream.add(_g.Label('Temperature:')).set_style('font-size: 20pt; font-weight: bold; color: '+('pink' if _s.settings['dark_theme_qt'] else 'red'))
-        self.tab_stream.new_autorow()
-        self.tab_stream.grid_controls = self.tab_stream.add(_g.GridLayout(margins=False))
-        self.label_setpoint  = self.tab_stream.grid_controls.add(_g.Label('Setpoint:'))
-        self.number_setpoint = self.tab_stream.grid_controls.add(_g.NumberBox(-273.16, bounds=(-273.16, 500), suffix=' C')).set_width(100)
-        self.text_note       = self.tab_stream.grid_controls.add(_g.TextBox('Note')).set_width(200)
-        self.button_dump     = self.tab_stream.grid_controls.add(_g.Button('Dump Data', checkable=True))
-        self.label_dump_path = self.tab_stream.grid_controls.add(_g.Label(''))
-
-        # Expand remaining space
-        self.tab_stream.grid_controls.set_column_stretch(self.tab_stream.grid_controls._auto_column)
-
+        self.label_temperature = self.grid_bot.add(_g.Label('Temperature:')).set_style('font-size: 20pt; font-weight: bold; color: '+('pink' if _s.settings['dark_theme_qt'] else 'red'))
+        
+        self.grid_bot.new_autorow()
+        
+        self.grid_bot.grid_controls = self.grid_bot.add(_g.GridLayout(margins=False))
+        
+        self.grid_bot.grid_controls.add(_g.Label('Setpoint:'))
+        
+        self.number_setpoint = self.grid_bot.grid_controls.add(_g.NumberBox(
+            -273.16, bounds=(-273.16, 500), suffix='°C',
+            signal_changed=self._number_setpoint_changed)).set_width(100)
+        
+        self.grid_bot.grid_controls.add(_g.Label('History:'))
+        self.number_history  = self.grid_bot.grid_controls.add(_g.NumberBox(
+            0, bounds=(0,None), int=True, 
+            autosettings_path=name+'.number_history',
+            tip='How many points to keep in the plot. Set to 0 to keep everything.\n'+
+                'You can also use the script to display the last N points with indexing,\n'+
+                'e.g., d[0][-200:], which will not delete the old data.'))
+        
+        
         # Make the plotter.
-        self.tab_stream.new_autorow()
-        self.plot_stream = self.tab_stream.add(_g.DataboxPlot(file_type='*.csv', autosettings_path=name+'.plot', delimiter=','), alignment=0, column_span=10)
+        self.grid_bot.new_autorow()
+        self.plot_stream = self.grid_bot.add(_g.DataboxPlot(file_type='*.csv', autosettings_path=name+'.plot', delimiter=','), alignment=0, column_span=10)
 
         # Timer for collecting data
         self.timer = _g.Timer(interval_ms=1000, single_shot=False)
         self.timer.signal_tick.connect(self._timer_tick)
 
-        # Other signals
-        self.button_dump.signal_toggled.connect(self._button_dump_toggled)
-        self.number_setpoint.signal_changed.connect(self._number_setpoint_changed)
+        # Bottom log file controls
+        self.grid_bot.new_autorow()
+        self.grid_bot.grid_controls2 = self.grid_bot.add(_g.GridLayout(margins=False))
+        self.text_note       = self.grid_bot.grid_controls2.add(_g.TextBox(
+            'Log File Note', tip='Note to be added to the log file header.')).set_width(290)
+        
+        self.button_dump     = self.grid_bot.grid_controls2.add(_g.Button(
+            'Log Data', 
+            checkable=True,
+            signal_toggled=self._button_dump_toggled,
+            tip='Append incoming data to a text file of your choice.'))
+
+        self.label_dump_path = self.grid_bot.grid_controls2.add(_g.Label(''))
 
         # Finally show it.
         self.window.show(block)
@@ -232,7 +248,7 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         T = self.api.get_temperature()
         S = self.api.get_temperature_setpoint()
         P = self.api.get_main_output_power()
-        self.number_setpoint.set_value(S, block_events=True)
+        self.number_setpoint.set_value(S, block_signals=True)
 
         # Append this to the databox
         self.plot_stream.append_row([t, T, S, P], ckeys=['Time (s)', 'Temperature (C)', 'Setpoint (C)', 'Power (%)'])
@@ -254,7 +270,7 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
 
             # Get the setpoint
             try:
-                self.number_setpoint.set_value(self.api.get_temperature_setpoint(), block_events=True)
+                self.number_setpoint.set_value(self.api.get_temperature_setpoint(), block_signals=True)
                 self.timer.start()
             except:
                 self.number_setpoint.set_value(0)

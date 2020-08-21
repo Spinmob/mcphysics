@@ -1063,11 +1063,6 @@ class adalm2000():
         self._quad_configure_ao_ai()
         self.waveform_designer.button_send.click()
 
-        print('step',
-              q.number_step(),
-              q.get_sweep_step_frequency(q.number_step()),
-              self.tab_ao.settings['Ch1/Sine'])
-
         # Wait for the send to finish
         while self.waveform_designer.button_send.is_checked(): self.window.sleep(0.01)
 

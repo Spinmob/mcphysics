@@ -288,7 +288,7 @@ class visa_gui_base(_g.BaseObject):
             if not self.api.instrument == None: self.api.instrument.close()
             self.api = None
             self.label_instrument_name.set_text('Disconnected')
-            self.button_connect.set_checked(False, block_events=True)
+            self.button_connect.set_checked(False, block_signals=True)
 
             # Make sure it's not still red and bold.
             self.label_instrument_name.set_style('')
