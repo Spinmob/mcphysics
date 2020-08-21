@@ -888,6 +888,7 @@ class adalm2000():
             name = self.name+'.waveform_designer',
             sync_rates=False,
             sync_samples=False,
+            buffer_increment=4,
             get_rate = self.get_ao_rate), alignment=0)
         self.waveform_designer.add_channels('Ch1','Ch2')
 
@@ -1088,13 +1089,6 @@ class adalm2000():
         q.button_go(False).set_colors(None, None)
         q.checkbox_auto(False)
 
-
-
-
-
-
-
-
     def _quad_button_sweep_toggled(self, *a):
         """
         Starts a sweep.
@@ -1126,18 +1120,6 @@ class adalm2000():
         # Uncheck it when done
         q.button_sweep.set_checked(False)
         q.button_sweep.set_colors(None, None)
-
-    # def _quad_settings_changed(self, *a):
-    #     """
-    #     If someone changed a setting in the lockin tab.
-    #     """
-    #     f, c, N, r, n = self._quad_get_errthing_that_fits()
-
-    #     # Update the frequency
-    #     self.quadratures.number_frequency.set_value(f,block_events=True)
-
-    #     # Trigger a reconfigure on the next demod
-    #     self._quad_needs_configure_ao_ai = True
 
     def _quad_get_errthing_that_fits(self, cs):
         """
@@ -1337,9 +1319,6 @@ class adalm2000():
         else:
             if s['Ch1']: self.ao.send_samples(1, p['V1'])
             if s['Ch2']: self.ao.send_samples(2, p['V2'])
-
-
-
 
         # Clear and replace the send plot info
         ps = self.waveform_designer.plot_sent

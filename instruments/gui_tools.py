@@ -10,7 +10,7 @@ _x = None
 
 
 
-def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=200, max_samples=8096):
+def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=200, max_samples=8096, buffer_increment=1):
     """
     Finds the closest frequency (Hz) that is possible for the specified rate (Hz)
     and a buffer size between min_samples and max_samples.
@@ -29,6 +29,10 @@ def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=20
     max_samples : int
         Maximum buffer size allowed.
 
+    buffer_increment=1 : int
+        Enforce that the output buffer size is an integer multiple of this.
+        For the adalm2000, e.g., this must be 4 as of v0.2.1 libm2k
+
     Returns
     -------
     nearest achievable frequency
@@ -38,31 +42,41 @@ def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=20
     buffer size to achieve this
     """
 
-    # Now, given this rate, calculate the number of points needed to make one cycle.
+    # Make sure min_samples and max_samples are integer multiples of buffer_increment
+    max_samples = max_samples - max_samples%buffer_increment
+    min_samples = min_samples - min_samples%buffer_increment + buffer_increment
+
+    # Number of points needed to make one cycle.
     if f_target: N1 = rate / f_target # This is a float with a remainder
-    else:        N1 = min_samples
+    else:        return 0.0, 1, min_samples
 
     # The goal now is to add an integer number of these cycles up to the
     # max_samples and look for the one with the smallest remainder.
     max_cycles = int(        max_samples/N1 )
     min_cycles = int(_n.ceil(min_samples/N1))
 
-    # List of options to search
-    options = _n.array(range(min_cycles,max_cycles+1)) * N1 # Possible floats
+    # List of precise buffer sizes (floating point) to consider.
+    # We want to pick the one that is the closest to an integer multiple
+    # of buffer_increment.
+    options = _n.array(range(min_cycles,max_cycles+1)) * N1
 
-    # How close each option is to an integer.
-    residuals = _n.minimum(abs(options-_n.ceil(options)), abs(options-_n.floor(options)))
+    # How close each option is to an allowed number of samples
+    mods = options % buffer_increment
+    residuals = _n.minimum(mods, abs(mods-buffer_increment))
 
     # Find the best fit.
     if len(residuals):
 
-        # Now we can get the number of cycles
-        c = _n.where(residuals==min(residuals))[0][0]
+        # Now we can get the exact number of cycles for the smallest residuals
+        Nxact = options[_n.argmin(residuals)]
 
-        # Now we can get the number of samples
-        N = int(_n.round(N1*(c+min_cycles)))
+        # Round Nxact to the nearest allowed buffer size.
+        residual = Nxact % buffer_increment
+        if residual < 0.5*buffer_increment: N = Nxact - residual
+        else:                               N = Nxact - residual + buffer_increment
 
         # If this is below the minimum value, set it to the minimum
+        # Not sure how this could happen.
         if N < min_samples: N = min_samples
 
     # Single period does not fit. Use the maximum number of samples to get the lowest possible frequency.
@@ -70,10 +84,9 @@ def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=20
 
     # Now, given this number of points, which might include several oscillations,
     # calculate the actual closest frequency
-    df = rate/N # Frequency step
+    df = rate/N                     # Allowed frequencies for this N
     n  = int(_n.round(f_target/df)) # Number of cycles
-    f  = n*df # Actual frequency that fits.
-
+    f  = n*df                       # Actual frequency that fits.
     return f, n, N
 
 class signal_chain(_g.Window):
@@ -160,20 +173,27 @@ class waveform_designer(_g.Window):
     sync_samples=False
         Set to True to automatically synchronize the number of output samples between channels.
 
-    margins=False
-        Whether to include margins around this.
+    buffer_increment=1 : int
+        Force the output buffer to be an integer multiple of this value. For
+        the ADALM2000 and libm2k v0.2.1, this is 4.
 
     get_rate=None
         Optional function to overload the default self.get_rate()
 
+    margins=False
+        Whether to include margins around this.
+
     **kwargs are sent to the waveform DataboxPlot.
     """
     def __init__(self, rates=1000, name='waveform_designer',
-                 sync_rates=False, sync_samples=False, margins=False, get_rate=None, **kwargs):
+                 sync_rates=False, sync_samples=False,
+                 buffer_increment=1,
+                 get_rate=None, margins=False, **kwargs):
         _g.Window.__init__(self, title=name, margins=margins, autosettings_path=name)
 
         # Overload
         if get_rate: self.get_rate = get_rate
+        self.buffer_increment=buffer_increment
 
         # Remember these specifications
         self.name=name
@@ -208,7 +228,8 @@ class waveform_designer(_g.Window):
             f_target    = self.settings[key],
             rate        = self.get_rate(channel),
             min_samples = self.settings[channel+'/Samples/Min'],
-            max_samples = self.settings[channel+'/Samples/Max'])
+            max_samples = self.settings[channel+'/Samples/Max'],
+            buffer_increment = self.buffer_increment)
 
         # Now update the settings
         self.settings.set_value(channel+'/Samples', samples, block_key_signals=True)
@@ -474,6 +495,21 @@ class waveform_designer(_g.Window):
         name   = key.split('/')[-1]
         parent = key.split('/')[-2]
 
+        if name == 'Samples':
+            s = self.settings
+            v = s[key]
+
+            # Enforce the buffer increment
+            r = s[key] % self.buffer_increment
+            if r: v = s[key] - r + self.buffer_increment
+
+            # Enforce the min max
+            if v > s[key+'/Max']: v = s[key+'/Max']
+            if v < s[key+'/Min']: v = s[key+'/Min']
+
+            s.set_value(key, v, block_key_signals=True)
+
+
         # If it's a frequency, we have to calculate the closest possible
         if name in ['Sine', 'Square']: self._get_nearest_frequency_settings(key)
 
@@ -554,7 +590,7 @@ class quadratures(_g.Window):
         s.add_parameter('Sweep/Steps', 10.0, dec=True,
             tip = 'Number of steps from start to stop.')
 
-        s.add_parameter('Sweep/Log_Scale', False,
+        s.add_parameter('Sweep/Log_Steps', False,
             tip = 'Whether to use log-spaced steps between Start and Stop.')
 
 
@@ -663,7 +699,8 @@ class quadratures(_g.Window):
         """
         When someone toggles the sweep, clear.
         """
-        if self.settings['Sweep/Clear']: self.plot_quadratures.clear()
+        if self.button_sweep() and self.settings['Sweep/Clear']:
+            self.plot_quadratures.clear()
 
     def get_raw(self):
         """
@@ -747,7 +784,7 @@ class quadratures(_g.Window):
         if step < 1 or step > sd['Sweep/Steps']: return None
 
         # Get the frequency list.
-        if sd['Sweep/Log_Scale']:
+        if sd['Sweep/Log_Steps']:
             if sd['Sweep/Start'] == 0: sd['Sweep/Start'] = sd['Stop' ]*0.01
             if sd['Sweep/Stop' ] == 0: sd['Sweep/Stop' ] = sd['Start']*0.01
             if sd['Sweep/Start'] == 0: return
@@ -760,31 +797,32 @@ class quadratures(_g.Window):
 
 if __name__ == '__main__':
 
-    #_egg.clear_egg_settings()
+    _egg.clear_egg_settings()
     # self = signal_chain()
 
-    self = waveform_designer(sync_samples=True, sync_rates=True).add_channels('a', 'b')
+    self = waveform_designer(sync_samples=True, sync_rates=True,
+                             buffer_increment=4).add_channels('a', 'b')
 
     #self = quadratures()
     self.show()
 
-    # Set up the output channels
-    so = self.settings
-    p  = self.plot_design
-    d = dict()
-    c = 'a'
-    so[c+'/Waveform'] = 'Sine'
-    d[c+'/Sine/Offset']    = 0
-    d[c+'/Sine/Phase']     = 90
+    # # Set up the output channels
+    # so = self.settings
+    # p  = self.plot_design
+    # d = dict()
+    # c = 'a'
+    # so[c+'/Waveform'] = 'Sine'
+    # d[c+'/Sine/Offset']    = 0
+    # d[c+'/Sine/Phase']     = 90
 
-    so.update(d, block_key_signals=True)
-    so.set_value(c+'/Rate', 750000.0, block_key_signals=True)
-    so.set_value(c+'/Sine', 2000.0, block_key_signals=True)
+    # so.update(d, block_key_signals=True)
+    # so.set_value(c+'/Rate', 750000.0, block_key_signals=True)
+    # so.set_value(c+'/Sine', 2000.0, block_key_signals=True)
 
-    # Update the actual frequency etc
-    self.update_other_quantities_based_on(c+'/Sine')
+    # # Update the actual frequency etc
+    # self.update_other_quantities_based_on(c+'/Sine')
 
-    self.update_design()
+    # self.update_design()
 
-    print(so[c+'/Sine'])
+    # print(so[c+'/Sine'])
 
