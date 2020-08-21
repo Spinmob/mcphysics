@@ -60,14 +60,15 @@ The McPhysics library is organized heirarchically, and you should use Spyder's c
   * __voigt():__ Voigt probability density function.
  
  ### mcphysics.instruments
-  * __[adalm2000()](https://github.com/Spinmob/mcphysics/wiki/instruments.adalm2000()):__ Scriptable graphical interface for the ADALM2000 multifunction DAQ.
+  * __[adalm2000()](https://github.com/Spinmob/mcphysics/wiki/instruments.adalm2000):__ Scriptable graphical interface for the ADALM2000 multifunction DAQ.
   * __adalm2000_api():__ Lower level, non-graphical interface for the ADALM2000.
-  * __[auber_syl53x2p](https://github.com/Spinmob/mcphysics/wiki/instruments.auber_syl53x2p()):__ Scriptable graphical interface for an Auber SYL-53X2P temperature controller.
+  * __[auber_syl53x2p](https://github.com/Spinmob/mcphysics/wiki/instruments.auber_syl53x2p):__ Scriptable graphical interface for an Auber SYL-53X2P temperature controller.
   * __auber_syl53x2p_apo():__ Lower level, non-graphical interface for the Auber SYL-53X2P.
-  * __[keithley_dmm()](https://github.com/Spinmob/mcphysics/wiki/instruments.keithley_dmm()):__ Graphical interface for our the Keithley digital multimeters (currently 199).
+  * __[keithley_dmm()](https://github.com/Spinmob/mcphysics/wiki/instruments.keithley_dmm):__ Graphical interface for our the Keithley digital multimeters (currently 199).
   * __keithley_dmm_api():__ Lower level, non-graphical interface for the DMM.
-  * __[sillyscope()](https://github.com/Spinmob/mcphysics/wiki/instruments.sillyscope()):__ Semi-unified graphical interface for interacting with an assortment of Rigol and Tektronix sillyscopes.
+  * __[sillyscope()](https://github.com/Spinmob/mcphysics/wiki/instruments.sillyscope):__ Semi-unified graphical interface for interacting with an assortment of Rigol and Tektronix sillyscopes.
   * __sillyscope_api():__ Lower level, non-graphical interface for the same sillyscopes.
+  * __[soundcard()](https://github.com/Spinmob/mcphysics/wiki/instruments.soundcard):__ Scriptable graphical interface for interacting with sound cards.
   
  ### mcphysics.playground
   * __fitting_statistics_demo():__ Graphical fake data generator and fitter. Useful for visualizing fit statistics.
