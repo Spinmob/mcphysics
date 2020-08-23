@@ -52,6 +52,8 @@ class soundcard():
 
         # Main Layout
         self.window = _g.Window('Soundcard', autosettings_path=name+'.window')
+        self.window.event_close = self._event_close
+
         self.grid_top = self.window.add(_g.GridLayout(margins=False), alignment=0)
         self.window.new_autorow()
         self.tabs = self.window.add(_g.TabArea(autosettings_path=name+'.tabs'), alignment=0)
@@ -118,7 +120,7 @@ class soundcard():
         # self.set_output_device(self.get_selected_input_device_index())
         # self.combo_device_out.set_index(self.get_selected_input_device_index())
 
-        
+
 
         # AI tab
         self.tab_in = self.tabs.add_tab('Input')
@@ -194,25 +196,25 @@ class soundcard():
 
 
         # QUADRATURES TAB
-        
+
         self.tab_quad = self.tabs.add_tab('Quadratures')
-        
+
         self.quadratures = self.tab_quad.quadratures = self.tab_quad.add(_gt.quadratures(
             channels = ['Left', 'Right'],
             name = name+'.quadratures'), alignment=0)
-        
+
         # Loop button is overkill
         self.quadratures.button_loop.hide()
-        
+
         # Signals
         self.quadratures.button_sweep.signal_toggled.connect(self._button_sweep_frequency_toggled)
         self.quadratures.button_get_raw.signal_toggled.connect(self._button_quad_get_raw_toggled)
-        
+
         # Modify the existing buttons because this system is so weird.
         self.quadratures.button_get_raw.set_checkable(True).set_text('Get Data')
         self.quadratures.button_get_raw.signal_toggled.connect(self._button_quad_get_raw_toggled)
         self.quadratures.get_raw = lambda *a : None  # Kill the fake data.
-        
+
         # Sweep signals
         self.signal_sweep_iterate  = _s.thread.signal(self._sweep_iterate)
         self.signal_waveform_ok    = _s.thread.signal(self._sweep_waveform_ok)
@@ -225,19 +227,29 @@ class soundcard():
         # Show the window
         if show: self.window.show(block)
 
+    def _event_close(self, *a):
+        """
+        Called when the window closes.
+        """
+        print('Stopping soundcard and closing window, but not destroying. Use self.window.show() to bring it back.')
+        self.quadratures.button_sweep(False)
+        self.button_playrecord(False)
+        self.button_play(False)
+        self.button_record(False)
+
     def _button_quad_get_raw_toggled(self, *a):
         """
         Someone toggles the get_raw button.
         """
         # Make sure the record button is clicked.
         self.button_record(self.quadratures.button_get_raw())
-        
+
     def _button_sweep_frequency_toggled(self, *a):
         """
         When someone toggles "Sweep".
         """
         # Start the process.
-        if self.quadratures.button_sweep(): 
+        if self.quadratures.button_sweep():
             self.quadratures.button_sweep.set_colors('white', 'green')
             self.signal_sweep_iterate.emit((0,0))
         else:
@@ -246,35 +258,35 @@ class soundcard():
     def _sweep_iterate(self, a):
         """
         Performs one iteration and increments the counter.
-        
+
         n is the zero-referenced step, and i is the zero-referenced
         iteration at this step.
-        
+
         """
         # Unpack the data
         n, i = a
-        
+
         # Shortcuts
         q = self.quadratures
-        
+
         # If we're done.
-        if n >= q.settings['Sweep/Steps'] or not q.button_sweep(): 
+        if n >= q.settings['Sweep/Steps'] or not q.button_sweep():
             q.button_sweep(False).set_colors(None, None)
             return
 
         # Update the user; we do iteration after data comes in.
         I = self.quadratures.number_step(n+1)
         self.quadratures.number_iteration_sweep(i+1)
-        
-        # We only have to set up the output and let it settle 
+
+        # We only have to set up the output and let it settle
         # if we're starting a new frequency
-        if i > 0: 
+        if i > 0:
             self.quadratures.button_get_raw(True)
             return
-        
+
         # Get the current target frequency
         f_target = self.quadratures.get_sweep_step_frequency(I())
-        
+
         # Shortcuts
         pd = self.quadratures.plot_raw
         sd = self.quadratures.settings
@@ -290,18 +302,18 @@ class soundcard():
             'Left/Sine'            : f_target,
             'Left/Sine/Phase'      : 90,
             'Left/Sine/Amplitude'  : sd['Output/Left_Amplitude'],
-            
+
             'Right/Waveform'       : 'Sine',
             'Right/Sine/Phase'     : 90,
             'Right/Sine/Amplitude' : sd['Output/Right_Amplitude'],
-            
+
             'Left' : True,
             'Right': True,
             'Left/Loop'  : True,
             'Right/Loop' : True,
             }
         so.update(output_settings, block_key_signals=True)
-        
+
         # Calculate and update the rest of the settings.
         self.waveform_designer.update_other_quantities_based_on('Left/Sine')
         so.set_value('Right/Sine/Cycles', so['Left/Sine/Cycles'], block_key_signals=True)
@@ -314,7 +326,7 @@ class soundcard():
         # Update the ACTUAL quadrature frequency
         f = so['Left/Sine']
         self.quadratures.number_frequency(f)
-        
+
         # Figure out how many samples we need to have a integer number of periods AND be larger
         # than our collect time.
         if f:
@@ -323,20 +335,20 @@ class soundcard():
             samples = _n.round(periods*samples_per_period)
         else:
             samples = _n.round(float(self.combo_rate_in.get_text())*sd['Input/Collect'])
-       
+
         si['Iterations'] = 0
         si['Samples'] = samples
         si['Trigger'] = 'Continuous'
-        
+
         # Uncheck auto mode (handled by Get Raw button)
         self.quadratures.checkbox_auto(False)
-        
+
         # If we haven't started yet, start playing
         self.button_play(True)
 
         # Tell it to look for a new waveform. It will emit a signal when it gets this.
         self._set_shared(new_waveform = True)
-        
+
 
     def _sweep_waveform_ok(self, a):
         """
@@ -354,13 +366,13 @@ class soundcard():
         Called when the input has new data to get the quadratures from.
         """
         data, underflow, overflow, get_quadratures = a
-        
+
         # If there was an error, retry the point.
         if underflow or overflow:
             self.signal_sweep_iterate.emit(
                 (self.quadratures.number_step()-1, self.quadratures.number_iteration_sweep()-1))
             return
-        
+
         # Otherwise, it's valid, so analyze.
 
         # Shortcuts
@@ -379,7 +391,7 @@ class soundcard():
             pd[k]  = pr[k]
 
         pd.plot().autosave()
-        
+
         # Run the quadrature calculation
         if get_quadratures: self.quadratures.button_get_quadratures.click()
 
@@ -390,7 +402,7 @@ class soundcard():
         if I() >= self.quadratures.settings['Input/Iterations']:
             I(0)
             self.signal_sweep_iterate.emit((S(), I()))
-        
+
         # Next iteration
         else: self.signal_sweep_iterate.emit((S()-1, I()))
 
@@ -403,8 +415,8 @@ class soundcard():
         self.button_playrecord(False)
         self.button_play(False)
         self.button_record(False)
-        
-    
+
+
 
     # def _wait_for_new_waveform(self, timeout=3):
     #     """
@@ -437,7 +449,7 @@ class soundcard():
             if not self._shared['stream']: self._start_stream()
 
         else: self.button_play.set_colors(None, None)
-                
+
         self._thread_locker.unlock()
         # Otherwise we let it finish on its own.
 
@@ -454,7 +466,7 @@ class soundcard():
         if self.button_record():
 
             # We're starting over, so clear the stream if it exists.
-            if self._shared['stream']: 
+            if self._shared['stream']:
                 self._shared['stream'].read(self._shared['stream'].read_available)
                 self._shared['abort'] = True
 
@@ -536,7 +548,7 @@ class soundcard():
         buffer_in = _n.zeros((Ni,2), dtype=_n.float32)
         underflow = False
         overflow  = False
-        
+
         # Prevent slowdown for large index
         self._shared['no'] = self._shared['no'] % len(self._shared['L'])
 
@@ -570,7 +582,7 @@ class soundcard():
                 n1 = self._shared['no']
                 n2 = self._shared['no']+self._shared['stream'].write_available
 
-                # Wrap slows down for big indices. 
+                # Wrap slows down for big indices.
                 L = _n.take(self._shared['L'], range(n1,n2), mode='wrap')
                 R = _n.take(self._shared['R'], range(n1,n2), mode='wrap')
 
@@ -578,7 +590,7 @@ class soundcard():
                 oops_out = self._shared['stream'].write(
                     _n.ascontiguousarray(
                         _n.array([L, R], dtype=_n.float32).transpose() ) )
-                if oops_out: 
+                if oops_out:
                     underflow = self._shared['underflow'] = True
                     self._signal_output_underflow.emit(None)
 
@@ -597,7 +609,7 @@ class soundcard():
 
                 # Get what's available
                 data, oops_in = self._shared['stream'].read(n2-n1)
-                if oops_in: 
+                if oops_in:
                     overflow = self._shared['overflow'] = True
                     self._signal_input_overflow.emit(None)
 
@@ -705,7 +717,7 @@ class soundcard():
         # make sure it doesn't touch _thread_shared_data or stream
         if self._ready_for_more_data and not a is None:
 
-            (data, underflow, overflow) = a            
+            (data, underflow, overflow) = a
 
             self._ready_for_more_data = False
 
@@ -726,7 +738,7 @@ class soundcard():
             # If we're running a sweep, send the data to the quadratures raw
             # We also send the sweep state to indicate whether that function
             # should automatically get the quadratures.
-            if self.quadratures.button_get_raw() or self.quadratures.checkbox_auto(): 
+            if self.quadratures.button_get_raw() or self.quadratures.checkbox_auto():
                 self.signal_quad_new_data.emit(
                     (data, underflow, overflow, self.quadratures.button_sweep() or self.quadratures.checkbox_auto()))
 
@@ -736,7 +748,7 @@ class soundcard():
                 self.button_playrecord(False)
                 self.button_record(False)
                 self.button_play(False)
-                
+
             # Otherwise get the next data.
             else: self._ready_for_more_data = True
 
@@ -757,7 +769,7 @@ class soundcard():
         self.button_playrecord(False)
         self.button_record(False)
         self.button_play  (False)
-        
+
     def _start_stream(self, *a):
         """
         Someone clicked "record".
@@ -849,7 +861,7 @@ class soundcard():
         Called when someone changes the device.
         """
         self.set_devices(
-            self.combo_device_in .get_index(), 
+            self.combo_device_in .get_index(),
             self.combo_device_out.get_index())
 
     def _combo_rate_changed(self, *a):
@@ -904,7 +916,7 @@ class soundcard():
     def _get_shared(self, key, return_type):
         """
         Returns a copy of an object from self._shared in a thread-safe way.
-        
+
         Returns None if the key doesn't exist.
 
         return_type is the function that does the copying, e.g. int.
@@ -994,7 +1006,7 @@ class soundcard():
         Sets both input and output to the same device.
         """
         self.set_devices(device,device)
-        
+
 
 if __name__ == '__main__':
     #_g.clear_egg_settings()
