@@ -78,6 +78,7 @@ class errthing(_ut.TestCase):
     def test_instruments_sillyscope(self):       _m.instruments.sillyscope(block=True)
     def test_instruments_keithley_dmm(self):     _m.instruments.keithley_dmm(block=True)
     def test_instruments_auber_syl53x2p(self):   _m.instruments.auber_syl53x2p(block=True)
+    def test_instruments_soundcard(self):        _m.instruments.soundcard(block=True)
 
     def test_playground(self):
         global b
