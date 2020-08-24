@@ -37,13 +37,18 @@ class serial_gui_base(_g.BaseObject):
 
         # Remebmer the name.
         self.name = name
-
+        
+        # Checks periodically for the last exception
+        self.timer_exceptions = _g.ExceptionTimer()
+       
         # Where the actual api will live after we connect.
         self.api = None
         self._api_class = api_class
 
         # GUI stuff
-        self.window   = _g.Window(self.name, size=window_size, autosettings_path=name+'.window')
+        self.window   = _g.Window(
+            self.name, size=window_size, autosettings_path=name+'.window',
+            event_close = self._window_close)
         self.grid_top = self.window.place_object(_g.GridLayout(margins=False), alignment=0)
         self.window.new_autorow()
         self.grid_bot = self.window.place_object(_g.GridLayout(margins=False), alignment=0)
@@ -135,10 +140,19 @@ class serial_gui_base(_g.BaseObject):
             self.grid_bot.disable()
 
         # User function
-        self._after_button_connect_clicked()
+        self._after_button_connect_toggled()
 
     def _after_button_connect_toggled(self):
         """
         Dummy function called after connecting.
         """
         return
+    
+    def _window_close(self):
+        """
+        Disconnects. When you close the window.
+        """
+        print('Window closed but not destroyed. Use show() to bring it back.')
+        if self.button_connect():
+            print('  Disconnecting...')
+            self.button_connect(False)

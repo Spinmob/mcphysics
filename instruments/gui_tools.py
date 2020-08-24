@@ -10,7 +10,7 @@ _x = None
 
 
 
-def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=200, max_samples=8096):
+def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=200, max_samples=8096, buffer_increment=1):
     """
     Finds the closest frequency (Hz) that is possible for the specified rate (Hz)
     and a buffer size between min_samples and max_samples.
@@ -29,6 +29,10 @@ def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=20
     max_samples : int
         Maximum buffer size allowed.
 
+    buffer_increment=1 : int
+        Enforce that the output buffer size is an integer multiple of this.
+        For the adalm2000, e.g., this must be 4 as of v0.2.1 libm2k
+
     Returns
     -------
     nearest achievable frequency
@@ -38,31 +42,41 @@ def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=20
     buffer size to achieve this
     """
 
-    # Now, given this rate, calculate the number of points needed to make one cycle.
+    # Make sure min_samples and max_samples are integer multiples of buffer_increment
+    max_samples = max_samples - max_samples%buffer_increment
+    min_samples = min_samples - min_samples%buffer_increment + buffer_increment
+
+    # Number of points needed to make one cycle.
     if f_target: N1 = rate / f_target # This is a float with a remainder
-    else:        N1 = min_samples
+    else:        return 0.0, 1, min_samples
 
     # The goal now is to add an integer number of these cycles up to the
     # max_samples and look for the one with the smallest remainder.
     max_cycles = int(        max_samples/N1 )
     min_cycles = int(_n.ceil(min_samples/N1))
 
-    # List of options to search
-    options = _n.array(range(min_cycles,max_cycles+1)) * N1 # Possible floats
+    # List of precise buffer sizes (floating point) to consider.
+    # We want to pick the one that is the closest to an integer multiple
+    # of buffer_increment.
+    options = _n.array(range(min_cycles,max_cycles+1)) * N1
 
-    # How close each option is to an integer.
-    residuals = _n.minimum(abs(options-_n.ceil(options)), abs(options-_n.floor(options)))
+    # How close each option is to an allowed number of samples
+    mods = options % buffer_increment
+    residuals = _n.minimum(mods, abs(mods-buffer_increment))
 
     # Find the best fit.
     if len(residuals):
 
-        # Now we can get the number of cycles
-        c = _n.where(residuals==min(residuals))[0][0]
+        # Now we can get the exact number of cycles for the smallest residuals
+        Nxact = options[_n.argmin(residuals)]
 
-        # Now we can get the number of samples
-        N = int(_n.round(N1*(c+min_cycles)))
+        # Round Nxact to the nearest allowed buffer size.
+        residual = Nxact % buffer_increment
+        if residual < 0.5*buffer_increment: N = Nxact - residual
+        else:                               N = Nxact - residual + buffer_increment
 
         # If this is below the minimum value, set it to the minimum
+        # Not sure how this could happen.
         if N < min_samples: N = min_samples
 
     # Single period does not fit. Use the maximum number of samples to get the lowest possible frequency.
@@ -70,26 +84,25 @@ def get_nearest_frequency_settings(f_target=12345.678, rate=10e6, min_samples=20
 
     # Now, given this number of points, which might include several oscillations,
     # calculate the actual closest frequency
-    df = rate/N # Frequency step
+    df = rate/N                     # Allowed frequencies for this N
     n  = int(_n.round(f_target/df)) # Number of cycles
-    f  = n*df # Actual frequency that fits.
-
+    f  = n*df                       # Actual frequency that fits.
     return f, n, N
 
-class signal_chain(_g.Window):
+class data_processor(_g.Window):
     """
     Tab area containing a raw data tab and signal processing tabs.
 
     Parameters
     ----------
-    name='signal_chain'
+    name='data_processor'
         Unique identifier for autosettings. Make sure it is unique!
     margins=False
         Whether to include margins around this.
 
     **kwargs are sent to the raw databox plot.
     """
-    def __init__(self, name='signal_chain', margins=False, **kwargs):
+    def __init__(self, name='data_processor', margins=False, **kwargs):
 
         # Initialize the tabarea
         _g.Window.__init__(self, title=name, margins=margins, autosettings_path=name)
@@ -160,20 +173,27 @@ class waveform_designer(_g.Window):
     sync_samples=False
         Set to True to automatically synchronize the number of output samples between channels.
 
-    margins=False
-        Whether to include margins around this.
+    buffer_increment=1 : int
+        Force the output buffer to be an integer multiple of this value. For
+        the ADALM2000 and libm2k v0.2.1, this is 4.
 
     get_rate=None
         Optional function to overload the default self.get_rate()
 
+    margins=False
+        Whether to include margins around this.
+
     **kwargs are sent to the waveform DataboxPlot.
     """
     def __init__(self, rates=1000, name='waveform_designer',
-                 sync_rates=False, sync_samples=False, margins=False, get_rate=None, **kwargs):
+                 sync_rates=False, sync_samples=False,
+                 buffer_increment=1,
+                 get_rate=None, margins=False, **kwargs):
         _g.Window.__init__(self, title=name, margins=margins, autosettings_path=name)
 
         # Overload
         if get_rate: self.get_rate = get_rate
+        self.buffer_increment=buffer_increment
 
         # Remember these specifications
         self.name=name
@@ -208,7 +228,8 @@ class waveform_designer(_g.Window):
             f_target    = self.settings[key],
             rate        = self.get_rate(channel),
             min_samples = self.settings[channel+'/Samples/Min'],
-            max_samples = self.settings[channel+'/Samples/Max'])
+            max_samples = self.settings[channel+'/Samples/Max'],
+            buffer_increment = self.buffer_increment)
 
         # Now update the settings
         self.settings.set_value(channel+'/Samples', samples, block_key_signals=True)
@@ -305,14 +326,23 @@ class waveform_designer(_g.Window):
         # If we get a Rate, Samples, or Time, update the others
         if x[1] in ['Rate', 'Samples', 'Time']:
             s = self.settings
+            
+            # Catch an infinite loop
+            if s[x[0]+'/Samples/Max'] <= s[x[0]+'/Samples/Min']:  s.set_value(x[0]+'/Samples/Max', 2*s[x[0]+'/Samples/Min'], block_key_signals=True)
+            
+            # If samples is out of range, do the whole process again.
+            if x[1] in ['Samples']:
+                if   s[x[0]+'/Samples'] > s[x[0]+'/Samples/Max']: s[x[0]+'/Samples'] = s[x[0]+'/Samples/Max']
+                elif s[x[0]+'/Samples'] < s[x[0]+'/Samples/Min']: s[x[0]+'/Samples'] = s[x[0]+'/Samples/Min']
 
             # If Rate or Time changed, set the number of samples, rounding
-            if x[1] in ['Rate', 'Time']: s.set_value(x[0]+'/Samples', _n.ceil(s[x[0]+'/Time'] * self.get_rate(x[0])), block_key_signals=True)
+            if x[1] in ['Rate', 'Time']: s.set_value(x[0]+'/Samples', _n.ceil(s[x[0]+'/Time'] * self.get_rate(x[0])), block_key_signals=False)
 
             # Make sure the time matches the rounded samples (or changed samples!)
             s.set_value(x[0]+'/Time', s[x[0]+'/Samples'] / self.get_rate(x[0]), block_key_signals=True)
 
-
+            
+            
     def _sync_channels(self, channel):
         """
         Syncs them up if we're supposed to, using channel as the example.
@@ -397,7 +427,7 @@ class waveform_designer(_g.Window):
 
         # If we got a single value, it should be a floating point number
         if not _s.fun.is_iterable(rates):
-            s.add_parameter(c+'/Rate', rates, bounds=(1e-9, None), dec=True, siPrefix=True, suffix='Hz', tip='Output sampling rate (synced with Samples and Time).')
+            s.add_parameter(c+'/Rate', float(rates), bounds=(1e-9, None), dec=True, siPrefix=True, suffix='Hz', tip='Output sampling rate (synced with Samples and Time).')
         else:
             rate_strings = []
             for a in rates: rate_strings.append(str(a))
@@ -474,6 +504,21 @@ class waveform_designer(_g.Window):
         name   = key.split('/')[-1]
         parent = key.split('/')[-2]
 
+        if name == 'Samples':
+            s = self.settings
+            v = s[key]
+
+            # Enforce the buffer increment
+            r = s[key] % self.buffer_increment
+            if r: v = s[key] - r + self.buffer_increment
+
+            # Enforce the min max
+            if v > s[key+'/Max']: v = s[key+'/Max']
+            if v < s[key+'/Min']: v = s[key+'/Min']
+
+            s.set_value(key, v, block_key_signals=True)
+
+
         # If it's a frequency, we have to calculate the closest possible
         if name in ['Sine', 'Square']: self._get_nearest_frequency_settings(key)
 
@@ -505,6 +550,7 @@ class quadratures(_g.Window):
         self.button_sweep = self.grid_left_top.add(_g.Button(
             text            = 'Sweep',
             checkable       = True,
+            tip = 'Set outputs, collect data, and estimate quadratures at a variety of frequencies specified below.',
             signal_toggled  = self._button_sweep_toggled_pre), 0,0)
 
         self.grid_left_top.add(_g.Label('Step:'), 2,0, alignment=2)
@@ -554,7 +600,7 @@ class quadratures(_g.Window):
         s.add_parameter('Sweep/Steps', 10.0, dec=True,
             tip = 'Number of steps from start to stop.')
 
-        s.add_parameter('Sweep/Log_Scale', False,
+        s.add_parameter('Sweep/Log_Steps', False,
             tip = 'Whether to use log-spaced steps between Start and Stop.')
 
 
@@ -562,6 +608,8 @@ class quadratures(_g.Window):
         # GRID RIGHT
 
         self.grid_right_top  = self.grid_right.add(_g.GridLayout(margins=False))
+        
+        self.grid_right_top.add(_g.Label('Frequency:'))
         self.number_frequency = self.grid_right_top.add(_g.NumberBox(
             1000, step=0.1, dec = True,
             suffix='Hz', siPrefix = True,
@@ -580,9 +628,15 @@ class quadratures(_g.Window):
             tip='Get the quadratures from the data source.').set_width(120))
 
         self.checkbox_auto = self.grid_right_top.add(_g.CheckBox(
-            text              = 'Auto',
+            text              = 'Auto  ',
             autosettings_path = name+'.checkbox_auto',
             tip='Automatically get quadratures for all incoming data.'))
+
+        self.checkbox_truncate = self.grid_right_top.add(_g.CheckBox(
+            text              = 'Truncate  ',
+            checked           = True,
+            autosettings_path = name+'.checkbox_truncate',
+            tip='Automatically truncate the data to an integer number of oscillations.'))
 
         self.button_loop = self.grid_right_top.add(_g.Button(
             text           = 'Loop',
@@ -646,7 +700,9 @@ class quadratures(_g.Window):
         if d:
             self.plot_raw.clear()
             self.plot_raw.copy_all(d)
+            self.truncate_raw_data()
             self.plot_raw.plot()
+            
 
     def _button_loop_toggled(self, *a):
         """
@@ -663,7 +719,8 @@ class quadratures(_g.Window):
         """
         When someone toggles the sweep, clear.
         """
-        if self.settings['Sweep/Clear']: self.plot_quadratures.clear()
+        if self.button_sweep() and self.settings['Sweep/Clear']:
+            self.plot_quadratures.clear()
 
     def get_raw(self):
         """
@@ -671,13 +728,18 @@ class quadratures(_g.Window):
         DataboxPlot object having time-signal column pairs, e.g., t1, V1, t2, V2, ...
         """
         print('WARNING: quadratures.get_raw() is currently a dummy function that produces simulated data.')
+        self.button_get_raw.set_colors('white', 'red')
+        
+        N = _n.random.randint(700,1000)
+        
         d = _s.data.databox()
-        t = _n.linspace(0,1,400)
+        t = _n.linspace(0, (N-1)*1e-5, N)
         f = self.number_frequency()
         d['t1'] = t
-        d['V1'] = _n.random.normal(size=400)+_n.sin(2*_n.pi*f*t + 0.2)
+        d['V1'] = _n.random.normal(size=N)+4*_n.sin(2*_n.pi*f*t)
         d['t2'] = t
-        d['V2'] = _n.random.normal(size=400)+_n.cos(2*_n.pi*f*t + 0.2)
+        d['V2'] = _n.random.normal(size=N)+4*_n.cos(2*_n.pi*f*t)
+        
         return d
 
     def get_quadratures(self, f=None):
@@ -747,7 +809,7 @@ class quadratures(_g.Window):
         if step < 1 or step > sd['Sweep/Steps']: return None
 
         # Get the frequency list.
-        if sd['Sweep/Log_Scale']:
+        if sd['Sweep/Log_Steps']:
             if sd['Sweep/Start'] == 0: sd['Sweep/Start'] = sd['Stop' ]*0.01
             if sd['Sweep/Stop' ] == 0: sd['Sweep/Stop' ] = sd['Start']*0.01
             if sd['Sweep/Start'] == 0: return
@@ -757,34 +819,78 @@ class quadratures(_g.Window):
 
         return fs[step-1]
 
+    def truncate_raw_data(self, override_checkbox=False):
+        """
+        Truncates the raw data to an integer number of periods for the shown
+        frequency. Assumes the data in the Raw tab is in time-signal column.
+        
+        By default, this function will only truncate if the Truncate checkbox
+        is enabled. Setting override_checkbox=True will truncate even if it's not.
+        """
+        if not override_checkbox and not self.checkbox_truncate(): return self
+        
+        # Shortcuts
+        d = self.plot_raw
+        f = self.number_frequency()
+
+        # Don't truncate if the frequency is zero.
+        if f==0: return self
+        
+        # Loop over the data.
+        for n in range(0, len(d), 2):
+            
+            # Get the time step and total time
+            dt = d[n][1] -d[n][0]
+            T  = d[n][-1]-d[n][0]
+            
+            # Get the number of periods that fits
+            N = int(_n.floor(f*T))
+            
+            # If it's zero, we're hosed
+            if N < 1: 
+                print('WARNING, quadratures.truncate_raw_data(): Not even one period at frequency',f,'fits within the supplied data; truncation aborted.')
+                return self
+        
+            # Get the truncated time and samples
+            T = N/f
+            samples = int(_n.round(T/dt))
+            
+            # Truncate.
+            d[n]   = d[n  ][0:samples]
+            d[n+1] = d[n+1][0:samples]
+         
+        return self
+            
+
 
 if __name__ == '__main__':
 
-    #_egg.clear_egg_settings()
-    # self = signal_chain()
+    _egg.clear_egg_settings()
+    # self = data_processor()
 
-    self = waveform_designer(sync_samples=True, sync_rates=True).add_channels('a', 'b')
+    self = waveform_designer(sync_samples=True, sync_rates=True,
+                             buffer_increment=4).add_channels('a', 'b')
 
     #self = quadratures()
     self.show()
 
-    # Set up the output channels
-    so = self.settings
-    p  = self.plot_design
-    d = dict()
-    c = 'a'
-    so[c+'/Waveform'] = 'Sine'
-    d[c+'/Sine/Offset']    = 0
-    d[c+'/Sine/Phase']     = 90
+    # # Set up the output channels
+    # so = self.settings
+    # p  = self.plot_design
+    # d = dict()
+    # c = 'a'
+    # so[c+'/Waveform'] = 'Sine'
+    # d[c+'/Sine/Offset']    = 0
+    # d[c+'/Sine/Phase']     = 90
 
-    so.update(d, block_key_signals=True)
-    so.set_value(c+'/Rate', 750000.0, block_key_signals=True)
-    so.set_value(c+'/Sine', 2000.0, block_key_signals=True)
+    # so.update(d, block_key_signals=True)
+    # so.set_value(c+'/Rate', 750000.0, block_key_signals=True)
+    # so.set_value(c+'/Sine', 2000.0, block_key_signals=True)
 
-    # Update the actual frequency etc
-    self.update_other_quantities_based_on(c+'/Sine')
+    # # Update the actual frequency etc
+    # self.update_other_quantities_based_on(c+'/Sine')
 
-    self.update_design()
+    # self.update_design()
 
-    print(so[c+'/Sine'])
+    # print(so[c+'/Sine'])
 

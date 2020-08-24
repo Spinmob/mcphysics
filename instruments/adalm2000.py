@@ -773,7 +773,9 @@ class adalm2000():
 
         # Settings for the acquisition
         self.tab_ai.tab_controls.new_autorow()
-        s = self.tab_ai.settings  = self.tab_ai.tab_controls.add(_g.TreeDictionary(self.name+'.tab_ai.settings', name='AI'), column_span=4)
+        s = self.tab_ai.settings  = self.tab_ai.tab_controls.add(_g.TreeDictionary(
+            autosettings_path = self.name+'.tab_ai.settings', 
+            name              = self.name+'.tab_ai.settings').set_width(230), column_span=4)
         s.add_parameter('Iterations', 0, tip='How many acquisitions to perform.')
         s.add_parameter('Samples', 1000.0, bounds=(2,None), siPrefix=True, suffix='S', dec=True, tip='How many samples to acquire. 1-8192 guaranteed. \nLarger values possible, depending on USB bandwidth.')
         s.add_parameter('Rate', ['100 MHz', '10 MHz', '1 MHz', '100 kHz', '10 kHz', '1 kHz'], tip='How fast to sample voltages.')
@@ -888,6 +890,7 @@ class adalm2000():
             name = self.name+'.waveform_designer',
             sync_rates=False,
             sync_samples=False,
+            buffer_increment=4,
             get_rate = self.get_ao_rate), alignment=0)
         self.waveform_designer.add_channels('Ch1','Ch2')
 
@@ -908,7 +911,7 @@ class adalm2000():
             tip='Send the designed waveform to the actual analog outputs.'))
 
         wd.checkbox_auto = wd.grid_controls.add(_g.CheckBox(
-            'Enabled', autosettings_path=self.name+'.tab_ao.checkbox_auto',
+            'Auto', autosettings_path=self.name+'.tab_ao.checkbox_auto',
             signal_toggled=self._ao_after_settings_changed,
             tip='Automatically send the designed waveform whenever it changes.'))
 
@@ -1062,11 +1065,6 @@ class adalm2000():
         self._quad_configure_ao_ai()
         self.waveform_designer.button_send.click()
 
-        print('step',
-              q.number_step(),
-              q.get_sweep_step_frequency(q.number_step()),
-              self.tab_ao.settings['Ch1/Sine'])
-
         # Wait for the send to finish
         while self.waveform_designer.button_send.is_checked(): self.window.sleep(0.01)
 
@@ -1087,13 +1085,6 @@ class adalm2000():
 
         q.button_go(False).set_colors(None, None)
         q.checkbox_auto(False)
-
-
-
-
-
-
-
 
     def _quad_button_sweep_toggled(self, *a):
         """
@@ -1126,18 +1117,6 @@ class adalm2000():
         # Uncheck it when done
         q.button_sweep.set_checked(False)
         q.button_sweep.set_colors(None, None)
-
-    # def _quad_settings_changed(self, *a):
-    #     """
-    #     If someone changed a setting in the lockin tab.
-    #     """
-    #     f, c, N, r, n = self._quad_get_errthing_that_fits()
-
-    #     # Update the frequency
-    #     self.quadratures.number_frequency.set_value(f,block_events=True)
-
-    #     # Trigger a reconfigure on the next demod
-    #     self._quad_needs_configure_ao_ai = True
 
     def _quad_get_errthing_that_fits(self, cs):
         """
@@ -1270,7 +1249,7 @@ class adalm2000():
         si['Trigger/Delay'] = 0 # We manually delay.
 
         # Also update the demod frequency
-        self.quadratures.number_frequency(f, block_events=True)
+        self.quadratures.number_frequency(f, block_signals=True)
 
         # Make sure everything updates!
         self.window.process_events()
@@ -1337,9 +1316,6 @@ class adalm2000():
         else:
             if s['Ch1']: self.ao.send_samples(1, p['V1'])
             if s['Ch2']: self.ao.send_samples(2, p['V2'])
-
-
-
 
         # Clear and replace the send plot info
         ps = self.waveform_designer.plot_sent

@@ -35,6 +35,8 @@ class soundcard():
         self.name = name
         self._rates = [8000, 11025, 22050, 32000, 44100, 48000, 96000, 192000]
 
+        self._exception_timer = _g.ExceptionTimer()
+
         # All data accessed by the push-pull thread lives in this dictionary.
         # If you're using this dictionary, make sure to lock the thread!
         self._shared = dict()
@@ -50,6 +52,8 @@ class soundcard():
 
         # Main Layout
         self.window = _g.Window('Soundcard', autosettings_path=name+'.window')
+        self.window.event_close = self._event_close
+
         self.grid_top = self.window.add(_g.GridLayout(margins=False), alignment=0)
         self.window.new_autorow()
         self.tabs = self.window.add(_g.TabArea(autosettings_path=name+'.tabs'), alignment=0)
@@ -58,17 +62,13 @@ class soundcard():
 
         # Combo device selector
         device_names = self.get_device_names()
-        self.combo_device = self.grid_top.add(_g.ComboBox(device_names, autosettings_path=name+'.combo_device'))
-        self.label_rate    = self.grid_top.add(_g.Label('Rate (Hz):'))
-        self.combo_rate    = self.grid_top.add(_g.ComboBox(self._rates,  autosettings_path=name+'.combo_rate'))
-
-        # Match the input and output devices and update the list.
-        self.set_output_device(self.get_selected_input_device_index())
-        self.combo_device.set_index(self.get_selected_input_device_index())
-
-        # Link the signal
-        self.combo_device.signal_changed.connect(self._combo_device_changed)
-        self.combo_rate   .signal_changed.connect(self._combo_rate_changed)
+        self.grid_top.add(_g.Label('Input:'))
+        self.combo_device_in = self.grid_top.add(_g.ComboBox(
+            device_names, autosettings_path=name+'.combo_device_in'))
+        self.grid_top.add(_g.Label('Rate (Hz):'))
+        self.combo_rate_in = self.grid_top.add(_g.ComboBox(
+            self._rates,  autosettings_path=name+'.combo_rate_in',
+            default_index=4))
 
         # Buffer
         self.grid_top.add(_g.Label('Buffer: '))
@@ -101,6 +101,25 @@ class soundcard():
             0, int=True, tip='Number of running threads.').set_width(40))
         self.timer_status  = _g.Timer(100, signal_tick=self._timer_status_tick)
 
+        # Next row
+        self.grid_top.new_autorow()
+        self.grid_top.add(_g.Label('Output: '))
+        self.combo_device_out = self.grid_top.add(_g.ComboBox(device_names, autosettings_path=name+'.combo_device_out'))
+        self.grid_top.add(_g.Label('Rate (Hz):'))
+        self.combo_rate_out = self.grid_top.add(_g.ComboBox(
+            self._rates,  autosettings_path=name+'.combo_rate_out',
+            default_index=4))
+
+        # Link the signals
+        self.combo_device_out.signal_changed.connect(self._combo_device_changed)
+        self.combo_rate_out  .signal_changed.connect(self._combo_rate_changed)
+        self.combo_device_in .signal_changed.connect(self._combo_device_changed)
+        self.combo_rate_in   .signal_changed.connect(self._combo_rate_changed)
+
+        # # Match the input and output devices and update the list.
+        # self.set_output_device(self.get_selected_input_device_index())
+        # self.combo_device_out.set_index(self.get_selected_input_device_index())
+
 
 
         # AI tab
@@ -130,8 +149,8 @@ class soundcard():
         # AI Settings
         s.add_parameter('Iterations', 0, tip='Number of times to repeat the measurement. Set to 0 for infinite repetitions.')
         s.add_parameter('Rate', self._rates, default_list_index=4, tip='Sampling rate (Hz, synced with Samples and Time).')
-        s.add_parameter('Samples', 1000.0, bounds=(1,    None), dec=True, siPrefix=True, suffix='S', tip='How many samples to record (synced with Rate and Time).')
-        s.add_parameter('Time',       0.0, bounds=(1e-9, None), dec=True, siPrefix=True, suffix='s', tip='Duration of recording (synced with Rate and Samples).')
+        s.add_parameter('Samples', 1000.0, bounds=(2,    None), dec=True, siPrefix=True, suffix='S', tip='How many samples to record (synced with Rate and Time).')
+        s.add_parameter('Time',       0.1, bounds=(1e-9, None), dec=True, siPrefix=True, suffix='s', tip='Duration of recording (synced with Rate and Samples).')
         s.add_parameter('Trigger', ['Continuous', 'Left', 'Right'], tip='Trigger Mode')
         s.add_parameter('Trigger/Level',      0.0,  step=0.01, bounds=(-1,1), tip='Trigger level')
         s.add_parameter('Trigger/Hysteresis', 0.0, step=0.01, bounds=(0,2), tip='How far on the other side of the trigger the signal must go before retriggering is allowed.')
@@ -140,14 +159,14 @@ class soundcard():
 #        s.add_parameter('Trigger/Delay',      0.0,  suffix='s', siPrefix=True, tip='How long to wait after the trigger before keeping the data. Negative number means it will keep that much data before the trigger.')
 
         # Aliases and shortcuts
-        self.signal_chain    = self.tab_in.signal_chain = self.tab_in.add(_gt.signal_chain(name+'.tabs_ai_plots'), alignment=0)
-        self.tab_in.plot_raw = self.signal_chain.plot_raw
-        self.tab_in.A1       = self.tab_in.A1       = self.signal_chain.A1
-        self.tab_in.A2       = self.tab_in.A2       = self.signal_chain.A2
-        self.tab_in.A3       = self.tab_in.A3       = self.signal_chain.A3
-        self.tab_in.B1       = self.tab_in.B1       = self.signal_chain.B1
-        self.tab_in.B2       = self.tab_in.B2       = self.signal_chain.B2
-        self.tab_in.B3       = self.tab_in.B3       = self.signal_chain.B3
+        self.data_processor    = self.tab_in.data_processor = self.tab_in.add(_gt.data_processor(name+'.tabs_ai_plots'), alignment=0)
+        self.tab_in.plot_raw = self.data_processor.plot_raw
+        self.tab_in.A1       = self.tab_in.A1       = self.data_processor.A1
+        self.tab_in.A2       = self.tab_in.A2       = self.data_processor.A2
+        self.tab_in.A3       = self.tab_in.A3       = self.data_processor.A3
+        self.tab_in.B1       = self.tab_in.B1       = self.data_processor.B1
+        self.tab_in.B2       = self.tab_in.B2       = self.data_processor.B2
+        self.tab_in.B3       = self.tab_in.B3       = self.data_processor.B3
         self.tab_in.set_column_stretch(1)
 
         # AO tab
@@ -165,10 +184,11 @@ class soundcard():
         self.tab_out.settings    = self.waveform_designer.settings
 
         # Hide the Rates (they're controlled by the top combo) and sync
-        self.tab_in .settings.hide_parameter('Rate')
-        self.tab_out.settings.hide_parameter('Left/Rate')
-        self.tab_out.settings.hide_parameter('Right/Rate')
+        # self.tab_in .settings.hide_parameter('Rate')
+        # self.tab_out.settings.hide_parameter('Left/Rate')
+        # self.tab_out.settings.hide_parameter('Right/Rate')
         self._combo_rate_changed()
+        self._combo_device_changed()
 
         # Sync everything
         self._sync_rates_samples_time('Samples')
@@ -176,25 +196,25 @@ class soundcard():
 
 
         # QUADRATURES TAB
-        
+
         self.tab_quad = self.tabs.add_tab('Quadratures')
-        
+
         self.quadratures = self.tab_quad.quadratures = self.tab_quad.add(_gt.quadratures(
             channels = ['Left', 'Right'],
             name = name+'.quadratures'), alignment=0)
-        
+
         # Loop button is overkill
         self.quadratures.button_loop.hide()
-        
+
         # Signals
         self.quadratures.button_sweep.signal_toggled.connect(self._button_sweep_frequency_toggled)
         self.quadratures.button_get_raw.signal_toggled.connect(self._button_quad_get_raw_toggled)
-        
+
         # Modify the existing buttons because this system is so weird.
         self.quadratures.button_get_raw.set_checkable(True).set_text('Get Data')
         self.quadratures.button_get_raw.signal_toggled.connect(self._button_quad_get_raw_toggled)
         self.quadratures.get_raw = lambda *a : None  # Kill the fake data.
-        
+
         # Sweep signals
         self.signal_sweep_iterate  = _s.thread.signal(self._sweep_iterate)
         self.signal_waveform_ok    = _s.thread.signal(self._sweep_waveform_ok)
@@ -207,19 +227,29 @@ class soundcard():
         # Show the window
         if show: self.window.show(block)
 
+    def _event_close(self, *a):
+        """
+        Called when the window closes.
+        """
+        print('Stopping soundcard and closing window, but not destroying. Use self.window.show() to bring it back.')
+        self.quadratures.button_sweep(False)
+        self.button_playrecord(False)
+        self.button_play(False)
+        self.button_record(False)
+
     def _button_quad_get_raw_toggled(self, *a):
         """
         Someone toggles the get_raw button.
         """
         # Make sure the record button is clicked.
         self.button_record(self.quadratures.button_get_raw())
-        
+
     def _button_sweep_frequency_toggled(self, *a):
         """
         When someone toggles "Sweep".
         """
         # Start the process.
-        if self.quadratures.button_sweep(): 
+        if self.quadratures.button_sweep():
             self.quadratures.button_sweep.set_colors('white', 'green')
             self.signal_sweep_iterate.emit((0,0))
         else:
@@ -228,35 +258,35 @@ class soundcard():
     def _sweep_iterate(self, a):
         """
         Performs one iteration and increments the counter.
-        
+
         n is the zero-referenced step, and i is the zero-referenced
         iteration at this step.
-        
+
         """
         # Unpack the data
         n, i = a
-        
+
         # Shortcuts
         q = self.quadratures
-        
+
         # If we're done.
-        if n >= q.settings['Sweep/Steps'] or not q.button_sweep(): 
+        if n >= q.settings['Sweep/Steps'] or not q.button_sweep():
             q.button_sweep(False).set_colors(None, None)
             return
 
         # Update the user; we do iteration after data comes in.
         I = self.quadratures.number_step(n+1)
         self.quadratures.number_iteration_sweep(i+1)
-        
-        # We only have to set up the output and let it settle 
+
+        # We only have to set up the output and let it settle
         # if we're starting a new frequency
-        if i > 0: 
+        if i > 0:
             self.quadratures.button_get_raw(True)
             return
-        
+
         # Get the current target frequency
         f_target = self.quadratures.get_sweep_step_frequency(I())
-        
+
         # Shortcuts
         pd = self.quadratures.plot_raw
         sd = self.quadratures.settings
@@ -272,18 +302,18 @@ class soundcard():
             'Left/Sine'            : f_target,
             'Left/Sine/Phase'      : 90,
             'Left/Sine/Amplitude'  : sd['Output/Left_Amplitude'],
-            
+
             'Right/Waveform'       : 'Sine',
             'Right/Sine/Phase'     : 90,
             'Right/Sine/Amplitude' : sd['Output/Right_Amplitude'],
-            
+
             'Left' : True,
             'Right': True,
             'Left/Loop'  : True,
             'Right/Loop' : True,
             }
         so.update(output_settings, block_key_signals=True)
-        
+
         # Calculate and update the rest of the settings.
         self.waveform_designer.update_other_quantities_based_on('Left/Sine')
         so.set_value('Right/Sine/Cycles', so['Left/Sine/Cycles'], block_key_signals=True)
@@ -296,29 +326,29 @@ class soundcard():
         # Update the ACTUAL quadrature frequency
         f = so['Left/Sine']
         self.quadratures.number_frequency(f)
-        
+
         # Figure out how many samples we need to have a integer number of periods AND be larger
         # than our collect time.
         if f:
             periods            = _n.ceil(sd['Input/Collect']*f) # Number of periods to span our collection time.
-            samples_per_period = float(self.combo_rate.get_text())/f
+            samples_per_period = float(self.combo_rate_in.get_text())/f
             samples = _n.round(periods*samples_per_period)
         else:
-            samples = _n.round(float(self.combo_rate.get_text())*sd['Input/Collect'])
-       
+            samples = _n.round(float(self.combo_rate_in.get_text())*sd['Input/Collect'])
+
         si['Iterations'] = 0
         si['Samples'] = samples
         si['Trigger'] = 'Continuous'
-        
+
         # Uncheck auto mode (handled by Get Raw button)
         self.quadratures.checkbox_auto(False)
-        
+
         # If we haven't started yet, start playing
         self.button_play(True)
 
         # Tell it to look for a new waveform. It will emit a signal when it gets this.
         self._set_shared(new_waveform = True)
-        
+
 
     def _sweep_waveform_ok(self, a):
         """
@@ -336,13 +366,13 @@ class soundcard():
         Called when the input has new data to get the quadratures from.
         """
         data, underflow, overflow, get_quadratures = a
-        
+
         # If there was an error, retry the point.
         if underflow or overflow:
             self.signal_sweep_iterate.emit(
                 (self.quadratures.number_step()-1, self.quadratures.number_iteration_sweep()-1))
             return
-        
+
         # Otherwise, it's valid, so analyze.
 
         # Shortcuts
@@ -361,7 +391,7 @@ class soundcard():
             pd[k]  = pr[k]
 
         pd.plot().autosave()
-        
+
         # Run the quadrature calculation
         if get_quadratures: self.quadratures.button_get_quadratures.click()
 
@@ -372,7 +402,7 @@ class soundcard():
         if I() >= self.quadratures.settings['Input/Iterations']:
             I(0)
             self.signal_sweep_iterate.emit((S(), I()))
-        
+
         # Next iteration
         else: self.signal_sweep_iterate.emit((S()-1, I()))
 
@@ -385,8 +415,8 @@ class soundcard():
         self.button_playrecord(False)
         self.button_play(False)
         self.button_record(False)
-        
-    
+
+
 
     # def _wait_for_new_waveform(self, timeout=3):
     #     """
@@ -419,7 +449,7 @@ class soundcard():
             if not self._shared['stream']: self._start_stream()
 
         else: self.button_play.set_colors(None, None)
-                
+
         self._thread_locker.unlock()
         # Otherwise we let it finish on its own.
 
@@ -436,7 +466,7 @@ class soundcard():
         if self.button_record():
 
             # We're starting over, so clear the stream if it exists.
-            if self._shared['stream']: 
+            if self._shared['stream']:
                 self._shared['stream'].read(self._shared['stream'].read_available)
                 self._shared['abort'] = True
 
@@ -518,7 +548,7 @@ class soundcard():
         buffer_in = _n.zeros((Ni,2), dtype=_n.float32)
         underflow = False
         overflow  = False
-        
+
         # Prevent slowdown for large index
         self._shared['no'] = self._shared['no'] % len(self._shared['L'])
 
@@ -552,7 +582,7 @@ class soundcard():
                 n1 = self._shared['no']
                 n2 = self._shared['no']+self._shared['stream'].write_available
 
-                # Wrap slows down for big indices. 
+                # Wrap slows down for big indices.
                 L = _n.take(self._shared['L'], range(n1,n2), mode='wrap')
                 R = _n.take(self._shared['R'], range(n1,n2), mode='wrap')
 
@@ -560,7 +590,7 @@ class soundcard():
                 oops_out = self._shared['stream'].write(
                     _n.ascontiguousarray(
                         _n.array([L, R], dtype=_n.float32).transpose() ) )
-                if oops_out: 
+                if oops_out:
                     underflow = self._shared['underflow'] = True
                     self._signal_output_underflow.emit(None)
 
@@ -579,7 +609,7 @@ class soundcard():
 
                 # Get what's available
                 data, oops_in = self._shared['stream'].read(n2-n1)
-                if oops_in: 
+                if oops_in:
                     overflow = self._shared['overflow'] = True
                     self._signal_input_overflow.emit(None)
 
@@ -679,21 +709,15 @@ class soundcard():
             self._shared['stream'].stop()
             self._shared['stream'] = None
 
-            # Enable the sample rate again
-            self.combo_rate.enable()
-            self.combo_device.enable()
-            self.number_buffer.enable()
-            self.button_playrecord.enable()
-            self.button_record.set_colors(None, None)
-            self.button_play  .set_colors(None, None)
-            self.tab_in.button_triggered(False).set_text('Idle').set_colors(None,None)
+            self._unlock_controls()
+
 
         # Now, if we're ready to process this data, do so.
         # This will be happening in parallel with the thread, so
         # make sure it doesn't touch _thread_shared_data or stream
         if self._ready_for_more_data and not a is None:
 
-            (data, underflow, overflow) = a            
+            (data, underflow, overflow) = a
 
             self._ready_for_more_data = False
 
@@ -701,7 +725,7 @@ class soundcard():
 
             # Generate the time array
             Ni = len(data)
-            R  = float(self.combo_rate.get_text())
+            R  = float(self.combo_rate_in.get_text())
             self.tab_in.plot_raw['t']     = _n.linspace(0,(Ni-1)/R,Ni)
             self.tab_in.plot_raw['Left']  = data[:,0]
             self.tab_in.plot_raw['Right'] = data[:,1]
@@ -709,12 +733,12 @@ class soundcard():
             # Plot autosave and run the signal analysis chain.
             self.tab_in.plot_raw.plot()
             self.tab_in.plot_raw.autosave()
-            self.signal_chain.run()
+            self.data_processor.run()
 
             # If we're running a sweep, send the data to the quadratures raw
             # We also send the sweep state to indicate whether that function
             # should automatically get the quadratures.
-            if self.quadratures.button_get_raw() or self.quadratures.checkbox_auto(): 
+            if self.quadratures.button_get_raw() or self.quadratures.checkbox_auto():
                 self.signal_quad_new_data.emit(
                     (data, underflow, overflow, self.quadratures.button_sweep() or self.quadratures.checkbox_auto()))
 
@@ -724,13 +748,27 @@ class soundcard():
                 self.button_playrecord(False)
                 self.button_record(False)
                 self.button_play(False)
-                
+
             # Otherwise get the next data.
             else: self._ready_for_more_data = True
 
         # Otherwise, we haven't finished processing the previous data yet.
         else: self.tab_in.number_missed.increment()
 
+    def _unlock_controls(self):
+        """
+        Reenables buttons etc.
+        """
+        # Enable the sample rate again
+        self.combo_rate_in.enable()
+        self.combo_rate_out.enable()
+        self.combo_device_out.enable()
+        self.combo_device_in.enable()
+        self.number_buffer.enable()
+        self.tab_in.button_triggered(False, block_signals=True).set_text('Idle').set_colors(None,None)
+        self.button_playrecord(False)
+        self.button_record(False)
+        self.button_play  (False)
 
     def _start_stream(self, *a):
         """
@@ -738,8 +776,10 @@ class soundcard():
         """
 
         # First run setup.
-        self.combo_rate.disable()
-        self.combo_device.disable()
+        self.combo_rate_in.disable()
+        self.combo_rate_out.disable()
+        self.combo_device_out.disable()
+        self.combo_device_in.disable()
         self.number_buffer.disable()
         self.checkbox_overflow.set_checked(False)
         self.checkbox_underflow.set_checked(False)
@@ -754,10 +794,15 @@ class soundcard():
         # Create and start the stream
         self._shared['no'] = 0
         self._shared['triggered'] = False
-        self._shared['stream'] = self.api.Stream(
-                samplerate         = float(self.tab_in.settings['Rate']),
-                blocksize          = self.number_buffer(), # 0 for "optimal" latency
-                channels           = 2,)
+        try:
+            self._shared['stream'] = self.api.Stream(
+                    samplerate         = float(self.tab_in.settings['Rate']),
+                    blocksize          = self.number_buffer(), # 0 for "optimal" latency
+                    channels           = 2,)
+        except Exception as e:
+            print(e)
+            self._unlock_controls()
+            return
 
         # Create some signals the thread can send back to the GUI.
         self._signal_output_underflow = _s.thread.signal(self._event_output_underflow)
@@ -815,14 +860,16 @@ class soundcard():
         """
         Called when someone changes the device.
         """
-        self.set_devices(self.combo_device.get_index(), self.combo_device.get_index())
+        self.set_devices(
+            self.combo_device_in .get_index(),
+            self.combo_device_out.get_index())
 
     def _combo_rate_changed(self, *a):
         """
         Called when someone changes the rate.
         """
-        self.tab_in .settings['Rate']      = self.combo_rate.get_text()
-        self.tab_out.settings['Left/Rate'] = self.combo_rate.get_text()
+        self.tab_in .settings['Rate']      = self.combo_rate_in .get_text()
+        self.tab_out.settings['Left/Rate'] = self.combo_rate_out.get_text()
 
     def _sync_rates_samples_time(self, key):
         """
@@ -869,7 +916,7 @@ class soundcard():
     def _get_shared(self, key, return_type):
         """
         Returns a copy of an object from self._shared in a thread-safe way.
-        
+
         Returns None if the key doesn't exist.
 
         return_type is the function that does the copying, e.g. int.
@@ -963,6 +1010,10 @@ class soundcard():
 
 if __name__ == '__main__':
     #_g.clear_egg_settings()
+    import sys
+    def my_hook(*a):
+        print('PANTS', a)
+    sys.excepthook = my_hook
     self = soundcard()
 
 
