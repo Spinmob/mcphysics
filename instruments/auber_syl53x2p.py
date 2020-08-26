@@ -156,7 +156,7 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         _serial_tools.serial_gui_base.__init__(self, api_class=auber_syl53x2p_api, name=name, show=False, window_size=window_size)
 
         # Add GUI stuff to the bottom grid
-        self.label_temperature = self.grid_bot.add(_g.Label('Temperature:')).set_style('font-size: 20pt; font-weight: bold; color: '+('pink' if _s.settings['dark_theme_qt'] else 'red'))
+        self.label_temperature = self.grid_bot.add(_g.Label('Temperature: Unknown')).set_style('font-size: 20pt; font-weight: bold; color: '+('pink' if _s.settings['dark_theme_qt'] else 'red'))
         
         self.grid_bot.new_autorow()
         
@@ -277,7 +277,9 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
                 self.button_connect.set_checked(False)
                 self.label_status.set_text('Could not get temperature.').set_colors('pink' if _s.settings['dark_theme_qt'] else 'red')
 
+        # Disconnected
         else:
+            self.label_temperature('Temperature: Unknown')
             self.timer.stop()
 
 

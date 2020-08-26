@@ -5,6 +5,9 @@ _g = _egg.gui
 import spinmob as _s
 import time as _time
 
+try: import serial as _serial
+except: _serial = None
+
 try: from serial.tools.list_ports import comports as _comports
 except: _comports = None
 
@@ -32,8 +35,10 @@ class serial_gui_base(_g.BaseObject):
     window_size=[1,1] : list
         Dimensions of the window.
 
+    hide_address=False: bool
+        Whether to show the address control for things like the Auber.
     """
-    def __init__(self, api_class=None, name='serial_gui', show=True, block=False, window_size=[1,1]):
+    def __init__(self, api_class=None, name='serial_gui', show=True, block=False, window_size=[1,1], hide_address=False):
 
         # Remebmer the name.
         self.name = name
@@ -68,6 +73,10 @@ class serial_gui_base(_g.BaseObject):
 
         self._label_address = self.grid_top.add(_g.Label('Address:'))
         self.number_address = self.grid_top.add(_g.NumberBox(0, 1, int=True, autosettings_path=name+'.number_address', tip='Address (not used for every instrument)')).set_width(40)
+
+        # Hide if we're supposed to
+        self._label_address.show(hide_address)
+        self.number_address.show(hide_address)       
 
         self._label_baudrate = self.grid_top.add(_g.Label('Baud:'))
         self.combo_baudrates = self.grid_top.add(_g.ComboBox(['1200', '2400', '4800', '9600', '19200'], autosettings_path=name+'.combo_baudrates'))
@@ -111,7 +120,7 @@ class serial_gui_base(_g.BaseObject):
 
         # If we checked it, open the connection and start the timer.
         if self.button_connect.is_checked():
-            port = self._ports[self.combo_ports.get_index()]
+            port = self.get_selected_port()
             self.api = self._api_class(
                     port=port,
                     address=self.number_address.get_value(),
@@ -131,6 +140,11 @@ class serial_gui_base(_g.BaseObject):
 
             # Enable the grid
             self.grid_bot.enable()
+            
+            # Disable other controls
+            self.combo_baudrates.disable()
+            self.combo_ports.disable()
+            self.number_timeout.disable()
 
         # Otherwise, shut it down
         else:
@@ -138,6 +152,12 @@ class serial_gui_base(_g.BaseObject):
             self.label_status.set_text('')
             self.button_connect.set_colors()
             self.grid_bot.disable()
+            
+            # Enable other controls
+            self.combo_baudrates.enable()
+            self.combo_ports.enable()
+            self.number_timeout.enable()
+
 
         # User function
         self._after_button_connect_toggled()
@@ -156,3 +176,103 @@ class serial_gui_base(_g.BaseObject):
         if self.button_connect():
             print('  Disconnecting...')
             self.button_connect(False)
+
+    def get_selected_port(self):
+        """
+        Returns the actual port string from the combo box.
+        """
+        return self._ports[self.combo_ports.get_index()]
+
+class arduino_base_api():
+    """
+    Commands-only object for interacting with an Auber Instruments SYL-53X2P
+    temperature controller.
+
+    Parameters
+    ----------
+    port='COM3' : str
+        Name of the port to connect to.
+
+    baudrate=9600 : int
+        Baud rate of the connection. Must match the instrument setting.
+
+    timeout=2000 : number
+        How long to wait for responses before giving up (ms). Must be >300 for this instrument.
+    
+    """
+    def __init__(self, port='COM4', baudrate=9600, timeout=2000, **kwargs):
+
+        # Check for installed libraries
+        if not _serial:
+            _s._warn('You need to install pyserial to use the Arduino.')
+            self.serial = None
+            self.simulation_mode = True
+
+        # Assume everything will work for now
+        else: self.simulation_mode = False
+
+        # Also, if the specified port is "Simulation", enable simulation mode.
+        if port=='Simulation': self.simulation_mode = True
+
+        # If we have all the libraries, try connecting.
+        if not self.simulation_mode:
+            try:
+                # Create the instrument and ensure the settings are correct.
+                self.serial = _serial.Serial(
+                    port, baudrate=baudrate, 
+                    timeout=timeout*0.001)
+
+                # Simulation mode flag
+                self.simulation_mode = False
+
+            # Something went wrong. Go into simulation mode.
+            except Exception as e:
+                print('Could not open connection to "'+port+'" at baudrate '+str(baudrate)+'. Entering simulation mode.')
+                print(e)
+                self.modbus = None
+                self.simulation_mode = True
+
+    def disconnect(self):
+        """
+        Disconnects.
+        """
+        if not self.simulation_mode: self.serial.close()
+
+    def write(self, message='*IDN?'):
+        """
+        Writes the message, adding the appropriate termination.
+        """
+        self.serial.write((message+'\n').encode())
+        return self
+    
+    def read(self):
+        """
+        Reads until it receives a newline, and returns the stripped string.
+        """
+        result = self.serial.readline()
+        return result.strip() if len(result) else None
+    
+    def query(self, message='*IDN?'):
+        """
+        Calls a write(message) and read().
+        """
+        self.write(message)
+        return self.read()
+    
+class arduino_base():
+    """
+    Scripted graphical interface for an arduino.
+    """
+    def __init__(self, api_class=arduino_base_api, name='arduino', 
+                 show=True, block=False, window_size=[1,1]):
+        
+        # Run the base stuff
+        self.serial_gui_base = serial_gui_base(api_class=api_class, 
+            name=name, show=show, block=block, window_size=window_size, 
+            hide_address=True)  
+        
+
+        
+if __name__ == '__main__':
+    self = arduino_base()
+    

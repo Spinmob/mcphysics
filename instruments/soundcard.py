@@ -143,7 +143,7 @@ class soundcard():
         self.tab_in.settings = s = self.tab_in.tab_settings.add(_g.TreeDictionary(
             autosettings_path  = name+'.tab_in.settings',
             name               = name+'.tab_in.settings',
-            new_signal_changed = self._settings_changed_input), alignment=0)
+            new_parameter_signal_changed = self._settings_changed_input), alignment=0)
         s.set_width(270)
 
         # AI Settings
