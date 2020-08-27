@@ -38,7 +38,7 @@ class alpha_arduino(_serial_tools.arduino_base):
 
     def __init__(self, name='alpha_arduino', enable_conversion_edit=False, block=False):
 
-        number_width = 80
+        number_width = 100
 
         # Run the base arduino stuff
         _serial_tools.arduino_base.__init__(self, name=name, show=False)
