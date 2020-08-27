@@ -165,7 +165,7 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.grid_cal_state.add(_g.Label('Measured:'), alignment=2)
         self.number_bias_measured = self.grid_cal_state.add(_g.NumberBox(
-            decimals=4,
+            decimals=4, suffix='V',
             autosettings_path=name+'.number_bias_measured',
             tip='Measured bias voltage based on ADC1 and conversion parameters.')).disable().set_width(number_width)
 
