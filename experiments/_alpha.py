@@ -19,21 +19,35 @@ _debug = _mp._debug
 class alpha_arduino(_serial_tools.arduino_base):
     """
     Class for talking to the Arduino used to control the Alpha experiments.
+
+    Parameters
+    ----------
+    name='alpha_arduino' : str
+        Distinctive name for this instance. Used for remembering egg_settings, and other
+        settings.
+
+    enable_conversion_edit=False : bool
+        Set to True to enable editing of the conversion parameters. Use this option, but
+        do so with some level of caution. If the bias scale gets edited, for example,
+        you can accidentally overbias the detector. Another option is to adjust these manually
+        with, e.g., self.conversion['Pirani/V_offset'] = new_value.
+
+    block=False
+        Whether to block the console while the window is open.
     """
 
-    def __init__(self, name='alpha_arduino', enable_conversion_edit=False):
+    def __init__(self, name='alpha_arduino', enable_conversion_edit=False, block=False):
 
-        number_width = 120
-        header_style = 'color:teal; font-weight:bold; font-size:14pt' if _s.settings['dark_theme_qt'] \
-                  else 'color:blue; font-weight:bold; font-size:14pt'
+        number_width = 80
 
         # Run the base arduino stuff
-        _serial_tools.arduino_base.__init__(self, name=name)
+        _serial_tools.arduino_base.__init__(self, name=name, show=False)
 
         # Shortcuts
         self.label_status   = self.serial_gui_base.label_status
         self.label_message  = self.serial_gui_base.label_message
         self.button_connect = self.serial_gui_base.button_connect
+        self.window         = self.serial_gui_base.window
 
 
 
@@ -42,7 +56,7 @@ class alpha_arduino(_serial_tools.arduino_base):
         self.serial_gui_base.grid_bot.new_autorow()
         self.tabs = self.serial_gui_base.grid_bot.add(_g.TabArea(
             autosettings_path=name+'.tabs'), alignment=0)
-        self.tab_cal = self.tabs.add_tab('More Meaningful')
+        self.tab_cal = self.tabs.add_tab('"Meaningful" Values')
         self.tab_raw = self.tabs.add_tab('Arduino Values')
 
 
@@ -50,17 +64,19 @@ class alpha_arduino(_serial_tools.arduino_base):
         ## RAW TAB
         self.grid_raw_state = self.tab_raw.add(_g.GridLayout(margins=False))
 
+        #### ROW 1
+
         self.grid_raw_state.add(_g.Label('ADC1:'), alignment=2)
         self.number_adc1 = self.grid_raw_state.add(_g.NumberBox(
-            value=0, step=0.1, bounds=(0,3.3), suffix='V',
+            value=0, step=0.1, bounds=(0,3.3), decimals=4, suffix='V',
             autosettings_path=name+'.number_adc1',
-            tip='Unscaled voltage at ADC1.')).disable().set_width(number_width)
+            tip='Nominal voltage at ADC1 (bias readout); 0-3.3V.')).disable().set_width(number_width)
 
         self.grid_raw_state.add(_g.Label('PWM1:'), alignment=2)
         self.number_pwm1_setpoint = self.grid_raw_state.add(_g.NumberBox(
-            value = 0.0, step = 0.1, bounds = (0,3.3), suffix='V',
+            value = 0.0, step = 0.1, bounds = (0,3.3), decimals=4, suffix='V',
             autosettings_path = name+'.number_pwm1_setpoint',
-            tip               = 'Setpoint for PWM1.',
+            tip               = 'Setpoint for PWM1 (bias setpoint); 0-3.3V.',
             signal_changed    = self._number_pwm1_setpoint_changed,
             )).set_width(number_width)
 
@@ -70,38 +86,59 @@ class alpha_arduino(_serial_tools.arduino_base):
             signal_toggled = self._button_bias_enabled_toggled
             )).set_colors('white', 'blue')
 
+        self.grid_raw_state.add(_g.Label('Software PWM1 Upper Limit:'))
+        self.number_pwm1_limit = self.grid_raw_state.add(_g.NumberBox(
+            value = 1.263, bounds=(0,2.165), decimals=4, step=0.02,
+            autosettings_path = name+'.number_pwm1_limit',
+            signal_changed=self._number_pwm1_limit_changed,
+            tip='Software upper bound on the PWM1 setpoint, to prevent accidentally setting to too large a value.\n'
+               +'You can adjust this, but be careful. It is probably better to adjust the limit on the other tab.'
+            )).set_width(number_width)
+
+        #### ROW 2
+
         self.grid_raw_state.new_autorow()
         self.grid_raw_state.add(_g.Label('ADC2:'), alignment=2)
         self.number_adc2 = self.grid_raw_state.add(_g.NumberBox(
-            value=0, step=0.1, bounds=(0,3.3), suffix='V',
+            value=0, step=0.1, bounds=(0,3.3), decimals=4, suffix='V',
             autosettings_path=name+'.number_adc2',
-            tip='Unscaled voltage at ADC2.')).disable().set_width(number_width)
+            tip='Voltage at ADC2 (pirani readout); 0-3.3V.')).disable().set_width(number_width)
 
         self.grid_raw_state.add(_g.Label('PWM2:'), alignment=2)
         self.number_pwm2_setpoint = self.grid_raw_state.add(_g.NumberBox(
-            value=0.0, step=0.01, bounds=(0,3.3), suffix='V',
+            value=0.0, step=0.01, bounds=(0,3.3), decimals=4, suffix='V',
             autosettings_path = name+'.number_pwm2_setpoint',
-            tip               = 'Setpoint for PWM2.',
+            tip               = 'Setpoint for PWM2 (vent valve setpoint); 0-3.3V.',
             signal_changed    = self._number_pwm2_setpoint_changed
             )).set_width(number_width)
+
+        #### ROW 3
 
         self.grid_raw_state.new_autorow()
         self.grid_raw_state.add(_g.Label('ADC3:'), alignment=2)
         self.number_adc3 = self.grid_raw_state.add(_g.NumberBox(
-            value=0, step=0.1, bounds=(0,3.3), suffix='V',
+            value=0, step=0.1, bounds=(0,3.3), decimals=4, suffix='V',
             autosettings_path=name+'.number_adc3',
-            tip='Unscaled voltage at ADC3.')).disable().set_width(number_width)
+            tip='Voltage at ADC3 (pressure transducer); 0-3.3V.')).disable().set_width(number_width)
 
         self.grid_raw_state.add(_g.Label('Pump Valve:'), alignment=2)
         self.button_pump_valve_raw = self.grid_raw_state.add(_g.Button(
             'Closed', checkable=True,
             autosettings_path = name+'.button_pump_valve_raw',
             signal_toggled    = self._button_pump_valve_raw_toggled,
-            tip='Whether the pump valve is open or closed.'
+            tip='Whether the pump valve relay is open or closed.'
             )).set_colors('white','blue')
 
         # Plot raw
         self.tab_raw.new_autorow()
+
+        # self.button_raw_show_plot = self.tab_raw.add(_g.Button(
+        #     '^^^^^^^', checkable=True, checked=True,
+        #     autosettings_path = name+'.button_raw_show_plot',
+        #     signal_toggled    = self._button_raw_show_plot_toggled,
+        #     tip='Show / hide the plot.'), alignment=0)
+
+        # self.tab_raw.new_autorow()
 
         self.tab_raw.plot = self.tab_raw.add(_g.DataboxPlot(
             autosettings_path = name+'.tab_raw.plot',
@@ -121,12 +158,14 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.grid_cal_state.add(_g.Label('Bias Setpoint:'), alignment=2)
         self.number_bias_setpoint = self.grid_cal_state.add(_g.NumberBox(
-            value=0.0, step=0.01, bounds=(0,200), suffix='V',
+            value=0.0, step=1, bounds=(0,70), decimals=4, suffix='V',
             autosettings_path=name+'.number_bias_setpoint',
+            signal_changed=self._number_bias_setpoint_changed,
             tip='Detector bias voltage setpoint.')).set_width(number_width)
 
         self.grid_cal_state.add(_g.Label('Measured:'), alignment=2)
         self.number_bias_measured = self.grid_cal_state.add(_g.NumberBox(
+            decimals=4,
             autosettings_path=name+'.number_bias_measured',
             tip='Measured bias voltage based on ADC1 and conversion parameters.')).disable().set_width(number_width)
 
@@ -136,6 +175,15 @@ class alpha_arduino(_serial_tools.arduino_base):
             signal_toggled = self._button_bias_enabled_toggled
             )).set_colors('white','blue')
 
+        self.grid_cal_state.add(_g.Label('Software Upper Limit:'))
+        self.number_bias_limit = self.grid_cal_state.add(_g.NumberBox(
+            value=70.0, step=1, bounds=(0,120), decimals=4, suffix='V',
+            autosettings_path=name+'.number_bias_limit',
+            signal_changed=self._number_bias_limit_changed,
+            tip='Software upper bound on the bias setpoint, to help prevent accidentally setting it too high.\n'+
+                'You can change this, but be careful!'
+            )).set_width(number_width)
+
         self.grid_cal_state.new_autorow()
 
         ####### PRESSURE
@@ -144,13 +192,13 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.grid_cal_state.add(_g.Label('Pressure Transducer:'), alignment=2)
         self.number_pressure_transducer = self.grid_cal_state.add(_g.NumberBox(
-            value=0, step=0.1, bounds=(0,None), suffix='Pa', siPrefix=True,
+            value=0, step=0.1, bounds=(0,None), decimals=4, suffix='Pa', siPrefix=True,
             autosettings_path=name+'.number_pressure_transducer',
             tip='Pressure measured by the transducer. Relies on conversion parameters.')).disable().set_width(number_width)
 
         self.grid_cal_state.add(_g.Label('Pirani:'), alignment=2)
         self.number_pressure_pirani = self.grid_cal_state.add(_g.NumberBox(
-            value=0, step=0.1, bounds=(0,None), suffix='Pa', siPrefix=True,
+            value=0, step=0.1, bounds=(0,None), decimals=4, suffix='Pa', siPrefix=True,
             autosettings_path=name+'.number_pirani',
             tip='Pressure measured by the Pirani gauge. Relies on conversion parameters.')).disable().set_width(number_width)
 
@@ -170,8 +218,9 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.grid_cal_state.add(_g.Label('Vent Valve:'), alignment=2)
         self.number_vent_valve_setpoint = self.grid_cal_state.add(_g.NumberBox(
-            value=0.0, step=0.01, bounds=(0,100), suffix='%',
+            value=0.0, step=0.01, bounds=(0,100), decimals=4, suffix='%',
             autosettings_path=name+'.number_vent_valve_setpoint',
+            signal_changed = self._number_vent_valve_setpoint_changed,
             tip='Vent valve setpoint (0-100%).')).set_width(number_width)
 
 
@@ -234,14 +283,47 @@ class alpha_arduino(_serial_tools.arduino_base):
         ## OTHER STUFF
 
         # Timer for querying arduino state
-        self.timer = _g.Timer(500)
+        self.timer = _g.Timer(250, single_shot=True)
         self.timer.signal_tick.connect(self._timer_tick)
         self.t_connect = None
 
         # Run stuff after connecting.
         self.serial_gui_base._after_button_connect_toggled = self._after_button_connect_toggled
 
+        self.window.show(block)
 
+    def _number_bias_setpoint_changed(self, *a):
+        """
+        Update the PWM1 output accordingly, and let its handler do the rest.
+        """
+        self.number_pwm1_setpoint(self.get_pwm1_from_bias(a[1]))
+
+    def _number_vent_valve_setpoint_changed(self, *a):
+        """
+        Update the PWM2 output accordingly, and let its handler do the rest.
+        """
+        self.number_pwm2_setpoint(self.get_pwm2_from_vent_valve_percent(a[1]))
+
+    def _number_bias_limit_changed(self, *a):
+        """
+        When someone changes the limit, update the bounds.
+        """
+        # Set the cap. This will adjust the value if needed.
+        self.number_bias_setpoint.set_pyqtgraph_options(bounds=(0,a[1]))
+
+        # Set the cap on the other tab.
+        self.number_pwm1_limit(self.get_pwm1_from_bias(a[1]))
+
+
+    def _number_pwm1_limit_changed(self, *a):
+        """
+        When someone changes the limit, update the bounds on all four.
+        """
+        # Set the cap. This will adjust the value if needed.
+        self.number_pwm1_setpoint.set_pyqtgraph_options(bounds=(0,a[1]))
+
+        # Set the cap on the other tab.
+        self.number_bias_limit(self.get_bias_from_pwm1(a[1]))
 
     def _number_pwm1_setpoint_changed(self, *a):
         """
@@ -445,7 +527,7 @@ class alpha_arduino(_serial_tools.arduino_base):
         """
         Given the voltage V_ADC1 from ADC1, returns the actual bias voltage applied
         to the detection circuit (above the big resistor), using the conversion
-        parameters in the "Calibrated" tab (self.conversion).
+        parameters in self.conversion.
 
         Specifically, V_bias = (V_bias:V_ADC1) * V_PWM1
         """
@@ -455,16 +537,25 @@ class alpha_arduino(_serial_tools.arduino_base):
         """
         Given the PWM1 setpoint V_PWM1, returns the expected voltage applied
         to the detection circuit (above the big resistor), using the conversion
-        parameters in the "Calibrated" tab (self.conversion).
+        parameters in self.conversion.
 
         Specifically, V_bias = (V_bias:V_PWM1) * V_PWM1
         """
         return self.conversion['Bias/V_bias:V_PWM1']*V_PWM1
 
+    def get_pwm1_from_bias(self, V_bias):
+        """
+        Given the bias voltage V_bias, returns the corresponding PWM1 setpoint
+        voltage (0-3.3V) using the parameters in self.conversion.
+
+        Specifically, V_PWM1 = V_bias / (V_bias:V_PWM1)
+        """
+        return V_bias / self.conversion['Bias/V_bias:V_PWM1']
+
     def get_vent_valve_percent_from_pwm2(self, V_PWM2):
         """
         Given the PWM2 setpoint, returns the expected valve position (0-100%)
-        from the conversion parameters in the "Calibrated" tab (self.conversion).
+        from the conversion parameters in self.conversion.
 
         Specifically Percentage = Scale*(V_PWM2 * Gain_LPF - V_offset)
         """
@@ -473,12 +564,24 @@ class alpha_arduino(_serial_tools.arduino_base):
         V_offset = self.conversion['Vent_Valve/V_offset']
         return Scale*(V_PWM2 * Gain_LPF - V_offset)
 
+    def get_pwm2_from_vent_valve_percent(self, percentage):
+        """
+        Given the desired vent valve open percentage, returns the corresponding
+        PWM2 setpoint (0-3.3V), using the parameters in self.conversion.
+
+        Specifically, V_PWM2 = (V_offset + percentage/Scale) / Gain_LPF
+        """
+        Scale    = self.conversion['Vent_Valve/Scale']
+        Gain_LPF = self.conversion['Vent_Valve/Gain_LPF']
+        V_offset = self.conversion['Vent_Valve/V_offset']
+        return (V_offset + percentage/Scale) / Gain_LPF
+
     def get_pressure_from_adc2(self, V_adc2):
         """
         Pirani Guage
 
         Given the voltage V_adc2 from ADC2, returns the pressure (Pa) estimated
-        from the conversion parameters in the "Calibrated" tab (self.conversion).
+        from the conversion parameters in self.conversion.
 
         Specifically, P = P_offset + P_scale * 10**((V_adc2-V_offset)/V_scale)
         """
@@ -494,7 +597,7 @@ class alpha_arduino(_serial_tools.arduino_base):
         Pressure Transducer
 
         Given the voltage V_adc3 from ADC3, returns the pressure (Pa) estimated
-        from the conversion parameters in the "Calibrated" tab (self.conversion).
+        from the conversion parameters in self.conversion.
 
         Specifically, P = P_offset + Ratio*V_adc3
         """
@@ -512,30 +615,37 @@ class alpha_arduino(_serial_tools.arduino_base):
         # Bias measurement
         V1 = self.get_adc_voltage(1)
         if V1 is None: return
+        self.window.process_events()
 
         # Pirani
         V2 = self.get_adc_voltage(2)
         if V2 is None: return
+        self.window.process_events()
 
         # Pressure transducer
         V3 = self.get_adc_voltage(3)
         if V3 is None: return
+        self.window.process_events()
 
         # Pump valve state (0 or 1)
         pump_valve_open = self.get_pump_valve_state()
         if pump_valve_open is None: return
+        self.window.process_events()
 
         # Bias enabled
         pwm1_enabled = self.get_pwm1_enabled()
         if pwm1_enabled is None: return
+        self.window.process_events()
 
         # Bias setpoint
         pwm1 = self.get_pwm_voltage_setpoint(1)
         if pwm1 is None: return
+        self.window.process_events()
 
         # Vent valve setpoint
         pwm2 = self.get_pwm_voltage_setpoint(2)
         if pwm2 is None: return
+        self.window.process_events()
 
         # Add header information
         self.conversion.send_to_databox_header(self.tab_raw.plot)
@@ -580,7 +690,9 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.api.log = print
 
+        self.timer.start()
+
 if __name__ == '__main__':
-    #_egg.clear_egg_settings()
+    _egg.clear_egg_settings()
     self = alpha_arduino()
-    self.button_connect(True)
+    #self.button_connect(True)

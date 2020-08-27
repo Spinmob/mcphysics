@@ -9,7 +9,7 @@ _g = _egg.gui
 import spinmob as _s
 import time as _time
 
-try:    from . import serial_tools as _serial_tools
+try:    from . import _serial_tools
 except: _serial_tools = _mp.instruments._serial_tools
 
 _debug_enabled = False

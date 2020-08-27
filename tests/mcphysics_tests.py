@@ -80,6 +80,8 @@ class errthing(_ut.TestCase):
     def test_instruments_auber_syl53x2p(self):   _m.instruments.auber_syl53x2p(block=True)
     def test_instruments_soundcard(self):        _m.instruments.soundcard(block=True)
 
+    def test_experiments_alpha_arduino(self):    _m.experiments.alpha_arduino(block=True)
+
     def test_playground(self):
         global b
 

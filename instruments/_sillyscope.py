@@ -5,9 +5,10 @@ import spinmob.egg as _egg
 _g = _egg.gui
 import mcphysics as _mp
 
-from . import visa_tools as _visa_tools
+try: from . import _visa_tools
+except: _visa_tools = _mp.instruments._visa_tools
 
-_debug_enabled = False
+_mp._debug_enabled = False
 _debug = _mp._debug
 
 class sillyscope_api(_visa_tools.visa_api_base):
@@ -1001,3 +1002,6 @@ class sillyscope(_visa_tools.visa_gui_base):
         Quits acquisition loop when the window closes.
         """
         self.button_acquire.set_checked(False)
+
+if __name__ == '__main__':
+    self = sillyscope()

@@ -5,7 +5,7 @@ import numpy       as _n
 import time        as _t
 import os          as _os
 _g  = _egg.gui
-try:    from . import gui_tools as _gt
+try:    from . import _gui_tools as _gt
 except: _gt = _mp.instruments._gui_tools
 _p  = _mp._p
 

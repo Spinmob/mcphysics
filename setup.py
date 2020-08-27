@@ -1,4 +1,4 @@
-__version__ = '1.4.2' # Keep this on the first line
+__version__ = '1.5.0' # Keep this on the first line
 
 
 
@@ -12,11 +12,13 @@ setup(name           = 'McPhysics',
 
       packages       = [
           'mcphysics',
-          'mcphysics.instruments'],
+          'mcphysics.instruments',
+          'mcphysics.experiments'],
 
       package_dir    = {
           'mcphysics' : '.',
-          'instruments' : './instruments'},
+          'instruments' : './instruments',
+          'experiments' : './experiments'},
 
       package_data={
           ''  : [

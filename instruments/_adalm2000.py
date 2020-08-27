@@ -12,7 +12,7 @@ import mcphysics as _mp
 import spinmob   as _s
 import spinmob.egg as _egg
 _g = _egg.gui
-try: from . import gui_tools as _gt
+try: from . import _gui_tools as _gt
 except: _gt = _mp.instruments._gui_tools
 
 import traceback as _traceback
@@ -774,7 +774,7 @@ class adalm2000():
         # Settings for the acquisition
         self.tab_ai.tab_controls.new_autorow()
         s = self.tab_ai.settings  = self.tab_ai.tab_controls.add(_g.TreeDictionary(
-            autosettings_path = self.name+'.tab_ai.settings', 
+            autosettings_path = self.name+'.tab_ai.settings',
             name              = self.name+'.tab_ai.settings').set_width(230), column_span=4)
         s.add_parameter('Iterations', 0, tip='How many acquisitions to perform.')
         s.add_parameter('Samples', 1000.0, bounds=(2,None), siPrefix=True, suffix='S', dec=True, tip='How many samples to acquire. 1-8192 guaranteed. \nLarger values possible, depending on USB bandwidth.')

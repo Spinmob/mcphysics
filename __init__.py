@@ -73,6 +73,7 @@ def check_installation():
     print()
 
 import mcphysics.instruments as instruments
+import mcphysics.experiments as experiments
 from . import data
 from . import functions
 from . import playground
