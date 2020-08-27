@@ -7,6 +7,7 @@ import mcphysics as _mp
 
 _debug_enabled = False
 _debug = _mp._debug
+_p = _mp._p
 
 #     TO DO: Automate the continuous mode triggering on init.
 #     TO DO: Import data file monitor.
@@ -377,12 +378,14 @@ class keithley_dmm(_g.BaseObject):
 
         # Don't proceed if we have no connection
         if self.api == None:
-            self.button_acquire.set_checked(False)
+            self.button_acquire(False)
             return
 
         # Ask the user for the dump file
         self.path = _s.dialogs.save('*.csv', 'Select an output file.', force_extension='*.csv')
-        if self.path == None: return
+        if self.path == None:
+            self.button_acquire(False)
+            return
 
         # Update the label
         self.label_path.set_text('Output Path: ' + self.path)
@@ -479,3 +482,7 @@ class keithley_dmm(_g.BaseObject):
         Quits acquisition loop when the window closes.
         """
         self.button_acquire.set_checked(False)
+
+
+if __name__ == '__main__':
+    self = keithley_dmm()

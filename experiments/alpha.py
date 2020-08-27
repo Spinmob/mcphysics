@@ -105,7 +105,8 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.tab_raw.plot = self.tab_raw.add(_g.DataboxPlot(
             autosettings_path = name+'.tab_raw.plot',
-            name              = name+'.tab_raw.plot'), alignment=0)
+            name              = name+'.tab_raw.plot',
+            show_logger       = True), alignment=0)
 
 
 
@@ -225,7 +226,8 @@ class alpha_arduino(_serial_tools.arduino_base):
         # Plot cal
         self.tab_cal.plot = self.tab_cal.add(_g.DataboxPlot(
             autosettings_path = name+'.tab_cal.plot',
-            name              = name+'.tab_cal.plot'), alignment=0)
+            name              = name+'.tab_cal.plot',
+            show_logger       = True), alignment=0)
 
 
         ######################################

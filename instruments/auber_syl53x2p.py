@@ -170,7 +170,10 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
 
         # Make the plotter.
         self.grid_bot.new_autorow()
-        self.plot_stream = self.grid_bot.add(_g.DataboxPlot(file_type='*.csv', autosettings_path=name+'.plot', delimiter=','), alignment=0, column_span=10)
+        self.plot_stream = self.grid_bot.add(_g.DataboxPlot(
+            file_type='*.csv',
+            autosettings_path=name+'.plot',
+            delimiter=',', show_logger=True), alignment=0, column_span=10)
 
         # Timer for collecting data
         self.timer = _g.Timer(interval_ms=1000, single_shot=False)
