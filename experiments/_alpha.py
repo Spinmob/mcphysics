@@ -209,10 +209,10 @@ class alpha_arduino(_serial_tools.arduino_base):
         #self.grid_cal_state.add(_g.Label('VALVES')).set_style(header_style)
 
         self.grid_cal_state.add(_g.Label('Pump Valve:'), alignment=2)
-        self.button_pump_valve_cal = self.grid_cal_state.add(_g.Button(
+        self.button_pump_valve = self.grid_cal_state.add(_g.Button(
             'Closed', checkable=True,
-            autosettings_path = name+'.button_pump_valve_cal',
-            signal_toggled    = self._button_pump_valve_cal_toggled,
+            autosettings_path = name+'.button_pump_valve',
+            signal_toggled    = self._button_pump_valve_toggled,
             tip='Whether the pump valve is open or closed.'
             )).set_colors('white','blue')
 
@@ -352,14 +352,14 @@ class alpha_arduino(_serial_tools.arduino_base):
         # Set the pump valve
         self.set_pump_valve_state(self.button_pump_valve_raw())
 
-    def _button_pump_valve_cal_toggled(self, *a):
+    def _button_pump_valve_toggled(self, *a):
         """
         Called when someone toggles the pump valve on the raw tab.
         """
-        _debug('_button_pump_valve_cal_toggled')
+        _debug('_button_pump_valve_toggled')
 
         # Set the pump valve
-        self.set_pump_valve_state(self.button_pump_valve_cal())
+        self.set_pump_valve_state(self.button_pump_valve())
 
     def _button_bias_enabled_toggled(self, value):
         """
@@ -484,10 +484,10 @@ class alpha_arduino(_serial_tools.arduino_base):
         if value is not None:
             if value:
                 self.button_pump_valve_raw(True, block_signals=True).set_text('Opened').set_colors('white','red')
-                self.button_pump_valve_cal(True, block_signals=True).set_text('Opened').set_colors('white','red')
+                self.button_pump_valve(True, block_signals=True).set_text('Opened').set_colors('white','red')
             else:
                 self.button_pump_valve_raw(False, block_signals=True).set_text('Closed').set_colors('white','blue')
-                self.button_pump_valve_cal(False, block_signals=True).set_text('Closed').set_colors('white','blue')
+                self.button_pump_valve(False, block_signals=True).set_text('Closed').set_colors('white','blue')
 
         return value
 
