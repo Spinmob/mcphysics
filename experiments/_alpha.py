@@ -74,7 +74,7 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.grid_raw_state.add(_g.Label('PWM1:'), alignment=2)
         self.number_pwm1_setpoint = self.grid_raw_state.add(_g.NumberBox(
-            value = 0.0, step = 0.1, bounds = (0,3.3), decimals=4, suffix='V',
+            value = 0.0, step = 0.02, bounds = (0,3.3), decimals=4, suffix='V',
             autosettings_path = name+'.number_pwm1_setpoint',
             tip               = 'Setpoint for PWM1 (bias setpoint); 0-3.3V.',
             signal_changed    = self._number_pwm1_setpoint_changed,
@@ -192,13 +192,13 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.grid_cal_state.add(_g.Label('Pressure Transducer:'), alignment=2)
         self.number_pressure_transducer = self.grid_cal_state.add(_g.NumberBox(
-            value=0, step=0.1, bounds=(0,None), decimals=4, suffix='Pa', siPrefix=True,
+            value=0, bounds=(0,None), decimals=4, suffix='Pa', siPrefix=True,
             autosettings_path=name+'.number_pressure_transducer',
             tip='Pressure measured by the transducer. Relies on conversion parameters.')).disable().set_width(number_width)
 
         self.grid_cal_state.add(_g.Label('Pirani:'), alignment=2)
         self.number_pressure_pirani = self.grid_cal_state.add(_g.NumberBox(
-            value=0, step=0.1, bounds=(0,None), decimals=4, suffix='Pa', siPrefix=True,
+            value=0, bounds=(0,None), decimals=4, suffix='Pa', siPrefix=True,
             autosettings_path=name+'.number_pirani',
             tip='Pressure measured by the Pirani gauge. Relies on conversion parameters.')).disable().set_width(number_width)
 
@@ -218,7 +218,7 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.grid_cal_state.add(_g.Label('Vent Valve:'), alignment=2)
         self.number_vent_valve_setpoint = self.grid_cal_state.add(_g.NumberBox(
-            value=0.0, step=0.01, bounds=(0,100), decimals=4, suffix='%',
+            value=0.0, step=0.5, bounds=(0,100), decimals=4, suffix='%',
             autosettings_path=name+'.number_vent_valve_setpoint',
             signal_changed = self._number_vent_valve_setpoint_changed,
             tip='Vent valve setpoint (0-100%).')).set_width(number_width)
@@ -374,6 +374,8 @@ class alpha_arduino(_serial_tools.arduino_base):
         """
         Returns the nominal (raw) voltage at Arduino ADC channel n.
         """
+        if not self.button_connect(): return
+
         if self.api.simulation_mode: value = _n.random.rand()
         else:                        value = self.api.query('VOLTAGE'+str(int(n))+'?', float)
 
@@ -403,6 +405,8 @@ class alpha_arduino(_serial_tools.arduino_base):
         """
         Returns the setpoint for PWMn.
         """
+        if not self.button_connect(): return
+
         if self.api.simulation_mode: value = _n.random.rand()
         else:                        value = self.api.query('PWM'+str(int(n))+'?', float)
 
@@ -426,6 +430,8 @@ class alpha_arduino(_serial_tools.arduino_base):
         """
         Sets the target output voltage for PWMn to the value V_PWM (0-3.3V).
         """
+        if not self.button_connect(): return
+
         if not self.api.simulation_mode:
             self.api.write('PWM'+str(int(n))+' '+str(V_PWM))
 
@@ -435,6 +441,8 @@ class alpha_arduino(_serial_tools.arduino_base):
         """
         Returns whether the bias is enabled.
         """
+        if not self.button_connect(): return
+
         if self.api.simulation_mode: value = _n.random.randint(0,2)
         else:                        value = self.api.query('BIAS:ONOFF?', int)
 
@@ -453,6 +461,8 @@ class alpha_arduino(_serial_tools.arduino_base):
         """
         Enables the bias output if True.
         """
+        if not self.button_connect(): return
+
         if not self.api.simulation_mode:
             self.api.write('BIAS:ON' if enabled else 'BIAS:OFF')
 
@@ -465,6 +475,8 @@ class alpha_arduino(_serial_tools.arduino_base):
         Returns the status of the relay to the pump valve, with 1 meaning
         "on/open" and 0 meaning "off/closed". Also updates the state in the GUI.
         """
+        if not self.button_connect(): return
+
         if self.api.simulation_mode: value = _n.random.randint(0,2)
         else:                        value = self.api.query('RELAY?', int)
 
@@ -484,6 +496,8 @@ class alpha_arduino(_serial_tools.arduino_base):
         Sets the state of the pump valve to open if state is True or 1, and closed
         if False or 0.
         """
+        if not self.button_connect(): return
+
         if not self.api.simulation_mode:
             self.api.write('RELAY '+('1' if state else '0'))
 
