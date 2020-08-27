@@ -35,7 +35,7 @@ class soundcard():
         self.name = name
         self._rates = [8000, 11025, 22050, 32000, 44100, 48000, 96000, 192000]
 
-        self._exception_timer = _g.ExceptionTimer()
+        self._exception_timer = _g.TimerExceptions()
 
         # All data accessed by the push-pull thread lives in this dictionary.
         # If you're using this dictionary, make sure to lock the thread!

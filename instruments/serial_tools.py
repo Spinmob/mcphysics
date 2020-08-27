@@ -42,10 +42,11 @@ class serial_gui_base(_g.BaseObject):
 
         # Remebmer the name.
         self.name = name
-        
+
         # Checks periodically for the last exception
-        self.timer_exceptions = _g.ExceptionTimer()
-       
+        self.timer_exceptions = _g.TimerExceptions()
+        self.timer_exceptions.signal_new_exception.connect(self._new_exception)
+
         # Where the actual api will live after we connect.
         self.api = None
         self._api_class = api_class
@@ -71,17 +72,19 @@ class serial_gui_base(_g.BaseObject):
         self._ports.append('Simulation')
         self.combo_ports = self.grid_top.add(_g.ComboBox(ports, autosettings_path=name+'.combo_ports'))
 
-        self._label_address = self.grid_top.add(_g.Label('Address:'))
-        self.number_address = self.grid_top.add(_g.NumberBox(0, 1, int=True, autosettings_path=name+'.number_address', tip='Address (not used for every instrument)')).set_width(40)
+        self.grid_top.add(_g.Label('Address:')).show(hide_address)
+        self.number_address = self.grid_top.add(_g.NumberBox(
+            0, 1, int=True,
+            autosettings_path=name+'.number_address',
+            tip='Address (not used for every instrument)')).set_width(40).show(hide_address)
 
-        # Hide if we're supposed to
-        self._label_address.show(hide_address)
-        self.number_address.show(hide_address)       
+        self.grid_top.add(_g.Label('Baud:'))
+        self.combo_baudrates = self.grid_top.add(_g.ComboBox(
+            ['1200', '2400', '4800', '9600', '19200'],
+            default_index=3,
+            autosettings_path=name+'.combo_baudrates'))
 
-        self._label_baudrate = self.grid_top.add(_g.Label('Baud:'))
-        self.combo_baudrates = self.grid_top.add(_g.ComboBox(['1200', '2400', '4800', '9600', '19200'], autosettings_path=name+'.combo_baudrates'))
-
-        self._label_timeout = self.grid_top.add(_g.Label('Timeout:'))
+        self.grid_top.add(_g.Label('Timeout:'))
         self.number_timeout = self.grid_top.add(_g.NumberBox(2000, dec=True, bounds=(1, None), suffix=' ms', tip='How long to wait for an answer before giving up (ms).', autosettings_path=name+'.number_timeout')).set_width(100)
 
         # Button to connect
@@ -95,6 +98,10 @@ class serial_gui_base(_g.BaseObject):
 
         # Status
         self.label_status = self.grid_top.add(_g.Label(''))
+
+        # Error
+        self.grid_top.new_autorow()
+        self.label_message = self.grid_top.add(_g.Label(''), column_span=10).set_colors('pink' if _s.settings['dark_theme_qt'] else 'red')
 
         # By default the bottom grid is disabled
         self.grid_bot.disable()
@@ -133,14 +140,14 @@ class serial_gui_base(_g.BaseObject):
                 self.label_status.set_colors('pink' if _s.settings['dark_theme_qt'] else 'red')
                 self.button_connect.set_colors(background='pink')
             else:
-                self.label_status.set_text('Connected')
+                self.label_status.set_text('Connected').set_colors('teal' if _s.settings['dark_theme_qt'] else 'blue')
 
             # Record the time if it's not already there.
             if self.t0 is None: self.t0 = _time.time()
 
             # Enable the grid
             self.grid_bot.enable()
-            
+
             # Disable other controls
             self.combo_baudrates.disable()
             self.combo_ports.disable()
@@ -152,7 +159,7 @@ class serial_gui_base(_g.BaseObject):
             self.label_status.set_text('')
             self.button_connect.set_colors()
             self.grid_bot.disable()
-            
+
             # Enable other controls
             self.combo_baudrates.enable()
             self.combo_ports.enable()
@@ -167,7 +174,13 @@ class serial_gui_base(_g.BaseObject):
         Dummy function called after connecting.
         """
         return
-    
+
+    def _new_exception(self, a):
+        """
+        Just updates the status with the exception.
+        """
+        self.label_message(str(a)).set_colors('red')
+
     def _window_close(self):
         """
         Disconnects. When you close the window.
@@ -198,7 +211,7 @@ class arduino_base_api():
 
     timeout=2000 : number
         How long to wait for responses before giving up (ms). Must be >300 for this instrument.
-    
+
     """
     def __init__(self, port='COM4', baudrate=9600, timeout=2000, **kwargs):
 
@@ -214,13 +227,29 @@ class arduino_base_api():
         # Also, if the specified port is "Simulation", enable simulation mode.
         if port=='Simulation': self.simulation_mode = True
 
+        # Response from *IDN? query.
+        self.idn = None
+
+
         # If we have all the libraries, try connecting.
         if not self.simulation_mode:
             try:
+
                 # Create the instrument and ensure the settings are correct.
                 self.serial = _serial.Serial(
-                    port, baudrate=baudrate, 
-                    timeout=timeout*0.001)
+                    port, baudrate=baudrate,
+                    timeout=0.5) # HACK: temporarily short timeout to test for response
+
+                # HACK: Keep trying until it's ready (temporarily disable the log)
+                t0 = _time.time()
+                log = self.log
+                self.log = None
+                while _time.time()-t0 < timeout*0.001 and self.idn==None:
+                    self.idn = self.query('*IDN?', ignore_error=True)
+                self.log = log
+
+                # HACK: NOW set the desired timeout
+                self.serial.timeout = timeout*0.001
 
                 # Simulation mode flag
                 self.simulation_mode = False
@@ -230,6 +259,7 @@ class arduino_base_api():
                 print('Could not open connection to "'+port+'" at baudrate '+str(baudrate)+'. Entering simulation mode.')
                 print(e)
                 self.modbus = None
+                self.serial = None
                 self.simulation_mode = True
 
     def disconnect(self):
@@ -238,41 +268,82 @@ class arduino_base_api():
         """
         if not self.simulation_mode: self.serial.close()
 
+    def log(self, *a):
+        """
+        Overload this to change from printing all communications. You can
+        also set it to False or None to disable.
+        """
+        print(*a)
+
     def write(self, message='*IDN?'):
         """
         Writes the message, adding the appropriate termination.
+
+        Parameters
+        ----------
+        message='*IDN?' : str
+            Message to send.
         """
+
+        if self.log: self.log('arduino write', message)
         self.serial.write((message+'\n').encode())
         return self
-    
-    def read(self):
+
+    def read(self, return_type=str, ignore_error=False):
         """
-        Reads until it receives a newline, and returns the stripped string.
+        Reads until it receives a newline. Returns the stripped string.
+
+        Parameters
+        ----------
+        return_type=str : function
+            Function to convert to a desired resturn type (if no timeout).
+
+        ignore_error=False : bool
+            If True, will not raise an exception when it times out.
         """
         result = self.serial.readline()
-        return result.strip() if len(result) else None
-    
-    def query(self, message='*IDN?'):
+        if len(result):
+            result
+            if self.log: self.log('arduino read', return_type, result.strip())
+            return return_type(result.decode().strip())
+        else:
+            if self.log: self.log('arduino read', return_type, 'TIMEOUT')
+            if not ignore_error: raise Exception('Arduino read timeout.')
+            return None
+
+    def query(self, message='*IDN?', return_type=str, ignore_error=False):
         """
-        Calls a write(message) and read().
+        Calls a write(message) and read(). Returns None if it times out.
+
+        Parameters
+        ----------
+        message='*IDN?' : str
+            Query message.
+
+        return_type=str : conversion function
+            Function that converts the result to another type.
+
+        ignore_error=False : bool
+            If True, will not raise an exception when it times out.
         """
         self.write(message)
-        return self.read()
-    
+        return self.read(return_type, ignore_error)
+
+
 class arduino_base():
     """
     Scripted graphical interface for an arduino.
     """
-    def __init__(self, api_class=arduino_base_api, name='arduino', 
+    def __init__(self, api_class=arduino_base_api, name='arduino',
                  show=True, block=False, window_size=[1,1]):
-        
-        # Run the base stuff
-        self.serial_gui_base = serial_gui_base(api_class=api_class, 
-            name=name, show=show, block=block, window_size=window_size, 
-            hide_address=True)  
-        
 
-        
+        # Run the base stuff
+        self.serial_gui_base = serial_gui_base(api_class=api_class,
+            name=name, show=show, block=block, window_size=window_size,
+            hide_address=True)
+
+
+
+
 if __name__ == '__main__':
     self = arduino_base()
-    

@@ -157,26 +157,17 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
 
         # Add GUI stuff to the bottom grid
         self.label_temperature = self.grid_bot.add(_g.Label('Temperature: Unknown')).set_style('font-size: 20pt; font-weight: bold; color: '+('pink' if _s.settings['dark_theme_qt'] else 'red'))
-        
+
         self.grid_bot.new_autorow()
-        
+
         self.grid_bot.grid_controls = self.grid_bot.add(_g.GridLayout(margins=False))
-        
+
         self.grid_bot.grid_controls.add(_g.Label('Setpoint:'))
-        
+
         self.number_setpoint = self.grid_bot.grid_controls.add(_g.NumberBox(
             -273.16, bounds=(-273.16, 500), suffix='°C',
             signal_changed=self._number_setpoint_changed)).set_width(100)
-        
-        self.grid_bot.grid_controls.add(_g.Label('History:'))
-        self.number_history  = self.grid_bot.grid_controls.add(_g.NumberBox(
-            0, bounds=(0,None), int=True, 
-            autosettings_path=name+'.number_history',
-            tip='How many points to keep in the plot. Set to 0 to keep everything.\n'+
-                'You can also use the script to display the last N points with indexing,\n'+
-                'e.g., d[0][-200:], which will not delete the old data.'))
-        
-        
+
         # Make the plotter.
         self.grid_bot.new_autorow()
         self.plot_stream = self.grid_bot.add(_g.DataboxPlot(file_type='*.csv', autosettings_path=name+'.plot', delimiter=','), alignment=0, column_span=10)
@@ -187,17 +178,6 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
 
         # Bottom log file controls
         self.grid_bot.new_autorow()
-        self.grid_bot.grid_controls2 = self.grid_bot.add(_g.GridLayout(margins=False))
-        self.text_note       = self.grid_bot.grid_controls2.add(_g.TextBox(
-            'Log File Note', tip='Note to be added to the log file header.')).set_width(290)
-        
-        self.button_dump     = self.grid_bot.grid_controls2.add(_g.Button(
-            'Log Data', 
-            checkable=True,
-            signal_toggled=self._button_dump_toggled,
-            tip='Append incoming data to a text file of your choice.'))
-
-        self.label_dump_path = self.grid_bot.grid_controls2.add(_g.Label(''))
 
         # Finally show it.
         self.window.show(block)
@@ -209,34 +189,7 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         # Set the temperature setpoint
         self.api.set_temperature_setpoint(self.number_setpoint.get_value())
 
-    def _button_dump_toggled(self, *a):
-        """
-        Called when someone toggles the dump button. Ask for a path or remove the path.
-        """
-        if self.button_dump.is_checked():
-            path = _s.dialogs.save('*.csv', 'Dump incoming data to this file.', force_extension='*.csv')
 
-            # If the path is valid, reset the clock, write the header
-            if path:
-
-                # Store the path in a visible location
-                self.label_dump_path.set_text(path)
-                self.text_note.disable()
-
-                # Add header information to the Databox
-                self.plot_stream.h(**{
-                    'Note'                : self.text_note.get_text(),
-                    'Dump Start Time'     : _time.ctime(self.t0),
-                    'Dump Start Time (s)' : self.t0, })
-
-                # Save it forcing overwrite
-                self.plot_stream.save_file(path, force_overwrite=True)
-
-            else:
-                self.button_dump.set_checked(False)
-                self.text_note.enable()
-
-        else: self.label_dump_path.set_text('')
 
 
     def _timer_tick(self, *a):
@@ -251,16 +204,14 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         self.number_setpoint.set_value(S, block_signals=True)
 
         # Append this to the databox
-        self.plot_stream.append_row([t, T, S, P], ckeys=['Time (s)', 'Temperature (C)', 'Setpoint (C)', 'Power (%)'])
+        self.plot_stream.append_log([t, T, S, P], ckeys=['Time (s)', 'Temperature (C)', 'Setpoint (C)', 'Power (%)'])
         self.plot_stream.plot()
+
+        # Update the big red text.
         self.label_temperature.set_text('Temperature: %.1f °C' % T)
         self.window.process_events()
 
-        # If the dump file is checked, dump the row
-        if self.button_dump.is_checked():
-            f = open(self.label_dump_path.get_text(), 'a')
-            f.write('%.6f,%.1f,%.1f,%.1f\n' % (t,T,S,P))
-            f.close()
+
 
     def _after_button_connect_toggled(self):
         """
