@@ -183,7 +183,7 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
 
         # Make the plotter.
         self.grid_bot.new_autorow()
-        self.plot_stream = self.grid_bot.add(_g.DataboxPlot(
+        self.plot = self.grid_bot.add(_g.DataboxPlot(
             file_type='*.csv',
             autosettings_path=name+'.plot',
             delimiter=',', show_logger=True), alignment=0, column_span=10)
@@ -220,8 +220,8 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         self.number_setpoint.set_value(S, block_signals=True)
 
         # Append this to the databox
-        self.plot_stream.append_log([t, T, S, P], ckeys=['Time (s)', 'Temperature (C)', 'Setpoint (C)', 'Power (%)'])
-        self.plot_stream.plot()
+        self.plot.append_log([t, T, S, P], ckeys=['Time (s)', 'Temperature (C)', 'Setpoint (C)', 'Power (%)'])
+        self.plot.plot()
 
         # Update the big red text.
         self.number_temperature(T)
