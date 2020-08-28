@@ -326,6 +326,8 @@ class arduino_base_api():
         ignore_error=False : bool
             If True, will not raise an exception when it times out.
         """
+        x = self.serial.read_all()
+        if len(x): print('RUH ROH: During query("'+message+'"), before write(), read_all() returned', x)
         self.write(message)
         return self.read(return_type, ignore_error)
 

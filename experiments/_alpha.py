@@ -30,7 +30,7 @@ class alpha_arduino(_serial_tools.arduino_base):
         Set to True to enable editing of the conversion parameters. Use this option, but
         do so with some level of caution. If the bias scale gets edited, for example,
         you can accidentally overbias the detector. Another option is to adjust these manually
-        with, e.g., self.conversion['Pirani/V_offset'] = new_value.
+        with, e.g., self.conversion['Pirani/Offset'] = new_value.
 
     block=False
         Whether to block the console while the window is open.
@@ -242,23 +242,23 @@ class alpha_arduino(_serial_tools.arduino_base):
                tip='Ratio of volts applied to the detection circuit (above the big resistor) to volts measured at the Arduino ADC1.')
 
 
-        sr.add('Pirani/P_offset', 0.0, suffix='Pa', siPrefix=True,
-               tip='Pressure (Pa) = P_offset + P_scale * 10**((V_ADC2-V_offset)/V_scale)')
+        sr.add('Pirani/P_offset', 0.0, suffix='Pa', siPrefix=True, decimals=4,
+               tip='Pressure (Pa) = P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)')
 
-        sr.add('Pirani/P_scale', 1.0, suffix='Pa', siPrefix=True,
-               tip='Pressure (Pa) = P_offset + P_scale * 10**((V_ADC2-V_offset)/V_scale)')
+        sr.add('Pirani/P_scale', 1.0, suffix='Pa', siPrefix=True, decimals=4,
+               tip='Pressure (Pa) = P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)')
 
-        sr.add('Pirani/V_offset', 3.5, suffix='V',
-               tip='Pressure (Pa) = P_offset + P_scale * 10**((V_ADC2-V_offset)/V_scale)')
+        sr.add('Pirani/Offset', 3.5, suffix='V', decimals=4,
+               tip='Pressure (Pa) = P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)')
 
-        sr.add('Pirani/V_scale', 1.0, suffix='V',
-               tip='Pressure (Pa) = P_offset + P_scale * 10**((V_ADC2-V_offset)/V_scale)')
+        sr.add('Pirani/Attenuation', 1.0/4.003, suffix='V', decimals=4,
+               tip='Pressure (Pa) = P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)')
 
 
-        sr.add('Pressure_Transducer/P_offset', 0.0, suffix='Pa', siPrefix=True,
+        sr.add('Pressure_Transducer/P_offset', 0.0,  decimals=4, suffix='Pa', siPrefix=True,
                tip='Pressure (Pa) = P_offset + Ratio*V_ADC3')
 
-        sr.add('Pressure_Transducer/Ratio', 38200.0, suffix='Pa/V', siPrefix=True,
+        sr.add('Pressure_Transducer/Ratio', 38200.0, decimals=4, suffix='Pa/V', siPrefix=True,
                tip='Pressure (Pa) = P_offset + Ratio*V_ADC3')
 
 
@@ -283,7 +283,7 @@ class alpha_arduino(_serial_tools.arduino_base):
         ## OTHER STUFF
 
         # Timer for querying arduino state
-        self.timer = _g.Timer(250, single_shot=True)
+        self.timer = _g.Timer(500)
         self.timer.signal_tick.connect(self._timer_tick)
         self.t_connect = None
 
@@ -590,23 +590,23 @@ class alpha_arduino(_serial_tools.arduino_base):
         V_offset = self.conversion['Vent_Valve/V_offset']
         return (V_offset + percentage/Scale) / Gain_LPF
 
-    def get_pressure_from_adc2(self, V_adc2):
+    def get_pressure_from_adc2(self, V_ADC2):
         """
         Pirani Guage
 
         Given the voltage V_adc2 from ADC2, returns the pressure (Pa) estimated
         from the conversion parameters in self.conversion.
 
-        Specifically, P = P_offset + P_scale * 10**((V_adc2-V_offset)/V_scale)
+        Specifically, P = P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)
         """
-        P_offset = self.conversion['Pirani/P_offset']
-        P_scale = self.conversion['Pirani/P_scale']
-        V_offset = self.conversion['Pirani/V_offset']
-        V_scale = self.conversion['Pirani/V_scale']
+        P_offset    = self.conversion['Pirani/P_offset']
+        P_scale     = self.conversion['Pirani/P_scale']
+        Offset      = self.conversion['Pirani/Offset']
+        Attenuation = self.conversion['Pirani/Attenuation']
 
-        return P_offset + P_scale * 10**((V_adc2-V_offset)/V_scale)
+        return P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)
 
-    def get_pressure_from_adc3(self, V_adc3):
+    def get_pressure_from_adc3(self, V_ADC3):
         """
         Pressure Transducer
 
@@ -618,7 +618,7 @@ class alpha_arduino(_serial_tools.arduino_base):
         P_offset = self.conversion['Pressure_Transducer/P_offset']
         Ratio    = self.conversion['Pressure_Transducer/Ratio']
 
-        return P_offset + Ratio * V_adc3
+        return P_offset + Ratio * V_ADC3
 
     def _timer_tick(self, *a):
         """
@@ -704,7 +704,6 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.api.log = print
 
-        self.timer.start()
 
 if __name__ == '__main__':
     _egg.clear_egg_settings()
