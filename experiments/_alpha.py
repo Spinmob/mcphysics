@@ -26,17 +26,17 @@ class alpha_arduino(_serial_tools.arduino_base):
         Distinctive name for this instance. Used for remembering egg_settings, and other
         settings.
 
-    enable_conversion_edit=False : bool
+    enable_settings_edit=False : bool
         Set to True to enable editing of the conversion parameters. Use this option, but
         do so with some level of caution. If the bias scale gets edited, for example,
         you can accidentally overbias the detector. Another option is to adjust these manually
-        with, e.g., self.conversion['Pirani/Offset'] = new_value.
+        with, e.g., self.settings['Pirani/Offset'] = new_value.
 
     block=False
         Whether to block the console while the window is open.
     """
 
-    def __init__(self, name='alpha_arduino', enable_conversion_edit=False, block=False):
+    def __init__(self, name='alpha_arduino', enable_settings_edit=False, block=False):
 
         number_width = 100
 
@@ -228,12 +228,12 @@ class alpha_arduino(_serial_tools.arduino_base):
         self.tab_cal.new_autorow()
 
         # Settings
-        sr = self.conversion = self.tab_cal.settings = self.tab_cal.add(_g.TreeDictionary(
+        sr = self.settings = self.tab_cal.settings = self.tab_cal.add(_g.TreeDictionary(
             autosettings_path = name+'.tab_cal.settings',
             name              = name+'.tab_cal.settings',
             new_parameter_signal_changed=self._settings_cal_changed)).set_width(230)
 
-        if not enable_conversion_edit: sr.disable()
+        if not enable_settings_edit: sr.disable()
 
         sr.add('Bias/V_bias:V_PWM1', 55.44, suffix='V/V',
                tip='Ratio of volts applied to the detection circuit (above the big resistor) to volts from the Arduino PWM1.')
@@ -541,53 +541,53 @@ class alpha_arduino(_serial_tools.arduino_base):
         """
         Given the voltage V_ADC1 from ADC1, returns the actual bias voltage applied
         to the detection circuit (above the big resistor), using the conversion
-        parameters in self.conversion.
+        parameters in self.settings.
 
         Specifically, V_bias = (V_bias:V_ADC1) * V_PWM1
         """
-        return self.conversion['Bias/V_bias:V_ADC1']*V_ADC1
+        return self.settings['Bias/V_bias:V_ADC1']*V_ADC1
 
     def get_bias_from_pwm1(self, V_PWM1):
         """
         Given the PWM1 setpoint V_PWM1, returns the expected voltage applied
         to the detection circuit (above the big resistor), using the conversion
-        parameters in self.conversion.
+        parameters in self.settings.
 
         Specifically, V_bias = (V_bias:V_PWM1) * V_PWM1
         """
-        return self.conversion['Bias/V_bias:V_PWM1']*V_PWM1
+        return self.settings['Bias/V_bias:V_PWM1']*V_PWM1
 
     def get_pwm1_from_bias(self, V_bias):
         """
         Given the bias voltage V_bias, returns the corresponding PWM1 setpoint
-        voltage (0-3.3V) using the parameters in self.conversion.
+        voltage (0-3.3V) using the parameters in self.settings.
 
         Specifically, V_PWM1 = V_bias / (V_bias:V_PWM1)
         """
-        return V_bias / self.conversion['Bias/V_bias:V_PWM1']
+        return V_bias / self.settings['Bias/V_bias:V_PWM1']
 
     def get_vent_valve_percent_from_pwm2(self, V_PWM2):
         """
         Given the PWM2 setpoint, returns the expected valve position (0-100%)
-        from the conversion parameters in self.conversion.
+        from the conversion parameters in self.settings.
 
         Specifically Percentage = Scale*(V_PWM2 * Gain_LPF - V_offset)
         """
-        Scale    = self.conversion['Vent_Valve/Scale']
-        Gain_LPF = self.conversion['Vent_Valve/Gain_LPF']
-        V_offset = self.conversion['Vent_Valve/V_offset']
+        Scale    = self.settings['Vent_Valve/Scale']
+        Gain_LPF = self.settings['Vent_Valve/Gain_LPF']
+        V_offset = self.settings['Vent_Valve/V_offset']
         return Scale*(V_PWM2 * Gain_LPF - V_offset)
 
     def get_pwm2_from_vent_valve_percent(self, percentage):
         """
         Given the desired vent valve open percentage, returns the corresponding
-        PWM2 setpoint (0-3.3V), using the parameters in self.conversion.
+        PWM2 setpoint (0-3.3V), using the parameters in self.settings.
 
         Specifically, V_PWM2 = (V_offset + percentage/Scale) / Gain_LPF
         """
-        Scale    = self.conversion['Vent_Valve/Scale']
-        Gain_LPF = self.conversion['Vent_Valve/Gain_LPF']
-        V_offset = self.conversion['Vent_Valve/V_offset']
+        Scale    = self.settings['Vent_Valve/Scale']
+        Gain_LPF = self.settings['Vent_Valve/Gain_LPF']
+        V_offset = self.settings['Vent_Valve/V_offset']
         return (V_offset + percentage/Scale) / Gain_LPF
 
     def get_pressure_from_adc2(self, V_ADC2):
@@ -595,14 +595,14 @@ class alpha_arduino(_serial_tools.arduino_base):
         Pirani Guage
 
         Given the voltage V_adc2 from ADC2, returns the pressure (Pa) estimated
-        from the conversion parameters in self.conversion.
+        from the conversion parameters in self.settings.
 
         Specifically, P = P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)
         """
-        P_offset    = self.conversion['Pirani/P_offset']
-        P_scale     = self.conversion['Pirani/P_scale']
-        Offset      = self.conversion['Pirani/Offset']
-        Attenuation = self.conversion['Pirani/Attenuation']
+        P_offset    = self.settings['Pirani/P_offset']
+        P_scale     = self.settings['Pirani/P_scale']
+        Offset      = self.settings['Pirani/Offset']
+        Attenuation = self.settings['Pirani/Attenuation']
 
         return P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)
 
@@ -611,12 +611,12 @@ class alpha_arduino(_serial_tools.arduino_base):
         Pressure Transducer
 
         Given the voltage V_adc3 from ADC3, returns the pressure (Pa) estimated
-        from the conversion parameters in self.conversion.
+        from the conversion parameters in self.settings.
 
         Specifically, P = P_offset + Ratio*V_adc3
         """
-        P_offset = self.conversion['Pressure_Transducer/P_offset']
-        Ratio    = self.conversion['Pressure_Transducer/Ratio']
+        P_offset = self.settings['Pressure_Transducer/P_offset']
+        Ratio    = self.settings['Pressure_Transducer/Ratio']
 
         return P_offset + Ratio * V_ADC3
 
@@ -662,8 +662,8 @@ class alpha_arduino(_serial_tools.arduino_base):
         self.window.process_events()
 
         # Add header information
-        self.conversion.send_to_databox_header(self.tab_raw.plot)
-        self.conversion.send_to_databox_header(self.tab_cal.plot)
+        self.settings.send_to_databox_header(self.tab_raw.plot)
+        self.settings.send_to_databox_header(self.tab_cal.plot)
 
         # Log the raw values.
         self.tab_raw.plot.append_log(
