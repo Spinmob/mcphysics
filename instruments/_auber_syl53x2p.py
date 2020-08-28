@@ -155,24 +155,31 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         # Run the base class stuff, which shows the window at the end.
         _serial_tools.serial_gui_base.__init__(self, api_class=auber_syl53x2p_api, name=name, show=False, window_size=window_size)
 
-        style_big = 'font-size: 20pt; font-weight: bold; color: '+('pink' if _s.settings['dark_theme_qt'] else 'red')
+        self.window.set_size([0,0])
+
+        style_big_blue = 'font-size: 20pt; font-weight: bold; color: '+('cyan' if _s.settings['dark_theme_qt'] else 'blue')
+        style_big_red  = 'font-size: 20pt; font-weight: bold; color: '+('pink' if _s.settings['dark_theme_qt'] else 'red')
+        style_big      = 'font-size: 20pt; font-weight: bold; color: '+('yellow' if _s.settings['dark_theme_qt'] else 'purple')
 
         # Add GUI stuff to the bottom grid
-        self.label_temperature = self.grid_bot.add(_g.Label('Temperature:')).set_style(style_big)
-        self.number_temperature = self.grid_bot.add(_g.NumberBox(
-            value=-273.16, suffix='°C', tip='Last recorded temperature value.'
-            )).set_width(200).set_style(style_big)
-        self.label_temperature_status = self.grid_bot.add(_g.Label('(unknown)')).set_style(style_big)
+        self.grid_bot.add(_g.Label('Setpoint:'), alignment=2).set_style(style_big_blue)
+
+        self.number_setpoint = self.grid_bot.add(_g.NumberBox(
+            -273.16, bounds=(-273.16, 500), suffix='°C',
+            signal_changed=self._number_setpoint_changed
+            )).set_width(200).set_style(style_big_blue)
+        self.label_temperature_status = self.grid_bot.add(_g.Label(
+            '(unknown)'), row_span=2).set_style(style_big)
 
         self.grid_bot.new_autorow()
-
-        self.grid_bot.grid_controls = self.grid_bot.add(_g.GridLayout(margins=False))
-
-        self.grid_bot.grid_controls.add(_g.Label('Setpoint:'))
-
-        self.number_setpoint = self.grid_bot.grid_controls.add(_g.NumberBox(
-            -273.16, bounds=(-273.16, 500), suffix='°C',
-            signal_changed=self._number_setpoint_changed)).set_width(100)
+        self.grid_bot.add(_g.Label('Measured:'), alignment=2).set_style(style_big_red)
+        
+        self.number_temperature = self.grid_bot.add(_g.NumberBox(
+            value=-273.16, suffix='°C', tip='Last recorded temperature value.'
+            )).set_width(200).disable().set_style(style_big_red)
+        
+        
+        self.grid_bot.new_autorow()
 
         # Make the plotter.
         self.grid_bot.new_autorow()
@@ -245,6 +252,7 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
 
 
 if __name__ == '__main__':
+    _egg.clear_egg_settings()
     #self = _serial_gui_base(auber_syl53x2p_api)
     self = auber_syl53x2p()
     #self = auber_syl53x2p_api()
