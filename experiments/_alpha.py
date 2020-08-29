@@ -68,7 +68,7 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.grid_raw_state.add(_g.Label('ADC1:'), alignment=2)
         self.number_adc1 = self.grid_raw_state.add(_g.NumberBox(
-            value=0, step=0.1, bounds=(0,3.3), decimals=4, suffix='V',
+            value=0, step=0.1, decimals=4, suffix='V',
             autosettings_path=name+'.number_adc1',
             tip='Nominal voltage at ADC1 (bias readout); 0-3.3V.')).disable().set_width(number_width)
 
@@ -100,7 +100,7 @@ class alpha_arduino(_serial_tools.arduino_base):
         self.grid_raw_state.new_autorow()
         self.grid_raw_state.add(_g.Label('ADC2:'), alignment=2)
         self.number_adc2 = self.grid_raw_state.add(_g.NumberBox(
-            value=0, step=0.1, bounds=(0,3.3), decimals=4, suffix='V',
+            value=0, step=0.1, decimals=4, suffix='V',
             autosettings_path=name+'.number_adc2',
             tip='Voltage at ADC2 (pirani readout); 0-3.3V.')).disable().set_width(number_width)
 
@@ -117,7 +117,7 @@ class alpha_arduino(_serial_tools.arduino_base):
         self.grid_raw_state.new_autorow()
         self.grid_raw_state.add(_g.Label('ADC3:'), alignment=2)
         self.number_adc3 = self.grid_raw_state.add(_g.NumberBox(
-            value=0, step=0.1, bounds=(0,3.3), decimals=4, suffix='V',
+            value=0, step=0.1, decimals=4, suffix='V',
             autosettings_path=name+'.number_adc3',
             tip='Voltage at ADC3 (pressure transducer); 0-3.3V.')).disable().set_width(number_width)
 
@@ -192,13 +192,13 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.grid_cal_state.add(_g.Label('Pressure Transducer:'), alignment=2)
         self.number_pressure_transducer = self.grid_cal_state.add(_g.NumberBox(
-            value=0, bounds=(0,None), decimals=4, suffix='Pa', siPrefix=True,
+            value=0, decimals=4, suffix='Pa', siPrefix=True,
             autosettings_path=name+'.number_pressure_transducer',
             tip='Pressure measured by the transducer. Relies on conversion parameters.')).disable().set_width(number_width)
 
         self.grid_cal_state.add(_g.Label('Pirani:'), alignment=2)
         self.number_pressure_pirani = self.grid_cal_state.add(_g.NumberBox(
-            value=0, bounds=(0,None), decimals=4, suffix='Pa', siPrefix=True,
+            value=0, decimals=4, suffix='Pa', siPrefix=True,
             autosettings_path=name+'.number_pirani',
             tip='Pressure measured by the Pirani gauge. Relies on conversion parameters.')).disable().set_width(number_width)
 
@@ -218,7 +218,7 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         self.grid_cal_state.add(_g.Label('Vent Valve:'), alignment=2)
         self.number_vent_valve_setpoint = self.grid_cal_state.add(_g.NumberBox(
-            value=0.0, step=0.5, bounds=(0,100), decimals=4, suffix='%',
+            value=0.0, step=0.5, decimals=4, suffix='%',
             autosettings_path=name+'.number_vent_valve_setpoint',
             signal_changed = self._number_vent_valve_setpoint_changed,
             tip='Vent valve setpoint (0-100%).')).set_width(number_width)
@@ -706,6 +706,6 @@ class alpha_arduino(_serial_tools.arduino_base):
 
 
 if __name__ == '__main__':
-    _egg.clear_egg_settings()
+    #_egg.clear_egg_settings()
     self = alpha_arduino()
     #self.button_connect(True)

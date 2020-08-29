@@ -221,11 +221,24 @@ class soundcard():
         self.signal_quad_new_data  = _s.thread.signal(self._quad_new_data)
         self.signal_sweep_done     = _s.thread.signal(self._sweep_done)
 
+        # Fix the units
+        self._strip_V_suffix(self.tab_out.settings)
+
         # Start the timer
         self.timer_status.start()
 
         # Show the window
         if show: self.window.show(block)
+
+    def _strip_V_suffix(self, s):
+        """
+        Loops over keys and eliminates all 'V' suffixes.
+        """
+        for k in s.get_keys():
+            o = s.get_pyqtgraph_options(k)
+            if 'suffix' in o and o['suffix'] == 'V':
+                s.set_pyqtgraph_options(k, suffix='')
+
 
     def _event_close(self, *a):
         """
@@ -1010,10 +1023,6 @@ class soundcard():
 
 if __name__ == '__main__':
     #_g.clear_egg_settings()
-    import sys
-    def my_hook(*a):
-        print('PANTS', a)
-    sys.excepthook = my_hook
     self = soundcard()
 
 
