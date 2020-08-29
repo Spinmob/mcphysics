@@ -221,7 +221,20 @@ class alpha_arduino(_serial_tools.arduino_base):
             value=0.0, step=0.5, decimals=4, suffix='%',
             autosettings_path=name+'.number_vent_valve_setpoint',
             signal_changed = self._number_vent_valve_setpoint_changed,
-            tip='Vent valve setpoint (0-100%).')).set_width(number_width)
+            tip='Vent valve setpoint (0-100 %).')).set_width(number_width)
+
+        self.button_vent_close = self.grid_cal_state.add(_g.Button(
+            '100 %',
+            signal_clicked = self._button_vent_open_clicked,
+            tip = 'Push me to set the vent valve to 100 %.'
+            ))
+
+        self.button_vent_close = self.grid_cal_state.add(_g.Button(
+            '0 %',
+            signal_clicked = self._button_vent_close_clicked,
+            tip = 'Push me to set the vent valve to 0 %.'
+            ))
+
 
 
         # Plot raw
@@ -291,6 +304,18 @@ class alpha_arduino(_serial_tools.arduino_base):
         self.serial_gui_base._after_button_connect_toggled = self._after_button_connect_toggled
 
         self.window.show(block)
+
+    def _button_vent_close_clicked(self, *a):
+        """
+        Close the vent.
+        """
+        self.number_vent_valve_setpoint(0)
+
+    def _button_vent_open_clicked(self, *a):
+        """
+        Close the vent.
+        """
+        self.number_vent_valve_setpoint(100)
 
     def _number_bias_setpoint_changed(self, *a):
         """
