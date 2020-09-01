@@ -448,12 +448,11 @@ class motors_api():
         """
         if len(args) >= 2:
             x, y = args[0], args[1]
+            return _n.sqrt(x*x+y*y), _n.degrees(_n.arctan2(y,x))
 
         else:
-            r_steps, a_steps = self._unsafe._radius_steps, self._unsafe._angle_steps
+            r_steps, a_steps = self.get_ra_steps()
             return r_steps/_RAD_STEPS_PER_MM, a_steps/_ANG_STEPS_PER_DEG
-
-        return _n.sqrt(x*x+y*y), _n.degrees(_n.arctan2(y,x))
 
     # def get_radial_steps(self):
     #     """
@@ -475,9 +474,13 @@ class motors_api():
         r_steps and a_steps, and use these instead of the internally stored
         values to calculate the cartesian coordinates.
         """
-        if len(args) >= 2: r_steps, a_steps = args[0], args[1]
-        else:              r_steps, a_steps = self.get_polar()
-        return r_steps*_n.cos(a_steps/2), r_steps*_n.sin(a_steps/2)
+        if len(args) >= 2: 
+            r_steps, a_steps = args[0], args[1]
+        else:              
+            r_steps, a_steps = self.get_ra_steps()
+        
+        a = a_steps/_ANG_STEPS_PER_DEG
+        return r_steps*_n.cos(_n.radians(a)), r_steps*_n.sin(_n.radians(a))
 
     def get_xy(self, *args):
         """
@@ -491,10 +494,9 @@ class motors_api():
         if len(args) >= 2: 
             r, a = args[0], args[1]
         else:
-            r = self._unsafe._radius_steps/_RAD_STEPS_PER_MM
-            a = self._unsafe._angle_steps/_ANG_STEPS_PER_DEG
+            r,a = self.get_ra()
 
-        return r*_n.cos(a), r*_n.sin(a)
+        return r*_n.cos(_n.radians(a)), r*_n.sin(_n.radians(a))
 
     def home(self):
         """
@@ -839,8 +841,8 @@ class motors_api():
     #     # Get current position in cartesian
     #     r = self._unsafe._radius_steps
     #     a = self._unsafe._angle_steps # TODO: This is the motor's calibration?
-    #     x_cur = r * _n.cos(a)
-    #     y_cur = r * _n.sin(a)
+    #     x_cur = r * _n.cos(_n.radians(a))
+    #     y_cur = r * _n.sin(_n.radians(a))
 
     #     # This will probably introduce some rounding error...
     #     x_cur = int(round(x_cur))
