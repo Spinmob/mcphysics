@@ -15,8 +15,11 @@ except: _serial_tools = _mp.instruments._serial_tools
 _mp._debug_enabled = True
 _debug = _mp._debug
 
+# Aliases
+adalm2000  = _mp.instruments.adalm2000
+sillyscope = _mp.instruments.sillyscope
 
-class alpha_arduino(_serial_tools.arduino_base):
+class arduino(_serial_tools.arduino_base):
     """
     Class for talking to the Arduino used to control the Alpha experiments.
 

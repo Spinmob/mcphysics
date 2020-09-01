@@ -5,4 +5,7 @@ _p = _traceback.print_last
 import mcphysics as _mp
 
 from . import _alpha
-alpha_arduino = _alpha.alpha_arduino
+from . import _drum
+
+alpha = _alpha
+drum  = _drum
