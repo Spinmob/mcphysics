@@ -24,21 +24,21 @@ _RAD_MAX_STEPS = 10000 # Number of steps from the center to corner of plate
 #       with the edges of the square plate that it will not collide near the corners?
 # TODO: I commented out most of the movement functions, opting for absolute coordinates
 #       only. Students can keep track of their coordinates or use the get_ and set_
-#       functions, and this will avoid them shifting too far. It also reduces the 
+#       functions, and this will avoid them shifting too far. It also reduces the
 #       immediate work to be done. I've also adopted
 #       "r,a" for polar to shorten names, and "_steps" to make as clear as possible
 #       when we're talking about steps or absolute (especially brutal with angles!)
 #       Please check my factors of 2 and calculations are right, and fill in the
 #       calibrations (at least roughly) (search for TODO in this document)
 # TODO: (Optional) What if instead of checking and failing, we just have the radial motor
-#       drive to the maximum value and print a warning, since all these functions now 
-#       return the "actual" value. I'm not wed to this idea, since perhaps the 
+#       drive to the maximum value and print a warning, since all these functions now
+#       return the "actual" value. I'm not wed to this idea, since perhaps the
 #       students should not take such data. Anyway, your call.
 # TODO: There are still some manual conversions between cartesian and polar.
 #       Probably a good idea to use the get_xy and get_ra functions instead, so that
 #       the calibration lives in one place only. No rush on this.
 # TODO: get_squine_max_steps() and get_squine_max() should be replaced with
-#       get_max_r_steps() and get_max_r(), with a check against the shape to 
+#       get_max_r_steps() and get_max_r(), with a check against the shape to
 #       determine whether a squine or simple limit is required. Not a big priority
 #       before term start, since students only really need get_xy() and set_xy().
 
@@ -57,29 +57,23 @@ import queue     as _queue
 import numpy     as _n
 import time      as _time
 
-
-
-
-####################
-# Helper Functions #
-####################
-
-
+get_available_com_ports  = _mp.instruments._serial_tools.get_available_com_ports
+list_available_com_ports = _mp.instruments._serial_tools.list_available_com_ports
 
 
 class _unsafe_motors:
     """
     Class for talking to the motors. Pays no mind to whether it will crash into
     walls.
-    
+
     Parameters
     ----------
     port='COM5' : str or None
-        Port to assume is the controlling arduino. 
+        Port to assume is the controlling arduino.
         Setting to None or "Simulation" means simulation mode.
     """
-    
-    
+
+
     D_NONE = 0
     D_INFO = 1
     D_OPEN = 2
@@ -88,18 +82,18 @@ class _unsafe_motors:
     def __init__(self, port='COM5', debug=D_ALL):
         self._handle = False
         self.debug = debug
-        
+
         if port in [None, "Simulation"]:
             self.simulation_mode = True
 
         # Otherwise give it a shot.
-        else:            
+        else:
             # Attempt to open the com port.
             try:
                 device = port
                 if self.D_OPEN & self.debug: print("Attempting '%s'"%(device))
                 self._handle = _serial.Serial(device,115200) # 115200 = Data Rate
-                
+
                 # Open queue for threaded communication with device.
                 self._queue = _queue.Queue()
                 t = _threading.Thread(target=self._reader)
@@ -109,21 +103,21 @@ class _unsafe_motors:
                 while False == self._timeout_for(b"reset",timeout=1):
                     self._debug_print("resetting")
                     self._handle.write(b"reset\n")
-                
+
                 # It all worked, no simulation needed
                 self.simulation_mode = False
-                
+
             # Whoopsie-doodle
             except Exception as e:
                 print("Exception:", e, 'entering simulation mode...')
                 self.simulation_mode = True
-            
-            
+
+
     def _reader(self):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return
-        
+
         self._debug_print("reader starts")
         while True:
             str = self._handle.readline()
@@ -131,16 +125,16 @@ class _unsafe_motors:
 
     # Wait for message matching "str", with max wait time "timeout"
     def _timeout_for(self,str,timeout):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return 'fake response from _timeout_for'
-        
+
         while True:
             try:
                 resp = self._queue.get(block=True,timeout=timeout)
                 self._debug_print("after get")
                 self._queue.task_done()
-                rc = resp.find(str)  
+                rc = resp.find(str)
                 if 0 == rc : return resp
                 print("UnMatched: %s" % (resp.decode()))
             except _queue.Empty:
@@ -149,10 +143,10 @@ class _unsafe_motors:
 
     # Wait for message matching "str" with no max time
     def _wait_for(self,str,timeout=None):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return 'fake response from _wait_for'
-        
+
         while True:
             resp = self._queue.get()
             self._queue.task_done()
@@ -162,36 +156,36 @@ class _unsafe_motors:
             if "ERR:" == resp[0:4]:
                 print(resp)
                 raise RuntimeError
-            rc = resp.find(str)  
+            rc = resp.find(str)
             if 0 == rc : return resp
             print(b"Unmatched: %s" % (resp),)
 
     # Set debug mode? Not really sure yet.
     def _debug(self):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return
-        
+
         self._handle.write(b"debug\n");
         self._wait_for(b"debug")
         return;
 
     # Get the device status
     def _status(self):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return
-        
+
         self._handle.write(b"status\n");
         self._wait_for(b"status")
-        return;        
+        return;
 
     # Sets the pulse time for the angular motor
     def _angular_set(self,dt):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return _n.random.rand()
-        
+
         command = b"a_set %f\n" % (dt)
         self._handle.write(command);
         resp = self._wait_for(b"a_set")
@@ -200,10 +194,10 @@ class _unsafe_motors:
 
     # Sets the pulse time for the radial motor
     def _radial_set(self,dt):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return _n.random.rand()
-        
+
         command = b"r_set %f\n" % (dt)
         self._handle.write(command);
         resp = self._wait_for(b"r_set")
@@ -212,10 +206,10 @@ class _unsafe_motors:
 
     # Sends the angular motor the given number of steps.
     def _angular_go(self,steps):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return True
-        
+
         command = b"a_go %d\n" % (steps)
         self._handle.write(command);
         self._wait_for(b"a_go")
@@ -223,10 +217,10 @@ class _unsafe_motors:
 
     # Sends the radial motor the given number of steps.
     def _radial_go(self,steps):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return True
-        
+
         command = b"r_go %d\n" % (steps)
         self._handle.write(command);
         self._wait_for(b"r_go")
@@ -234,30 +228,30 @@ class _unsafe_motors:
 
     # Returns true if the angular motor is not moving
     def _angular_idle(self):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return True
-        
+
         self._handle.write(b"a_idle\n")
         resp = self._wait_for(b"a_idle")
         return b"true" == resp[7:11]
 
     # Returns true if the radial motor is not moving
     def _radial_idle(self):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return True
-        
+
         self._handle.write(b"r_idle\n")
         resp = self._wait_for(b"r_idle")
         return b"true" == resp[7:11]
 
     # Home the angular motor
     def _angular_home(self):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return True
-        
+
         self._handle.write(b"a_home\n")
         self._wait_for(b"a_home")
         resp = self._wait_for(b"HOMING").decode('ascii')
@@ -268,10 +262,10 @@ class _unsafe_motors:
 
     # Home the radial motor
     def _radial_home(self):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return True
-        
+
         self._handle.write(b"r_home\n")
         self._wait_for(b"r_home")
         resp = self._wait_for(b"HOMING").decode('ascii')
@@ -282,10 +276,10 @@ class _unsafe_motors:
     # Sends both motors a given number of steps and waits until they're both
     # done moving
     def _go_and_wait(self,angular,radial):
-        if self.simulation_mode: 
+        if self.simulation_mode:
             _time.sleep(0.5)
             return True
-        
+
         while not (self._angular_idle() and self._radial_idle()): True
         if (angular != 0): self._angular_go(angular)
         if (radial != 0): self._radial_go(radial)
@@ -303,60 +297,60 @@ class _unsafe_motors:
 ######################################
 # Safe Motor Control Class           #
 ######################################
-class motors():
+class motors_api():
     def __init__(self, port='COM5', debug=True, shape="circle"):
-        """ 
+        """
         A safe wrapper for controlling the drum stepper motors lab.
-        Everytime an instance is opened, the experiment is homed, this uses 
+        Everytime an instance is opened, the experiment is homed, this uses
         limit switches to set the apparatus to its (0,0) position.
-       
+
         Moving the equpiment is then done using "safe" functions.
 
-        WARNING: You should have no reason to access and functions/fields prefixed 
+        WARNING: You should have no reason to access and functions/fields prefixed
                  with an underscore '_'. Python leaves these fully accessible and you can
-                 100% break the equipment if you mess with them. If you really 
-                 think you need to for some fantastic new functionality that will 
+                 100% break the equipment if you mess with them. If you really
+                 think you need to for some fantastic new functionality that will
                  make the experiment go better, please contact a TA/Prof first.
-        
+
         To initialize, simply define a new drum object:
         ```
         import safe_drum as sd
-        drum = sd.motors()
+        drum = sd.motors_api()
         ```
-        
+
         This will print out some connection messages, and assuming the device connects
         properly, will home the instrument. If any errors occur during homing, a large
         warning will be displayed, please watch-out for that.
-        
+
         Once homed, you have control of the instrument.  The main moving function is
-        `drum.set_ra_steps(r_steps, a_steps)` which sets the scanner to an 
+        `drum.set_ra_steps(r_steps, a_steps)` which sets the scanner to an
         absolute position defined by a radius and angle.
 
         Both numbers should be in number of steps for the motor with rough conversion:
         1 Radial step ~ 0.01 mm
         1 Angular step ~ 0.5 degrees of rotaton.
 
-        There are a bunch of wrappers to this motion function, allowing for relative 
+        There are a bunch of wrappers to this motion function, allowing for relative
         motion and cartesian coordinates. See those functions for more info.
 
 
         Parameters
         ----------
         port='COM5' : str or None
-            Port to assume is the controlling arduino. 
+            Port to assume is the controlling arduino.
             Setting to None or "Simulation" means simulation mode.
-            
+
         debug : bool, optional
             Whether to print verbose debug messages, by default True
-        
+
         shape : str, optional
-            The shape of the plate in the apparatus. Can be one of 
+            The shape of the plate in the apparatus. Can be one of
             "circle" or "square", by default circle, for safety.
         """
-        
+
         # Unsafe API
         self._unsafe = _unsafe_motors(port, debug)
-        
+
         # Home the instrument on every startup, that way we are always at 0,0
         # from the beginning
         self._unsafe._radius_steps = _RAD_MIN_STEPS
@@ -373,18 +367,18 @@ class motors():
         """
         Calculates the absolute maximum radius for a given a_steps (in steps) position.
         This is effectively the distance between the center of a square and it's perimiter
-        at a given angle. 
-        As a multiple of half the square's width, for an edge it's exactly 1, 
-        for the exact corner it's sqrt(2). 
+        at a given angle.
+        As a multiple of half the square's width, for an edge it's exactly 1,
+        for the exact corner it's sqrt(2).
         Since the sensor is not a zero-size point, it's width must also be considered.
         This is handled by a multiplicative factor of (0.91 + 0.09 * _n.cos(2*theta)**2), which
         reduces the calculated squine value by a factor of 0.91 at the corner to 1.0 at the edge.
-    
+
         Parameters
         ----------
         a_steps : int
             the a_steps position in steps.
-    
+
         Returns
         -------
         int
@@ -400,12 +394,12 @@ class motors():
     def get_squine_max(self, a):
         """
         Returns the maximum allowed radius (follows a squine) for the square plate in mm.
-        
+
         Parameters
         ----------
         a : float
             The angle (degrees).
-        
+
         Returns
         -------
         r_max : float
@@ -417,43 +411,43 @@ class motors():
     def get_ra_steps(self, *args):
         """
         Returns the current polar coordinates in units of steps.
-        
+
         If the number of arguments is 2, this function will assume they are
         x_steps and y_steps, and calculate r_steps and a_steps from this.
         """
-        if len(args) >= 2: 
-            
+        if len(args) >= 2:
+
             # Convert to r, a
             x_steps, y_steps = args[0], args[1]
             r_steps = int(_n.round(_n.sqrt(x_steps**2 + y_steps**2)))
             a_steps = int(_n.round(_n.degrees(_n.arctan2(y_steps,x_steps))*2))
             return r_steps, a_steps
-        
+
         return self._unsafe._radius_steps, self._unsafe._angle_steps
 
     def get_ra(self, *args):
         """
         Returns the current polar coordinates r (mm) and a (degrees).
-        
+
         If the number of arguments is 2, this function will assume they are
         x and y, and calculate r and a from this.
         """
-        if len(args) >= 2: 
+        if len(args) >= 2:
             x, y = args[0], args[1]
-        
-        else: 
-            r_steps, a_steps = self._unsafe._radius_steps, self._unsafe._angle_steps    
+
+        else:
+            r_steps, a_steps = self._unsafe._radius_steps, self._unsafe._angle_steps
             x, y = 0, 0 # TODO: insert spec'd calibration
-            
+
         return _n.sqrt(x*x+y*y), _n.degrees(_n.arctan2(y,x))
 
-    # def get_radial_steps(self):  
+    # def get_radial_steps(self):
     #     """
     #     Returns the current radial motor step count.
     #     """
     #     return self._unsafe._radius_steps
-    
-    # def get_angular_steps(self): 
+
+    # def get_angular_steps(self):
     #     """
     #     Returns the current angular motor step count.
     #     """
@@ -462,12 +456,12 @@ class motors():
     def get_xy_steps(self, *args):
         """
         Returns the current cartesian coordinates in units of steps.
-        
+
         If you specify two arguments, this function will assume they are
         r_steps and a_steps, and use these instead of the internally stored
         values to calculate the cartesian coordinates.
         """
-        if len(args) >= 2: r_steps, a_steps = args[0], args[1] 
+        if len(args) >= 2: r_steps, a_steps = args[0], args[1]
         else:              r_steps, a_steps = self.get_polar()
         return r_steps*_n.cos(a_steps/2), r_steps*_n.sin(a_steps/2)
 
@@ -475,9 +469,9 @@ class motors():
         """
         Returns the current cartesian coordinates x (mm) and y (mm) based on
         the motor and threading specs.
-        
-        If you specify two arguments, this function will assume they are 
-        r (mm) and a (degrees), and use these instead of the internally 
+
+        If you specify two arguments, this function will assume they are
+        r (mm) and a (degrees), and use these instead of the internally
         stored values to calculate the cartesian coordinates.
         """
         if len(args) >= 2: r, a = args[0], args[1]
@@ -486,14 +480,14 @@ class motors():
         return r*_n.cos(a), r*_n.sin(a)
 
     def home(self):
-        """ 
+        """
         Moves the radial and angular motor backwards until they hit the limit switches.
         This defines the minimal position of the scanner along both axes.
         """
         if self.get_ra_steps()[1] > 710:
             self.set_ra_steps(self.get_ra_steps()[0], 710)
         print("Homing Instrument, please wait")
-        
+
         if self._unsafe.simulation_mode:
             _time.sleep(0.5)
             r_status = True
@@ -502,7 +496,7 @@ class motors():
         else:
             r_status = self._unsafe._radial_home()
             a_status = self._unsafe._angular_home()
-        
+
         if not (r_status and a_status):
             if r_status:
                 print("Radial Switch Failed.")
@@ -521,12 +515,12 @@ class motors():
             print("Homing Completed Succesfuly.")
 
     def set_ra_steps(self, r_steps, a_steps):
-        """ 
+        """
         Steps the radial and angular motors to the specified position relative
         to zero.
-        
+
         Returns the actual values after rounding to the motor resolution (integer steps).
-        
+
         This method protects the motor and sensor through several precautions:
             * Ensures limits are established on the given positions.
             * Automatically adjusts angular steps so that the actuator never performs
@@ -539,16 +533,16 @@ class motors():
         ----------
         r_steps : float
             The position, in steps, relative to zero to move the radial position to.
-        
+
         a_steps : float
             The position, in steps, relative to zero to move the angular position to.
             Currently, each a_step is 1/2 of a degree.
-        
+
         Returns
         -------
         r_steps, a_steps : int
             Values the motors were set to (steps).
-            
+
         Raises
         ------
         ValueError
@@ -556,13 +550,13 @@ class motors():
             or if it's set to a radius that is incompatible with the desired angular position.
         """
         self._unsafe._debug_print('set_ra_steps(%d, %d)' % (r_steps, a_steps))
-        
+
         # Ensure integers, or integer like numbers are passed
         r_steps = int(_n.round(r_steps))
         a_steps  = int(_n.round(a_steps))
         if not self.is_safe_polar(r_steps, a_steps/2):
             if self._unsafe._shape == "square":
-                raise ValueError("Radial position %d outside safe range %d for angular steps %d" % 
+                raise ValueError("Radial position %d outside safe range %d for angular steps %d" %
                                  (r_steps, self.get_squine_max_steps(a_steps), a_steps))
             if self._unsafe._shape == "circle":
                 raise ValueError("Radial position %d outside safe range %d" %
@@ -572,11 +566,11 @@ class motors():
         ang_delta = (a_steps % _ANG_MAX_STEPS) - self._unsafe._angle_steps
         ang_first = False
         if self._unsafe._shape == "square":
-            
+
             # Flags that modify how the motion should be handled
             retreat = False
             ang_first = False
-            
+
             # If the radius is outside the safe range and we're rotating
             # we need to first pull in the sensor, then do the rotation
             # and finally set the radius to the correct amount.
@@ -584,11 +578,11 @@ class motors():
                 self._unsafe._angle_steps,a_steps,
                 _n.abs(self._unsafe._angle_steps-a_steps)+1,
                 dtype=int))
-            
+
             safe_dist = _n.min(safe_dists)
             if (ang_delta != 0 and self._unsafe._radius_steps > safe_dist):
                 retreat = True
-            
+
             # If we're moving outside the safe radial distance, we want to rotate first.
             if (r_steps > _RAD_MAX_SAFE):
                 ang_first = True
@@ -599,13 +593,13 @@ class motors():
                 # If the target radius is within the safe limit, go there
                 # otherwise, move to the minimum safe distance.
                 self.set_radius(safe_dist)
-        
+
         # Calculate number of steps needed to move radially.
         # Put here since retreating will change this.
         rad_delta = r_steps - self._unsafe._radius_steps
 
         self._unsafe._debug_print(
-            "  Moving to:      %d, %d" % (self._unsafe._radius_steps + rad_delta, 
+            "  Moving to:      %d, %d" % (self._unsafe._radius_steps + rad_delta,
                                              self._unsafe._angle_steps  + ang_delta))
 
         # If there is motion to do, send the motors that number of steps
@@ -617,7 +611,7 @@ class motors():
                 self._unsafe._debug_print("  Rotating Angle First")
                 while not self._unsafe._angular_idle():
                     _time.sleep(0.1)
-        
+
         if rad_delta != 0:
             self._unsafe._radial_go(rad_delta)
 
@@ -628,7 +622,7 @@ class motors():
         # Register the new changes
         self._unsafe._angle_steps += ang_delta
         self._unsafe._radius_steps += rad_delta
-        self._unsafe._debug_print("  Final Position: %d, %d" % (self._unsafe._radius_steps, 
+        self._unsafe._debug_print("  Final Position: %d, %d" % (self._unsafe._radius_steps,
                                                                 self._unsafe._angle_steps))
 
         # Return the actual values
@@ -636,32 +630,32 @@ class motors():
 
     def set_ra(self, r_target, a_target):
         """
-        Sets the radius and angle of the sensor head using the motor and 
+        Sets the radius and angle of the sensor head using the motor and
         threading specifications. Note the stepper motors will lead to roundoff
         error. Returns the "actual" values based on motor steps and the same specs.
-        
+
         Returns the actual values after rounding to the motor resolution.
-        
+
         Parameters
         ----------
         r_target, a_target : float
-            Desired radius (mm) and angle (degrees).   
-        
+            Desired radius (mm) and angle (degrees).
+
         Returns
         -------
         r, a : (float, float)
             Actual values after rounding to the nearest step.
         """
         # TODO: insert calibration parameters, call set_ra_steps()
-        
-        # 
+
+        #
         return self.get_ra()
 
     # def shift_radius(self, steps):
-    #     """ 
+    #     """
     #     Step the radial motor by a given number of steps.
     #     Wrapper for set_ra_steps(), see that documentation for more info.
-           
+
     #     Parameters
     #     ----------
     #     steps : int
@@ -672,7 +666,7 @@ class motors():
     #     self.shift_polar(steps, 0)
 
     # def set_radius(self, steps):
-    #     """ 
+    #     """
     #     Steps the radial motor to an absolute position given by 'steps' from zero.
     #     Wrapper for set_ra_steps(), see that documentation for more info.
 
@@ -684,8 +678,8 @@ class motors():
     #     self.set_ra_steps(steps, self._unsafe._angle_steps)
 
     # def shift_angle(self, steps):
-    #     """ 
-    #     Step the angular motor by a given number of steps.  
+    #     """
+    #     Step the angular motor by a given number of steps.
     #     Wrapper for set_ra_steps(), see that documentation for more info.
 
     #     Parameters
@@ -701,7 +695,7 @@ class motors():
     #     """
     #     Steps the angular motor to an absolute position given by 'steps' from zero.
     #     Wrapper for set_ra_steps(), see that documentation for more info.
-           
+
     #     Parameters
     #     ----------
     #     steps : int
@@ -710,7 +704,7 @@ class motors():
     #     self.set_ra_steps(self._unsafe._radius_steps, steps)
 
     # def shift_polar(self, r_steps, a_steps):
-    #     """Step the radial and angular motor by a given number of steps.  
+    #     """Step the radial and angular motor by a given number of steps.
     #        Wrapper for set_ra_steps(), see that documentation for more info.
 
     #     Parameters
@@ -727,27 +721,27 @@ class motors():
     #     self.set_ra_steps(self._unsafe._radius_steps + r_steps, self._unsafe._angle_steps + a_steps)
 
     def set_xy_steps(self, x_steps, y_steps):
-        """ 
+        """
         Steps the radial and angular motors to a cartesian position (x_steps,y).
         This is done by converting the x_steps and y values to polar coordinates,
         so it may result in slightly different positions due to rounding.
 
-        Returns the actual values after rounding to the motor resolution.        
+        Returns the actual values after rounding to the motor resolution.
 
         Parameters
         ----------
         x_steps : int
             The position in steps along the x axis to position the sensor.
-        
-        y_steps : int 
+
+        y_steps : int
             The position in steps along the y axis to position the sensor.
-        
+
         Returns
         -------
         x_steps, y_steps: float, float
-            Actual values of x and y in units of steps after rounding to 
+            Actual values of x and y in units of steps after rounding to
             the motors' resolution.
-        
+
         Raises
         ------
         ValueError
@@ -756,66 +750,66 @@ class motors():
         """
         #     TODO: Maybe a better approach is to leave x_steps and y_steps as floating point, then
         #           round the radial and angular motor steps at the very end. No reason to enforce
-        #           integer x and y. 
+        #           integer x and y.
 
         self._unsafe._debug_print('set_xy_steps(%d, %d)' % (x_steps, y_steps))
-        
+
         # Ensure integers, or integer like numbers are passed
         x = int(x_steps)
         y = int(y_steps)
-        
+
         # Assert values are within range
         if not self.is_safe_cartesian(x,y):
             if self._unsafe._shape == "square":
-                raise ValueError("Position (%d, %d) contains value outside safe range of %d-%d." % 
+                raise ValueError("Position (%d, %d) contains value outside safe range of %d-%d." %
                                 (x,y, -_RAD_MAX_SAFE, _RAD_MAX_SAFE))
-                raise ValueError("Position (%d, %d) produces radius %d outside limit of %d." % 
+                raise ValueError("Position (%d, %d) produces radius %d outside limit of %d." %
                                 (x,y, int(round(_n.sqrt(x**2+y**2))), _RAD_MAX_SAFE))
 
         # Convert x,y to r,theta
         r     = _n.sqrt(x**2 + y**2)
         theta = _n.degrees(_n.arctan2(y,x))
-    
+
         # Convert to steps
         # This will probably introduce some rounding error...
         radial = int(round(r))
         angular = int(round(theta * 2))
 
         self.set_ra_steps(radial, angular)
-        
+
         # Return the actual values.
         return self.get_xy_steps()
 
     def set_xy(self, x_target, y_target):
         """
-        Sets the cartesian coordinates of the sensor head using the motor and 
+        Sets the cartesian coordinates of the sensor head using the motor and
         threading specifications. Note the stepper motors will lead to roundoff
         error. Returns the "actual" values based on the same specs.
-        
+
         Returns the actual values after rounding to the motor resolution.
-        
+
         Parameters
         ----------
         x_target, y_target : float
-            Desired x and y positions (mm).  
-        
+            Desired x and y positions (mm).
+
         Returns
         -------
         x, y : (float, float)
             Actual values after rounding to the nearest step.
         """
         # TODO: insert calibration parameters, call set_ra_steps(), return self.get_ra()
-        
+
 
     # def shift_cartesian(self, x_steps, y_steps):
     #     """
     #     Steps the radial and angular motors to move relative to the current position a number
-    #     of steps given (x,y) in cartesian coordinates. 
+    #     of steps given (x,y) in cartesian coordinates.
     #     This requires converting the current position to cartesian, calculating the new
     #     position and converting back to polar, and will likely result in a slightly different
     #     position due to rounding.
-        
-            
+
+
     #     Parameters
     #     ----------
     #     x_steps : int
@@ -825,10 +819,10 @@ class motors():
     #     """
     #     # Get current position in cartesian
     #     r = self._unsafe._radius_steps
-    #     a = self._unsafe._angle_steps/2 # TODO: This is the motor's calibration? 
+    #     a = self._unsafe._angle_steps/2 # TODO: This is the motor's calibration?
     #     x_cur = r * _n.cos(a)
     #     y_cur = r * _n.sin(a)
-        
+
     #     # This will probably introduce some rounding error...
     #     x_cur = int(round(x_cur))
     #     y_cur = int(round(y_cur))
@@ -840,7 +834,7 @@ class motors():
     #     self.set_xy_steps(new_x, new_y)
 
     def is_safe_polar(self, r_steps, a_steps):
-        """ 
+        """
         Returns true if the given polar coordinates are safe for the vibrating plate.
         Tip: You can use this to filter a list of coordinates to ensure that no errors occur
             while scanning through them.
@@ -874,10 +868,10 @@ class motors():
         Parameters
         ----------
         x_steps : int or float
-            The x coordinate of the given position. To be safe this value must be 
+            The x coordinate of the given position. To be safe this value must be
             within +/- the maximum safe radius
         y_steps : int or float
-            The y coordinate of the given position. To be safe this value must be 
+            The y coordinate of the given position. To be safe this value must be
             within +/- the maximum safe radius
 
         Returns
@@ -894,23 +888,23 @@ class motors():
 
 # Testing will remove
 if __name__ == "__main__":
-    
-    plate = motors('COM5')
-    
+
+    plate = motors_api('COM5')
+
     # Test Polar Bounds
     for i in range(0,360,60):
         print('\nangle', i)
         plate.set_ra_steps(plate.get_squine_max_steps(i),i)
-    
+
     # Test Cartesian Bounds
     for i in range(-7000,7200,200):
         print('\nposition', i)
         plate.set_xy_steps(i,i)
-        
+
     plate.set_ra_steps(0,0)
 
 """
-    
+
     # Set position to 0, 0
     #drum.home()
     # Testing basic moves
@@ -921,12 +915,12 @@ if __name__ == "__main__":
     # Testing Bounds
     drum.set_ra_steps(100,820)
     drum.set_ra_steps(100,-820)
-    try: 
+    try:
         drum.set_ra_steps(100000, 90)
     except ValueError:
         print("Caught Exception - Radius way to big")
         pass
-    
+
     # Testing Safe Rotation
     drum.radial_set(0.01)
     drum.set_ra_steps(11000, 90)

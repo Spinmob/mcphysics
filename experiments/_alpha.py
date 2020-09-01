@@ -69,13 +69,13 @@ class arduino(_serial_tools.arduino_base):
 
         #### ROW 1
 
-        self.grid_raw_state.add(_g.Label('V1:'), alignment=2)
+        self.grid_raw_state.add(_g.Label('V1 (bias):'), alignment=2)
         self.number_V1 = self.grid_raw_state.add(_g.NumberBox(
             value=0, step=0.1, decimals=4, suffix='V',
             autosettings_path=name+'.number_V1',
             tip='Nominal voltage at V1 (bias readout); 0-3.3V.')).disable().set_width(number_width)
 
-        self.grid_raw_state.add(_g.Label('PWM1:'), alignment=2)
+        self.grid_raw_state.add(_g.Label('PWM1 (bias):'), alignment=2)
         self.number_pwm1_setpoint = self.grid_raw_state.add(_g.NumberBox(
             value = 0.0, step = 0.02, bounds = (0,3.3), decimals=4, suffix='V',
             autosettings_path = name+'.number_pwm1_setpoint',
@@ -101,13 +101,13 @@ class arduino(_serial_tools.arduino_base):
         #### ROW 2
 
         self.grid_raw_state.new_autorow()
-        self.grid_raw_state.add(_g.Label('V2:'), alignment=2)
+        self.grid_raw_state.add(_g.Label('V2 (Pirani):'), alignment=2)
         self.number_V2 = self.grid_raw_state.add(_g.NumberBox(
             value=0, step=0.1, decimals=4, suffix='V',
             autosettings_path=name+'.number_V2',
             tip='Voltage at V2 (pirani readout); 0-3.3V.')).disable().set_width(number_width)
 
-        self.grid_raw_state.add(_g.Label('PWM2:'), alignment=2)
+        self.grid_raw_state.add(_g.Label('PWM2 (vent valve):'), alignment=2)
         self.number_pwm2_setpoint = self.grid_raw_state.add(_g.NumberBox(
             value=0.0, step=0.01, bounds=(0,3.3), decimals=4, suffix='V',
             autosettings_path = name+'.number_pwm2_setpoint',
@@ -118,17 +118,17 @@ class arduino(_serial_tools.arduino_base):
         #### ROW 3
 
         self.grid_raw_state.new_autorow()
-        self.grid_raw_state.add(_g.Label('V3:'), alignment=2)
+        self.grid_raw_state.add(_g.Label('V3 (transducer):'), alignment=2)
         self.number_V3 = self.grid_raw_state.add(_g.NumberBox(
             value=0, step=0.1, decimals=4, suffix='V',
             autosettings_path=name+'.number_V3',
             tip='Voltage at V3 (pressure transducer); 0-3.3V.')).disable().set_width(number_width)
 
-        self.grid_raw_state.add(_g.Label('Pump Valve:'), alignment=2)
-        self.button_pump_valve_raw = self.grid_raw_state.add(_g.Button(
-            'Closed', checkable=True,
-            autosettings_path = name+'.button_pump_valve_raw',
-            signal_toggled    = self._button_pump_valve_raw_toggled,
+        self.grid_raw_state.add(_g.Label('Relay 1 (pump valve):'), alignment=2)
+        self.button_relay1 = self.grid_raw_state.add(_g.Button(
+            'Enabled', checkable=True,
+            autosettings_path = name+'.button_relay1',
+            signal_toggled    = self._button_relay1_toggled,
             tip='Whether the pump valve relay is open or closed.'
             )).set_colors('white','blue')
 
@@ -194,9 +194,9 @@ class arduino(_serial_tools.arduino_base):
         #self.grid_cal_state.add(_g.Label('PRESSURE')).set_style(header_style)
 
         self.grid_cal_state.add(_g.Label('Pressure Transducer:'), alignment=2)
-        self.number_pressure_transducer = self.grid_cal_state.add(_g.NumberBox(
+        self.number_SPT25 = self.grid_cal_state.add(_g.NumberBox(
             value=0, decimals=4, suffix='Pa', siPrefix=True,
-            autosettings_path=name+'.number_pressure_transducer',
+            autosettings_path=name+'.number_SPT25',
             tip='Pressure measured by the transducer. Relies on conversion parameters.')).disable().set_width(number_width)
 
         self.grid_cal_state.add(_g.Label('Pirani:'), alignment=2)
@@ -271,10 +271,10 @@ class arduino(_serial_tools.arduino_base):
                tip='Pressure (Pa) = P_offset + P_scale * 10**(V2/Attenuation-Offset)')
 
 
-        sr.add('Pressure_Transducer/P_offset', 0.0,  decimals=4, suffix='Pa', siPrefix=True,
+        sr.add('SPT25/P_offset', 0.0,  decimals=4, suffix='Pa', siPrefix=True,
                tip='Pressure (Pa) = P_offset + Ratio*V3')
 
-        sr.add('Pressure_Transducer/Ratio', 38200.0, decimals=4, suffix='Pa/V', siPrefix=True,
+        sr.add('SPT25/Ratio', 38200.0, decimals=4, suffix='Pa/V', siPrefix=True,
                tip='Pressure (Pa) = P_offset + Ratio*V3')
 
 
@@ -371,14 +371,14 @@ class arduino(_serial_tools.arduino_base):
         # Send it to the output
         self.set_pwm_voltage_setpoint(2, a[1])
 
-    def _button_pump_valve_raw_toggled(self, *a):
+    def _button_relay1_toggled(self, *a):
         """
         Called when someone toggles the pump valve on the raw tab.
         """
-        _debug('_button_pump_valve_raw_toggled')
+        _debug('_button_relay1_toggled')
 
         # Set the pump valve
-        self.set_pump_valve_state(self.button_pump_valve_raw())
+        self.set_pump_valve_state(self.button_relay1())
 
     def _button_pump_valve_toggled(self, *a):
         """
@@ -423,7 +423,7 @@ class arduino(_serial_tools.arduino_base):
             # V3 = transducer
             elif n==3:
                 self.number_V3(value, block_signals=True)
-                self.number_pressure_transducer(self.get_pressure_from_V3(value), block_signals=True)
+                self.number_SPT25(self.get_pressure_from_V3(value), block_signals=True)
 
         # None means timeout (as far as I know)
         else: print('get_voltage', n, 'timeout')
@@ -511,10 +511,10 @@ class arduino(_serial_tools.arduino_base):
         # Update the GUI
         if value is not None:
             if value:
-                self.button_pump_valve_raw(True, block_signals=True).set_text('Opened').set_colors('white','red')
+                self.button_relay1(True, block_signals=True).set_text('Disabled').set_colors('white','red')
                 self.button_pump_valve(True, block_signals=True).set_text('Opened').set_colors('white','red')
             else:
-                self.button_pump_valve_raw(False, block_signals=True).set_text('Closed').set_colors('white','blue')
+                self.button_relay1(False, block_signals=True).set_text('Enabled').set_colors('white','blue')
                 self.button_pump_valve(False, block_signals=True).set_text('Closed').set_colors('white','blue')
 
         return value
@@ -643,8 +643,8 @@ class arduino(_serial_tools.arduino_base):
 
         Specifically, P = P_offset + Ratio*V3
         """
-        P_offset = self.settings['Pressure_Transducer/P_offset']
-        Ratio    = self.settings['Pressure_Transducer/Ratio']
+        P_offset = self.settings['SPT25/P_offset']
+        Ratio    = self.settings['SPT25/Ratio']
 
         return P_offset + Ratio * V3
 
@@ -735,5 +735,5 @@ class arduino(_serial_tools.arduino_base):
 
 if __name__ == '__main__':
     #_egg.clear_egg_settings()
-    self = alpha_arduino()
+    self = arduino()
     #self.button_connect(True)
