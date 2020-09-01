@@ -94,6 +94,9 @@ class _unsafe_motors:
         else:
             # Attempt to open the com port.
             try:
+                # Hopeful it all all works, no simulation needed
+                self.simulation_mode = False
+
                 device = port
                 if self.D_OPEN & self.debug: print("Attempting '%s'"%(device))
                 self._handle = _serial.Serial(device,115200) # 115200 = Data Rate
@@ -107,9 +110,6 @@ class _unsafe_motors:
                 while False == self._timeout_for(b"reset",timeout=1):
                     self._debug_print("resetting")
                     self._handle.write(b"reset\n")
-
-                # It all worked, no simulation needed
-                self.simulation_mode = False
 
             # Whoopsie-doodle
             except Exception as e:
@@ -251,12 +251,12 @@ class _unsafe_motors:
         return b"true" == resp[7:11]
 
     # Home the angular motor
-    def _angular_home(self):
+    def _angular_home(self, max_steps=_ANG_MAX_STEPS):
         if self.simulation_mode:
             _time.sleep(0.5)
             return True
 
-        self._handle.write(b"a_home\n")
+        self._handle.write(b"a_home %d\n" % int(max_steps))
         self._wait_for(b"a_home")
         resp = self._wait_for(b"HOMING").decode('ascii')
         print(resp)
@@ -265,12 +265,12 @@ class _unsafe_motors:
         return True
 
     # Home the radial motor
-    def _radial_home(self):
+    def _radial_home(self, max_steps=_RAD_MAX_SAFE):
         if self.simulation_mode:
             _time.sleep(0.5)
             return True
 
-        self._handle.write(b"r_home\n")
+        self._handle.write(b"r_home %d\n" % int(max_steps))
         self._wait_for(b"r_home")
         resp = self._wait_for(b"HOMING").decode('ascii')
         if "FAILED." in resp.split(" "):
