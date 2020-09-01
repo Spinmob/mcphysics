@@ -83,4 +83,7 @@ The McPhysics library is organized heirarchically, and you should use Spyder's c
   * __plot_and_integrate_reduced_chi2():__ Plots the reduced chi^2 distribution for the specified degrees of freedom, then numerically integrates it. This is useful if you want to know how reasonable a given value of chi^2 is.
 
  ### mcphysics.experiments
-  * __[alpha_arduino()](https://github.com/Spinmob/mcphysics/wiki/experiments.alpha_arduino):__ Graphical front-end for the specific arduino controllers connected to the Alpha Decay experiments.
+ Some of the experiments have a collection of the above tools, along with some additional tools specific to the experiment:
+ 
+  * __[alpha.arduino()](https://github.com/Spinmob/mcphysics/wiki/experiments.alpha.arduino):__ Graphical front-end for the specific Arduino controllers connected to the Alpha Decay experiments.
+  * __[drum.motors_api()](https://github.com/Spinmob/mcphysics/wiki/experiments.drum.motors_api)__: Scripted interface for controlling the stepper motors via the attached Arduino.
