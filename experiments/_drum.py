@@ -34,6 +34,9 @@ _RAD_MAX_STEPS = 10000 # Number of steps from the center to corner of plate
 #       drive to the maximum value and print a warning, since all these functions now 
 #       return the "actual" value. I'm not wed to this idea, since perhaps the 
 #       students should not take such data. Anyway, your call.
+# TODO: There are still some manual conversions between cartesian and polar.
+#       Probably a good idea to use the get_xy and get_ra functions instead, so that
+#       the calibration lives in one place only.
 
 _RAD_MAX_SAFE  = 7300 # Number of steps from center to edge of plate
 _RAD_MIN_STEPS = 0 # Initial steps in case we want a specific radius to be 0.
