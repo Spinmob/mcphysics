@@ -41,6 +41,10 @@ _RAD_MAX_STEPS = 10000 # Number of steps from the center to corner of plate
 #       get_max_r_steps() and get_max_r(), with a check against the shape to
 #       determine whether a squine or simple limit is required. Not a big priority
 #       before term start, since students only really need get_xy() and set_xy().
+# TODO: Instead of raising an exception when a position is out of bounds, we could just
+#       print a warning that it did not move and return something like None,None so the user
+#       can do things like square grids on a circular plate, skipping the acquisition for disallowed
+#       points. I suppose they could just do an "is_safe" check.
 
 _RAD_MAX_SAFE  = 7300 # Number of steps from center to edge of plate
 _RAD_MIN_STEPS = 0 # Initial steps in case we want a specific radius to be 0.
@@ -298,7 +302,7 @@ class _unsafe_motors:
 # Safe Motor Control Class           #
 ######################################
 class motors_api():
-    def __init__(self, port='COM5', debug=True, shape="circle"):
+    def __init__(self, port='COM5', shape="circle", debug=False):
         """
         A safe wrapper for controlling the drum stepper motors lab.
         Everytime an instance is opened, the experiment is homed, this uses
@@ -554,7 +558,7 @@ class motors_api():
         # Ensure integers, or integer like numbers are passed
         r_steps = int(_n.round(r_steps))
         a_steps  = int(_n.round(a_steps))
-        if not self.is_safe_polar(r_steps, a_steps/2):
+        if not self.is_safe_ra_steps(r_steps, a_steps/2):
             if self._unsafe._shape == "square":
                 raise ValueError("Radial position %d outside safe range %d for angular steps %d" %
                                  (r_steps, self.get_squine_max_steps(a_steps), a_steps))
@@ -759,7 +763,7 @@ class motors_api():
         y = int(y_steps)
 
         # Assert values are within range
-        if not self.is_safe_cartesian(x,y):
+        if not self.is_safe_xy_steps(x,y):
             if self._unsafe._shape == "square":
                 raise ValueError("Position (%d, %d) contains value outside safe range of %d-%d." %
                                 (x,y, -_RAD_MAX_SAFE, _RAD_MAX_SAFE))
@@ -833,7 +837,7 @@ class motors_api():
 
     #     self.set_xy_steps(new_x, new_y)
 
-    def is_safe_polar(self, r_steps, a_steps):
+    def is_safe_ra_steps(self, r_steps, a_steps):
         """
         Returns true if the given polar coordinates are safe for the vibrating plate.
         Tip: You can use this to filter a list of coordinates to ensure that no errors occur
@@ -860,7 +864,12 @@ class motors_api():
         elif self._unsafe._shape == "circle":
             return not (r_steps < _RAD_MIN_STEPS)
 
-    def is_safe_cartesian(self, x_steps, y_steps):
+    def is_safe_ra(self, r, a):
+        """
+        TODO:
+        """
+
+    def is_safe_xy_steps(self, x_steps, y_steps):
         """ Returns true if the given cartesian coordinates are safe for the vibrating drum.
             Tip: You can use this to filter a list of coordinates to ensure that no errors occur
                 while scanning through them.
@@ -885,6 +894,11 @@ class motors_api():
         if self._unsafe._shape == "circle":
             r = _n.sqrt(x_steps**2 + y_steps**2)
             return r <= _RAD_MAX_SAFE
+
+    def is_safe_xy(self, x, y):
+        """
+        TODO:
+        """
 
 # Testing will remove
 if __name__ == "__main__":
