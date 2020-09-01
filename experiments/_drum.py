@@ -37,6 +37,10 @@ _RAD_MAX_STEPS = 10000 # Number of steps from the center to corner of plate
 # TODO: There are still some manual conversions between cartesian and polar.
 #       Probably a good idea to use the get_xy and get_ra functions instead, so that
 #       the calibration lives in one place only. No rush on this.
+# TODO: get_squine_max_steps() and get_squine_max() should be replaced with
+#       get_max_r_steps() and get_max_r(), with a check against the shape to 
+#       determine whether a squine or simple limit is required. Not a big priority
+#       before term start, since students only really need get_xy() and set_xy().
 
 _RAD_MAX_SAFE  = 7300 # Number of steps from center to edge of plate
 _RAD_MIN_STEPS = 0 # Initial steps in case we want a specific radius to be 0.
