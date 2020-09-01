@@ -66,11 +66,11 @@ class alpha_arduino(_serial_tools.arduino_base):
 
         #### ROW 1
 
-        self.grid_raw_state.add(_g.Label('ADC1:'), alignment=2)
-        self.number_adc1 = self.grid_raw_state.add(_g.NumberBox(
+        self.grid_raw_state.add(_g.Label('V1:'), alignment=2)
+        self.number_V1 = self.grid_raw_state.add(_g.NumberBox(
             value=0, step=0.1, decimals=4, suffix='V',
-            autosettings_path=name+'.number_adc1',
-            tip='Nominal voltage at ADC1 (bias readout); 0-3.3V.')).disable().set_width(number_width)
+            autosettings_path=name+'.number_V1',
+            tip='Nominal voltage at V1 (bias readout); 0-3.3V.')).disable().set_width(number_width)
 
         self.grid_raw_state.add(_g.Label('PWM1:'), alignment=2)
         self.number_pwm1_setpoint = self.grid_raw_state.add(_g.NumberBox(
@@ -98,11 +98,11 @@ class alpha_arduino(_serial_tools.arduino_base):
         #### ROW 2
 
         self.grid_raw_state.new_autorow()
-        self.grid_raw_state.add(_g.Label('ADC2:'), alignment=2)
-        self.number_adc2 = self.grid_raw_state.add(_g.NumberBox(
+        self.grid_raw_state.add(_g.Label('V2:'), alignment=2)
+        self.number_V2 = self.grid_raw_state.add(_g.NumberBox(
             value=0, step=0.1, decimals=4, suffix='V',
-            autosettings_path=name+'.number_adc2',
-            tip='Voltage at ADC2 (pirani readout); 0-3.3V.')).disable().set_width(number_width)
+            autosettings_path=name+'.number_V2',
+            tip='Voltage at V2 (pirani readout); 0-3.3V.')).disable().set_width(number_width)
 
         self.grid_raw_state.add(_g.Label('PWM2:'), alignment=2)
         self.number_pwm2_setpoint = self.grid_raw_state.add(_g.NumberBox(
@@ -115,11 +115,11 @@ class alpha_arduino(_serial_tools.arduino_base):
         #### ROW 3
 
         self.grid_raw_state.new_autorow()
-        self.grid_raw_state.add(_g.Label('ADC3:'), alignment=2)
-        self.number_adc3 = self.grid_raw_state.add(_g.NumberBox(
+        self.grid_raw_state.add(_g.Label('V3:'), alignment=2)
+        self.number_V3 = self.grid_raw_state.add(_g.NumberBox(
             value=0, step=0.1, decimals=4, suffix='V',
-            autosettings_path=name+'.number_adc3',
-            tip='Voltage at ADC3 (pressure transducer); 0-3.3V.')).disable().set_width(number_width)
+            autosettings_path=name+'.number_V3',
+            tip='Voltage at V3 (pressure transducer); 0-3.3V.')).disable().set_width(number_width)
 
         self.grid_raw_state.add(_g.Label('Pump Valve:'), alignment=2)
         self.button_pump_valve_raw = self.grid_raw_state.add(_g.Button(
@@ -167,7 +167,7 @@ class alpha_arduino(_serial_tools.arduino_base):
         self.number_bias_measured = self.grid_cal_state.add(_g.NumberBox(
             decimals=4, suffix='V',
             autosettings_path=name+'.number_bias_measured',
-            tip='Measured bias voltage based on ADC1 and conversion parameters.')).disable().set_width(number_width)
+            tip='Measured bias voltage based on V1 and conversion parameters.')).disable().set_width(number_width)
 
         self.button_bias_enabled = self.grid_cal_state.add(_g.Button(
             'Disabled', checkable=True,
@@ -251,28 +251,28 @@ class alpha_arduino(_serial_tools.arduino_base):
         sr.add('Bias/V_bias:V_PWM1', 55.44, suffix='V/V',
                tip='Ratio of volts applied to the detection circuit (above the big resistor) to volts from the Arduino PWM1.')
 
-        sr.add('Bias/V_bias:V_ADC1', 80.0, suffix='V/V',
-               tip='Ratio of volts applied to the detection circuit (above the big resistor) to volts measured at the Arduino ADC1.')
+        sr.add('Bias/V_bias:V1', 80.0, suffix='V/V',
+               tip='Ratio of volts applied to the detection circuit (above the big resistor) to volts measured at the Arduino V1.')
 
 
         sr.add('Pirani/P_offset', 0.0, suffix='Pa', siPrefix=True, decimals=4,
-               tip='Pressure (Pa) = P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)')
+               tip='Pressure (Pa) = P_offset + P_scale * 10**(V2/Attenuation-Offset)')
 
         sr.add('Pirani/P_scale', 1.0, suffix='Pa', siPrefix=True, decimals=4,
-               tip='Pressure (Pa) = P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)')
+               tip='Pressure (Pa) = P_offset + P_scale * 10**(V2/Attenuation-Offset)')
 
         sr.add('Pirani/Offset', 3.5, suffix='V', decimals=4,
-               tip='Pressure (Pa) = P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)')
+               tip='Pressure (Pa) = P_offset + P_scale * 10**(V2/Attenuation-Offset)')
 
         sr.add('Pirani/Attenuation', 1.0/4.003, suffix='V', decimals=4,
-               tip='Pressure (Pa) = P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)')
+               tip='Pressure (Pa) = P_offset + P_scale * 10**(V2/Attenuation-Offset)')
 
 
         sr.add('Pressure_Transducer/P_offset', 0.0,  decimals=4, suffix='Pa', siPrefix=True,
-               tip='Pressure (Pa) = P_offset + Ratio*V_ADC3')
+               tip='Pressure (Pa) = P_offset + Ratio*V3')
 
         sr.add('Pressure_Transducer/Ratio', 38200.0, decimals=4, suffix='Pa/V', siPrefix=True,
-               tip='Pressure (Pa) = P_offset + Ratio*V_ADC3')
+               tip='Pressure (Pa) = P_offset + Ratio*V3')
 
 
         sr.add('Vent_Valve/Scale', 5.0, suffix='%/V',
@@ -395,9 +395,9 @@ class alpha_arduino(_serial_tools.arduino_base):
         # Send the command
         self.set_bias_enabled(value)
 
-    def get_adc_voltage(self, n=1):
+    def get_voltage(self, n=1):
         """
-        Returns the nominal (raw) voltage at Arduino ADC channel n.
+        Returns the nominal (raw) voltage Vn arduino ADC.
         """
         if not self.button_connect(): return
 
@@ -407,23 +407,23 @@ class alpha_arduino(_serial_tools.arduino_base):
         # Update the user.
         if value is not None:
 
-            # ADC1 = bias readout
+            # V1 = bias readout
             if   n==1:
-                self.number_adc1(value, block_signals=True)
-                self.number_bias_measured(self.get_bias_from_adc1(value), block_signals=True)
+                self.number_V1(value, block_signals=True)
+                self.number_bias_measured(self.get_bias_from_V1(value), block_signals=True)
 
-            # ADC2 = pirani
+            # V2 = pirani
             elif n==2:
-                self.number_adc2(value, block_signals=True)
-                self.number_pressure_pirani(self.get_pressure_from_adc2(value), block_signals=True)
+                self.number_V2(value, block_signals=True)
+                self.number_pressure_pirani(self.get_pressure_from_V2(value), block_signals=True)
 
-            # ADC3 = transducer
+            # V3 = transducer
             elif n==3:
-                self.number_adc3(value, block_signals=True)
-                self.number_pressure_transducer(self.get_pressure_from_adc3(value), block_signals=True)
+                self.number_V3(value, block_signals=True)
+                self.number_pressure_transducer(self.get_pressure_from_V3(value), block_signals=True)
 
         # None means timeout (as far as I know)
-        else: print('get_adc_voltage', n, 'timeout')
+        else: print('get_voltage', n, 'timeout')
         return value
 
     def get_pwm_voltage_setpoint(self, n):
@@ -562,15 +562,15 @@ class alpha_arduino(_serial_tools.arduino_base):
         """
         print(a)
 
-    def get_bias_from_adc1(self, V_ADC1):
+    def get_bias_from_V1(self, V1):
         """
-        Given the voltage V_ADC1 from ADC1, returns the actual bias voltage applied
+        Given the voltage V1 from ADC0, returns the actual bias voltage applied
         to the detection circuit (above the big resistor), using the conversion
         parameters in self.settings.
 
-        Specifically, V_bias = (V_bias:V_ADC1) * V_PWM1
+        Specifically, V_bias = (V_bias:V1) * V_PWM1
         """
-        return self.settings['Bias/V_bias:V_ADC1']*V_ADC1
+        return self.settings['Bias/V_bias:V1']*V1
 
     def get_bias_from_pwm1(self, V_PWM1):
         """
@@ -615,35 +615,35 @@ class alpha_arduino(_serial_tools.arduino_base):
         V_offset = self.settings['Vent_Valve/V_offset']
         return (V_offset + percentage/Scale) / Gain_LPF
 
-    def get_pressure_from_adc2(self, V_ADC2):
+    def get_pressure_from_V2(self, V2):
         """
         Pirani Guage
 
-        Given the voltage V_adc2 from ADC2, returns the pressure (Pa) estimated
+        Given the voltage V2 from ADC1, returns the pressure (Pa) estimated
         from the conversion parameters in self.settings.
 
-        Specifically, P = P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)
+        Specifically, P = P_offset + P_scale * 10**(V2/Attenuation-Offset)
         """
         P_offset    = self.settings['Pirani/P_offset']
         P_scale     = self.settings['Pirani/P_scale']
         Offset      = self.settings['Pirani/Offset']
         Attenuation = self.settings['Pirani/Attenuation']
 
-        return P_offset + P_scale * 10**(V_ADC2/Attenuation-Offset)
+        return P_offset + P_scale * 10**(V2/Attenuation-Offset)
 
-    def get_pressure_from_adc3(self, V_ADC3):
+    def get_pressure_from_V3(self, V3):
         """
         Pressure Transducer
 
-        Given the voltage V_adc3 from ADC3, returns the pressure (Pa) estimated
+        Given the voltage V3 from ADC2, returns the pressure (Pa) estimated
         from the conversion parameters in self.settings.
 
-        Specifically, P = P_offset + Ratio*V_adc3
+        Specifically, P = P_offset + Ratio*V3
         """
         P_offset = self.settings['Pressure_Transducer/P_offset']
         Ratio    = self.settings['Pressure_Transducer/Ratio']
 
-        return P_offset + Ratio * V_ADC3
+        return P_offset + Ratio * V3
 
     def _timer_tick(self, *a):
         """
@@ -652,17 +652,17 @@ class alpha_arduino(_serial_tools.arduino_base):
         self.api.log = None
 
         # Bias measurement
-        V1 = self.get_adc_voltage(1)
+        V1 = self.get_voltage(1)
         if V1 is None: return
         self.window.process_events()
 
         # Pirani
-        V2 = self.get_adc_voltage(2)
+        V2 = self.get_voltage(2)
         if V2 is None: return
         self.window.process_events()
 
         # Pressure transducer
-        V3 = self.get_adc_voltage(3)
+        V3 = self.get_voltage(3)
         if V3 is None: return
         self.window.process_events()
 
@@ -708,9 +708,9 @@ class alpha_arduino(_serial_tools.arduino_base):
 
             [_time.time()-self.t_connect,
 
-              self.get_bias_from_adc1    (V1),
-              self.get_pressure_from_adc2(V2),
-              self.get_pressure_from_adc3(V3),
+              self.get_bias_from_V1    (V1),
+              self.get_pressure_from_V2(V2),
+              self.get_pressure_from_V3(V3),
 
               pwm1_enabled,
               self.get_bias_from_pwm1(pwm1),
