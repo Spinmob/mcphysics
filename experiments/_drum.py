@@ -11,17 +11,14 @@
 # the order should be radial, angular for polar coordinates
 # and x,y for cartesian coordinates
 
-### Constants
-_ANG_MAX_STEPS = 720 # Number of steps that make a full circle
-_ANG_MIN_STEPS = 0   # Initial steps in case we want a specific physical angle to be 0 in the future.
-_RAD_MAX_STEPS = 10000 # Number of steps from the center to corner of plate
-
 # Since we're on a square. If the sensor is all the way in a corner, rotating
 # may result in a collision, so we need to be aware of these bounds.
-# TODO: Make sure this number is okay with the installed circular metal drum, or have
+# --TODO--: Make sure this number is okay with the installed circular metal drum, or have
 #       the class specify the max radius upon creation, with a low default value?
-# TODO: Double check if the homing definition of "zero" guaranteed to be sufficiently aligned
+        # Done: 7300 is a good distance for both the square and circular plates
+# --TODO--: Double check if the homing definition of "zero" guaranteed to be sufficiently aligned
 #       with the edges of the square plate that it will not collide near the corners?
+        # Done: Already checked this
 # TODO: I commented out most of the movement functions, opting for absolute coordinates
 #       only. Students can keep track of their coordinates or use the get_ and set_
 #       functions, and this will avoid them shifting too far. It also reduces the
@@ -30,10 +27,14 @@ _RAD_MAX_STEPS = 10000 # Number of steps from the center to corner of plate
 #       when we're talking about steps or absolute (especially brutal with angles!)
 #       Please check my factors of 2 and calculations are right, and fill in the
 #       calibrations (at least roughly) (search for TODO in this document)
+        # Done: Added calibration constants and filled out most places where it was needed.
+
 # TODO: (Optional) What if instead of checking and failing, we just have the radial motor
 #       drive to the maximum value and print a warning, since all these functions now
 #       return the "actual" value. I'm not wed to this idea, since perhaps the
 #       students should not take such data. Anyway, your call.
+        # Done: I prefer raising errors, students can figure out try/except if they want :P
+
 # TODO: There are still some manual conversions between cartesian and polar.
 #       Probably a good idea to use the get_xy and get_ra functions instead, so that
 #       the calibration lives in one place only. No rush on this.
@@ -45,9 +46,19 @@ _RAD_MAX_STEPS = 10000 # Number of steps from the center to corner of plate
 #       print a warning that it did not move and return something like None,None so the user
 #       can do things like square grids on a circular plate, skipping the acquisition for disallowed
 #       points. I suppose they could just do an "is_safe" check.
+        # Comment: That was my intention with the hints on safe_xy/safe_polar. 
+        # They could feed it a list and filter out any bad values, but I also
+        # like the None, None idea.
 
+### Constants
+_ANG_MAX_STEPS = 720 # Number of steps that make a full circle
+_ANG_MIN_STEPS = 0   # Initial steps in case we want a specific physical angle to be 0 in the future.
+_ANG_STEPS_PER_DEG = 2
+
+_RAD_MAX_STEPS = 10000 # Number of steps from the center to corner of plate
 _RAD_MAX_SAFE  = 7300 # Number of steps from center to edge of plate
 _RAD_MIN_STEPS = 0 # Initial steps in case we want a specific radius to be 0.
+_RAD_STEPS_PER_MM = 28*100/25.4 # Rod is 28 TPI, 100 steps per motor rotation, 25.4 mm/in
 
 # Aliases
 import mcphysics as _mp
@@ -259,7 +270,6 @@ class _unsafe_motors:
         self._handle.write(b"a_home %d\n" % int(max_steps))
         self._wait_for(b"a_home")
         resp = self._wait_for(b"HOMING").decode('ascii')
-        print(resp)
         if "FAILED." in resp.split(" "):
             return False
         return True
@@ -362,7 +372,7 @@ class motors_api():
         self._unsafe._shape = shape
         self.home()
 
-        # For a given angle theta, max radial position is squine(theta)
+    # For a given angle theta, max radial position is squine(theta)
     # Here's a function for getting that as a function of angular steps
     # Not good enough since the sensor has some width to it.
     # For now gonna try multiplying by (0.91 + 0.09 * cos(2*theta)**2) in order
@@ -410,7 +420,7 @@ class motors_api():
             Maximum allowed radius (mm).
         """
         r_steps = self.get_squine_max_steps(a*2)
-        # TODO: return calibrated radius
+        return r_steps / _RAD_STEPS_PER_MM
 
     def get_ra_steps(self, *args):
         """
@@ -441,7 +451,7 @@ class motors_api():
 
         else:
             r_steps, a_steps = self._unsafe._radius_steps, self._unsafe._angle_steps
-            x, y = 0, 0 # TODO: insert spec'd calibration
+            return r_steps/_RAD_STEPS_PER_MM, a_steps/_ANG_STEPS_PER_DEG
 
         return _n.sqrt(x*x+y*y), _n.degrees(_n.arctan2(y,x))
 
@@ -478,8 +488,11 @@ class motors_api():
         r (mm) and a (degrees), and use these instead of the internally
         stored values to calculate the cartesian coordinates.
         """
-        if len(args) >= 2: r, a = args[0], args[1]
-        else:              r, a = 0, self._unsafe._angle_steps*2 # TODO: insert radial calibration to mm
+        if len(args) >= 2: 
+            r, a = args[0], args[1]
+        else:
+            r = self._unsafe._radius_steps/_RAD_STEPS_PER_MM
+            a = self._unsafe._angle_steps/_ANG_STEPS_PER_DEG
 
         return r*_n.cos(a), r*_n.sin(a)
 
@@ -650,9 +663,9 @@ class motors_api():
         r, a : (float, float)
             Actual values after rounding to the nearest step.
         """
-        # TODO: insert calibration parameters, call set_ra_steps()
-
-        #
+        r_steps = r_target * _RAD_STEPS_PER_MM
+        a_steps = a_target * _ANG_STEPS_PER_DEG
+        self.set_ra_steps(r_steps, a_steps)
         return self.get_ra()
 
     # def shift_radius(self, steps):
@@ -802,7 +815,9 @@ class motors_api():
         x, y : (float, float)
             Actual values after rounding to the nearest step.
         """
-        # TODO: insert calibration parameters, call set_ra_steps(), return self.get_ra()
+        r_target, a_target = self.get_ra(x_target,y_target)
+        self.set_ra(r_target, a_target)
+        return self.get_xy()
 
 
     # def shift_cartesian(self, x_steps, y_steps):
@@ -823,7 +838,7 @@ class motors_api():
     #     """
     #     # Get current position in cartesian
     #     r = self._unsafe._radius_steps
-    #     a = self._unsafe._angle_steps/2 # TODO: This is the motor's calibration?
+    #     a = self._unsafe._angle_steps # TODO: This is the motor's calibration?
     #     x_cur = r * _n.cos(a)
     #     y_cur = r * _n.sin(a)
 
