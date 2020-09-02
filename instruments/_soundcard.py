@@ -184,9 +184,9 @@ class soundcard():
         self.tab_out.settings    = self.waveform_designer.settings
 
         # Hide the Rates (they're controlled by the top combo) and sync
-        # self.tab_in .settings.hide_parameter('Rate')
-        # self.tab_out.settings.hide_parameter('Left/Rate')
-        # self.tab_out.settings.hide_parameter('Right/Rate')
+        self.tab_in .settings.hide_parameter('Rate')
+        self.tab_out.settings.hide_parameter('Left/Rate')
+        self.tab_out.settings.hide_parameter('Right/Rate')
         self._combo_rate_changed()
         self._combo_device_changed()
 

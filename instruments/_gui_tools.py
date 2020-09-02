@@ -299,8 +299,12 @@ class waveform_designer(_g.Window):
             # Update the other quantities in the settings
             self.update_other_quantities_based_on(self.settings.get_key(a[0]))
 
-        # Select the appropriate waveform
-        for c in self._channels: self._settings_select_waveform(c)
+        # Update the channels in settings
+        for c in self._channels: 
+            
+            # Select the appropriate waveform / hide the others
+            self._settings_select_waveform(c)
+            
 
         # Update the other parameters and generate waveforms
         self.update_design()
