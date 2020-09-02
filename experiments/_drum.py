@@ -281,7 +281,7 @@ class _unsafe_motors:
 # Safe Motor Control Class           #
 ######################################
 class motors_api():
-    def __init__(self, port='COM5', shape="circle", debug=False):
+    def __init__(self, port, shape, debug=False):
         """
         A safe wrapper for controlling the drum stepper motors lab.
         Everytime an instance is opened, the experiment is homed, this uses
@@ -330,6 +330,9 @@ class motors_api():
             The shape of the plate in the apparatus. Can be one of
             "circle" or "square", by default circle, for safety.
         """
+
+        if not shape in ['square', 'circle']:
+            raise Exception('"shape" argument must be either "square" or "circle".')
 
         # Unsafe API
         self._unsafe = _unsafe_motors(port, debug)
@@ -414,7 +417,7 @@ class motors_api():
             if a_steps is None:
                 a_steps = self.get_ra_steps()[1]
             return self.get_squadius_steps(a_steps)
-            
+
     def get_max_r(self, a=None):
         """
         Get the maximum allowable radius in mm with the actuator at a given angle in degrees
@@ -486,11 +489,11 @@ class motors_api():
         r_steps and a_steps, and use these instead of the internally stored
         values to calculate the cartesian coordinates.
         """
-        if len(args) >= 2: 
+        if len(args) >= 2:
             r_steps, a_steps = args[0], args[1]
-        else:              
+        else:
             r_steps, a_steps = self.get_ra_steps()
-        
+
         a = a_steps/_ANG_STEPS_PER_DEG
         return r_steps*_n.cos(_n.radians(a)), r_steps*_n.sin(_n.radians(a))
 
@@ -503,7 +506,7 @@ class motors_api():
         r (mm) and a (degrees), and use these instead of the internally
         stored values to calculate the cartesian coordinates.
         """
-        if len(args) >= 2: 
+        if len(args) >= 2:
             r, a = args[0], args[1]
         else:
             r,a = self.get_ra()
@@ -541,9 +544,15 @@ class motors_api():
             input("Press Enter to acknowledge this message...")
 
         else:
+            # ADD A +1 angle bump so it doesn't walk backwards.
+            self._unsafe._angular_go(1)
+
+            # Call this "zero"
             self._unsafe._radius_steps = _RAD_MIN_STEPS
             self._unsafe._angle_steps  = _ANG_MIN_STEPS
-            print("Homing Completed Succesfuly.")
+            print("Homing Completed Succesfully.")
+
+
 
     def set_ra_steps(self, r_steps, a_steps):
         """
@@ -585,7 +594,7 @@ class motors_api():
         # Ensure integers, or integer like numbers are passed
         r_steps = int(_n.round(r_steps))
         a_steps = int(_n.round(a_steps))
-        
+
         # Make sure it's within bounds.
         if not self.is_safe_ra_steps(r_steps, a_steps):
             raise ValueError("Out of bounds: r_steps=%d, a_steps=%d" % (r_steps, a_steps))
@@ -602,7 +611,7 @@ class motors_api():
             # If the radius is outside the safe range and we're rotating
             # we need to first pull in the sensor, then do the rotation
             # and finally set the radius to the correct amount.
-            
+
             # Need to consider every angle we pass through and find the lowest
             # possible maximum radius.
             angles = _n.linspace(self._unsafe._angle_steps,a_steps,
@@ -785,12 +794,12 @@ class motors_api():
 
         # Assert values are within range
         if not self.is_safe_xy_steps(x_steps,y_steps):
-            
+
             # Squarror
             if self._unsafe._shape == "square":
                 raise ValueError("Position (%f, %f) contains value outside safe range of %d-%d." %
                                 (x_steps, y_steps, -_RAD_MAX_SAFE, _RAD_MAX_SAFE))
-            
+
             # Circle
             else:
                 raise ValueError("Position (%f, %f) produces radius %d outside limit of %d." %
@@ -809,8 +818,8 @@ class motors_api():
         """
         Sets the cartesian coordinates of the sensor head using the motor and
         threading specifications. Note the stepper motors will lead to roundoff
-        error. 
-        
+        error.
+
         Returns the actual values after rounding to the motor resolution.
 
         Parameters
@@ -847,7 +856,7 @@ class motors_api():
     #     """
     #     # Get current position in cartesian
     #     r = self._unsafe._radius_steps
-    #     a = self._unsafe._angle_steps 
+    #     a = self._unsafe._angle_steps
     #     x_cur = r * _n.cos(_n.radians(a))
     #     y_cur = r * _n.sin(_n.radians(a))
 
@@ -872,7 +881,7 @@ class motors_api():
         r_steps : int or float
             The radius of the given position. To be safe, this value must be within
             the minimal safe radius, and the maximum safe radius for the given angle.
-        
+
         a_steps : int or float
             The angle of the given position. This has no limitations as the angle
             will be automatically wrapped if it exceeds a full turn.
@@ -894,12 +903,12 @@ class motors_api():
         """
         Returns True if the given radius r (mm) and angle a (degrees) is within
         the bounds of the selected shape.
-        
+
         Parameters
         ----------
         r, a : float
             Radius r (mm) and angle a (degrees) of the sensor head.
-        
+
         Returns
         -------
         bool
@@ -908,10 +917,10 @@ class motors_api():
         r_steps = r * _RAD_STEPS_PER_MM
         a_steps = a * _ANG_STEPS_PER_DEG
         return self.is_safe_ra_steps(r_steps, a_steps)
-        
+
 
     def is_safe_xy_steps(self, x_steps, y_steps):
-        """ 
+        """
         Returns true if the given cartesian coordinates are safe for the vibrating drum.
         Pro Tip: You can use this to filter a list of coordinates to ensure that no errors occur
                  while scanning through them.
@@ -941,12 +950,12 @@ class motors_api():
         """
         Returns True if the given x (mm) and y (mm) are within
         the bounds of the selected shape.
-        
+
         Parameters
         ----------
         x, y : float
             Cartesian coordinates (mm) of the sensor head.
-        
+
         Returns
         -------
         bool
@@ -972,11 +981,11 @@ if __name__ == "__main__":
     #     plate.set_xy_steps(i,i)
 
     # plate.set_ra_steps(0,0)
-    
+
     # Test is_safe
     self = motors_api('COM5', shape='circle')
     import pylab
-    
+
     pylab.figure(1)
     pylab.ioff()
     N = 100
@@ -986,7 +995,7 @@ if __name__ == "__main__":
                 pylab.plot([x],[y], marker='o', ls='')
     pylab.ion()
     pylab.show()
-    
+
     pylab.figure(2)
     pylab.ioff()
     N = 100
@@ -997,7 +1006,7 @@ if __name__ == "__main__":
                            [r*_n.sin(_n.radians(a))], marker='o', ls='')
     pylab.ion()
     pylab.show()
-    
+
 
 """
 
