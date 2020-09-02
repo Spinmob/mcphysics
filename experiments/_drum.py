@@ -346,7 +346,7 @@ class motors_api():
     # Not good enough since the sensor has some width to it.
     # For now gonna try multiplying by (0.91 + 0.09 * cos(2*theta)**2) in order
     # to smoothly go from edge at angle 0 to corner at angle 45.
-    def get_squine_max_steps(self, a_steps):
+    def get_squadius_steps(self, a_steps):
         """
         Calculates the absolute maximum radius for a given a_steps (in steps) position.
         This is effectively the distance between the center of a square and it's perimiter
@@ -355,7 +355,7 @@ class motors_api():
         for the exact corner it's sqrt(2).
         Since the sensor is not a zero-size point, it's width must also be considered.
         This is handled by a multiplicative factor of (0.91 + 0.09 * _n.cos(2*theta)**2), which
-        reduces the calculated squine value by a factor of 0.91 at the corner to 1.0 at the edge.
+        reduces the calculated squadius value by a factor of 0.91 at the corner to 1.0 at the edge.
 
         Parameters
         ----------
@@ -374,23 +374,65 @@ class motors_api():
         with _n.errstate(divide='ignore'):
             return  multiple * _n.min(_n.abs([1/_n.cos(theta), 1/_n.sin(theta)]), axis=0)
 
-    def get_squine_max(self, a):
+    # I don't think we need this given get_max_r() - Rigel
+    # def get_squadius_max(self, a):
+    #     """
+    #     Returns the maximum allowed radius for the square plate in mm.
+
+    #     Parameters
+    #     ----------
+    #     a : float
+    #         The angle (degrees).
+
+    #     Returns
+    #     -------
+    #     r_max : float
+    #         Maximum allowed radius (mm).
+    #     """
+    #     a_steps = a*_ANG_STEPS_PER_DEG
+    #     r_steps = self.get_squine_max_steps(a_steps)
+    #     return r_steps / _RAD_STEPS_PER_MM
+
+    def get_max_r_steps(self, a_steps = None):
         """
-        Returns the maximum allowed radius (follows a squine) for the square plate in mm.
+        Get the maximum allowable radius in steps with the actuator at a given angle in steps.
 
         Parameters
         ----------
-        a : float
-            The angle (degrees).
+        a_steps : int, optional
+            The angle in steps to calculate the max radius at, only relevant for a square plate.
+            If not given, will take the current angular position.
 
         Returns
         -------
-        r_max : float
-            Maximum allowed radius (mm).
+        int
+            the maxiam radius in steps for the given angle.
         """
-        a_steps = a*_ANG_STEPS_PER_DEG
-        r_steps = self.get_squine_max_steps(a_steps)
-        return r_steps / _RAD_STEPS_PER_MM
+        if self._unsafe._shape == "circle":
+            return _RAD_MAX_SAFE
+        elif self._unsafe._shape == "square":
+            if a_steps is None:
+                a_steps = self.get_ra_steps()[1]
+            return self.get_squadius_steps(a_steps)
+            
+    def get_max_r(self, a=None):
+        """
+        Get the maximum allowable radius in mm with the actuator at a given angle in degrees
+
+        Parameters
+        ----------
+        a_steps : int, optional
+            The angle in degrees to calculate the max radius at, only relevant for a square plate.
+            If not given, will take the current angular position.
+
+        Returns
+        -------
+        int
+            the maximum radius in steps for the given angle.
+        """
+
+        max_r_steps = self.get_max_r_steps(None if a is None else a * _ANG_STEPS_PER_DEG)
+        return max_r_steps / _RAD_STEPS_PER_MM
 
     def get_ra_steps(self, *args):
         """
@@ -403,8 +445,8 @@ class motors_api():
 
             # Convert to r, a
             x_steps, y_steps = args[0], args[1]
-            r_steps = int(_n.round(_n.sqrt(x_steps**2 + y_steps**2)))
-            a_steps = int(_n.round(_n.degrees(_n.arctan2(y_steps,x_steps))*2))
+            r_steps = int(_n.round(_n.hypot(x_steps,y_steps)))
+            a_steps = int(_n.round(_n.degrees(_n.arctan2(y_steps,x_steps))*_ANG_STEPS_PER_DEG))
             return r_steps, a_steps
 
         return self._unsafe._radius_steps, self._unsafe._angle_steps
@@ -418,7 +460,7 @@ class motors_api():
         """
         if len(args) >= 2:
             x, y = args[0], args[1]
-            return _n.sqrt(x*x+y*y), _n.degrees(_n.arctan2(y,x))
+            return _n.hypot(x,y), _n.degrees(_n.arctan2(y,x))
 
         else:
             r_steps, a_steps = self.get_ra_steps()
@@ -560,12 +602,15 @@ class motors_api():
             # If the radius is outside the safe range and we're rotating
             # we need to first pull in the sensor, then do the rotation
             # and finally set the radius to the correct amount.
-            safe_dists = self.get_squine_max_steps(_n.linspace(
-                self._unsafe._angle_steps,a_steps,
-                _n.abs(self._unsafe._angle_steps-a_steps)+1,
-                dtype=int))
-
+            
+            # Need to consider every angle we pass through and find the lowest
+            # possible maximum radius.
+            angles = _n.linspace(self._unsafe._angle_steps,a_steps,
+                                 _n.abs(self._unsafe._angle_steps-a_steps)+1,
+                                 dtype=int)
+            safe_dists = self.get_max_r_steps(angles)
             safe_dist = _n.min(safe_dists)
+
             if (ang_delta != 0 and self._unsafe._radius_steps > safe_dist):
                 retreat = True
 
@@ -575,10 +620,10 @@ class motors_api():
 
             # If we're past the safe rotating radius, pull the radius in.
             if retreat:
-                self._unsafe._debug_print("  Retreating radius for rotation by %d steps" % ang_delta)
+                self._unsafe._debug_print("Retreating radius for rotation by %d steps" % ang_delta)
                 # If the target radius is within the safe limit, go there
                 # otherwise, move to the minimum safe distance.
-                self.set_radius(safe_dist)
+                self.set_ra_steps(safe_dist,self._unsafe._angle_steps)
 
         # Calculate number of steps needed to move radially.
         # Put here since retreating will change this.
@@ -749,16 +794,11 @@ class motors_api():
             # Circle
             else:
                 raise ValueError("Position (%f, %f) produces radius %d outside limit of %d." %
-                                (x_steps, y_steps, int(round(_n.sqrt(x_steps**2+y_steps**2))), _RAD_MAX_SAFE))
-
-        # Convert x,y to r,theta
-        r     = _n.sqrt(x_steps**2 + y_steps**2)
-        theta = _n.degrees(_n.arctan2(y_steps,x_steps))
+                                (x_steps, y_steps, int(round(_n.hypot(x_steps,y_steps))), _RAD_MAX_SAFE))
 
         # Convert to steps
         # This will probably introduce some rounding error...
-        radial = int(round(r))
-        angular = int(round(theta * 2))
+        r_steps, a_steps = self.get_ra_steps(x_steps, y_steps)
 
         self.set_ra_steps(radial, angular)
 
@@ -844,9 +884,11 @@ class motors_api():
         """
         r_steps = int(round(r_steps))
         a_steps = int(round(a_steps))
-        x_steps, y_steps = self.get_xy_steps(r_steps, a_steps)
- 
-        return self.is_safe_xy_steps(x_steps, y_steps)
+
+        if self._unsafe._shape == "square":
+            return not (r_steps < _RAD_MIN_STEPS or r_steps > self.get_max_r_steps(a_steps))
+        elif self._unsafe._shape == "circle":
+            return not (r_steps < _RAD_MIN_STEPS or r_steps > _RAD_MAX_SAFE)
 
     def is_safe_ra(self, r, a):
         """
@@ -892,7 +934,7 @@ class motors_api():
             checks = [(p < -_RAD_MAX_SAFE or p > _RAD_MAX_SAFE) for p in [x_steps,y_steps]]
             return not any(checks)
         if self._unsafe._shape == "circle":
-            r = _n.sqrt(x_steps**2 + y_steps**2)
+            r = _n.hypot(x_steps, y_steps)
             return r <= _RAD_MAX_SAFE
 
     def is_safe_xy(self, x, y):
