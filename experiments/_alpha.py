@@ -259,32 +259,33 @@ class arduino(_serial_tools.arduino_base):
 
 
         sr.add('Pirani/P_offset', 0.0, suffix='Pa', siPrefix=True, decimals=4,
-               tip='Pressure (Pa) = P_offset + P_scale * 10**(V2/Attenuation-Offset)')
+               tip='Pressure (Pa) = P_offset + P_scale * 10**(V2*Attenuation-Offset)')
 
         sr.add('Pirani/P_scale', 1.0, suffix='Pa', siPrefix=True, decimals=4,
-               tip='Pressure (Pa) = P_offset + P_scale * 10**(V2/Attenuation-Offset)')
+               tip='Pressure (Pa) = P_offset + P_scale * 10**(V2*Attenuation-Offset)')
 
-        sr.add('Pirani/Offset', 3.5, suffix='V', decimals=4,
-               tip='Pressure (Pa) = P_offset + P_scale * 10**(V2/Attenuation-Offset)')
+        sr.add('Pirani/Offset', 3.46, suffix='V', decimals=4,
+               tip='Pressure (Pa) = P_offset + P_scale * 10**(V2*Attenuation-Offset)')
 
-        sr.add('Pirani/Attenuation', 1.0/4.003, suffix='V', decimals=4,
-               tip='Pressure (Pa) = P_offset + P_scale * 10**(V2/Attenuation-Offset)')
+        sr.add('Pirani/Attenuation', 4.03, decimals=4,
+               tip='Pressure (Pa) = P_offset + P_scale * 10**(V2*Attenuation-Offset)')
 
 
-        sr.add('SPT25/P_offset', 0.0,  decimals=4, suffix='Pa', siPrefix=True,
+        sr.add('SPT25/P_offset', 2300,  decimals=4, suffix='Pa', siPrefix=True,
                tip='Pressure (Pa) = P_offset + Ratio*V3')
 
-        sr.add('SPT25/Ratio', 38200.0, decimals=4, suffix='Pa/V', siPrefix=True,
+        sr.add('SPT25/Ratio', 123340, decimals=4, suffix='Pa/V', siPrefix=True,
                tip='Pressure (Pa) = P_offset + Ratio*V3')
 
 
         sr.add('Vent_Valve/Scale', 5.0, suffix='%/V',
-               tip='Overall scale factor.\nPercentage Open = Scale*(V_PWM2 * Gain_LPF - V_offset)')
+               tip='Overall scale factor.\n'+
+                   'Percentage Open = Scale*(V_PWM2 * Gain_LPF - V_offset)')
 
         sr.add('Vent_Valve/Gain_LPF', 6.783,
                tip='Gain from the (active) low-pass filter on the PWM output.\nPercentage Open = Scale*(V_PWM2 * Gain_LPF - V_offset)')
 
-        sr.add('Vent_Valve/V_offset', 0.6, suffix='V',
+        sr.add('Vent_Valve/V_offset', 0, suffix='V',
                tip='Offset from transistor emitter-follower after low-pass filter.\nPercentage Open = Scale*(V_PWM2 * Gain_LPF - V_offset)')
 
 
@@ -625,14 +626,14 @@ class arduino(_serial_tools.arduino_base):
         Given the voltage V2 from ADC1, returns the pressure (Pa) estimated
         from the conversion parameters in self.settings.
 
-        Specifically, P = P_offset + P_scale * 10**(V2/Attenuation-Offset)
+        Specifically, P = P_offset + P_scale * 10**(V2*Attenuation-Offset)
         """
         P_offset    = self.settings['Pirani/P_offset']
         P_scale     = self.settings['Pirani/P_scale']
         Offset      = self.settings['Pirani/Offset']
         Attenuation = self.settings['Pirani/Attenuation']
 
-        return P_offset + P_scale * 10**(V2/Attenuation-Offset)
+        return P_offset + P_scale * 10**(V2*Attenuation-Offset)
 
     def get_pressure_from_V3(self, V3):
         """
@@ -734,6 +735,6 @@ class arduino(_serial_tools.arduino_base):
 
 
 if __name__ == '__main__':
-    #_egg.clear_egg_settings()
+    _egg.clear_egg_settings()
     self = arduino()
     #self.button_connect(True)
