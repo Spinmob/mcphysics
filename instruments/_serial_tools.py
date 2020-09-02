@@ -11,7 +11,7 @@ except: _serial = None
 try: from serial.tools.list_ports import comports as _comports
 except: _comports = None
 
-def get_available_com_ports():
+def get_com_ports():
     """
     Returns a dictionary of port names as keys and descriptive names as values.
     """
@@ -22,21 +22,21 @@ def get_available_com_ports():
         return ports
 
     else:
-        raise Exception('You need to install pyserial to use get_available_com_ports().')
+        raise Exception('You need to install pyserial to use get_com_ports().')
 
 
-def list_available_com_ports():
+def list_com_ports():
     """
     Prints a "nice" list of available COM ports.
     """
-    ports = get_available_com_ports()
+    ports = get_com_ports()
     if ports:
         keys = list(ports.keys())
         keys.sort()
         for key in keys:
             print(key, ':', ports[key])
 
-    else: raise Exception('And you definitely need it for list_available_com_ports().')
+    else: raise Exception('And you definitely need it for list_com_ports().')
 
 class serial_gui_base(_g.BaseObject):
     """

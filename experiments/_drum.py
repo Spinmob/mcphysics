@@ -13,52 +13,21 @@
 
 # Since we're on a square. If the sensor is all the way in a corner, rotating
 # may result in a collision, so we need to be aware of these bounds.
-# --TODO--: Make sure this number is okay with the installed circular metal drum, or have
-#       the class specify the max radius upon creation, with a low default value?
-        # Done: 7300 is a good distance for both the square and circular plates
-# --TODO--: Double check if the homing definition of "zero" guaranteed to be sufficiently aligned
-#       with the edges of the square plate that it will not collide near the corners?
-        # Done: Already checked this
-# TODO: I commented out most of the movement functions, opting for absolute coordinates
-#       only. Students can keep track of their coordinates or use the get_ and set_
-#       functions, and this will avoid them shifting too far. It also reduces the
-#       immediate work to be done. I've also adopted
-#       "r,a" for polar to shorten names, and "_steps" to make as clear as possible
-#       when we're talking about steps or absolute (especially brutal with angles!)
-#       Please check my factors of 2 and calculations are right, and fill in the
-#       calibrations (at least roughly) (search for TODO in this document)
-        # Done: Added calibration constants and filled out most places where it was needed.
 
-# TODO: (Optional) What if instead of checking and failing, we just have the radial motor
-#       drive to the maximum value and print a warning, since all these functions now
-#       return the "actual" value. I'm not wed to this idea, since perhaps the
-#       students should not take such data. Anyway, your call.
-        # Done: I prefer raising errors, students can figure out try/except if they want :P
-
-# TODO: There are still some manual conversions between cartesian and polar.
-#       Probably a good idea to use the get_xy and get_ra functions instead, so that
-#       the calibration lives in one place only. No rush on this.
 # TODO: get_squine_max_steps() and get_squine_max() should be replaced with
 #       get_max_r_steps() and get_max_r(), with a check against the shape to
 #       determine whether a squine or simple limit is required. Not a big priority
 #       before term start, since students only really need get_xy() and set_xy().
-# TODO: Instead of raising an exception when a position is out of bounds, we could just
-#       print a warning that it did not move and return something like None,None so the user
-#       can do things like square grids on a circular plate, skipping the acquisition for disallowed
-#       points. I suppose they could just do an "is_safe" check.
-        # Comment: That was my intention with the hints on safe_xy/safe_polar. 
-        # They could feed it a list and filter out any bad values, but I also
-        # like the None, None idea.
 
 ### Constants
 _ANG_MAX_STEPS = 720 # Number of steps that make a full circle
 _ANG_MIN_STEPS = 0   # Initial steps in case we want a specific physical angle to be 0 in the future.
 _ANG_STEPS_PER_DEG = 2
 
+_RAD_STEPS_PER_MM = 28*100/25.4 # Rod is 28 TPI, 100 steps per motor rotation, 25.4 mm/in
 _RAD_MAX_STEPS = 10000 # Number of steps from the center to corner of plate
 _RAD_MAX_SAFE  = 7300 # Number of steps from center to edge of plate
 _RAD_MIN_STEPS = 0 # Initial steps in case we want a specific radius to be 0.
-_RAD_STEPS_PER_MM = 28*100/25.4 # Rod is 28 TPI, 100 steps per motor rotation, 25.4 mm/in
 
 # Aliases
 import mcphysics as _mp
@@ -72,8 +41,8 @@ import queue     as _queue
 import numpy     as _n
 import time      as _time
 
-get_available_com_ports  = _mp.instruments._serial_tools.get_available_com_ports
-list_available_com_ports = _mp.instruments._serial_tools.list_available_com_ports
+get_com_ports  = _mp.instruments._serial_tools.get_com_ports
+list_com_ports = _mp.instruments._serial_tools.list_com_ports
 
 
 class _unsafe_motors:
@@ -419,7 +388,8 @@ class motors_api():
         r_max : float
             Maximum allowed radius (mm).
         """
-        r_steps = self.get_squine_max_steps(a*2)
+        a_steps = a*_ANG_STEPS_PER_DEG
+        r_steps = self.get_squine_max_steps(a_steps)
         return r_steps / _RAD_STEPS_PER_MM
 
     def get_ra_steps(self, *args):
@@ -572,14 +542,11 @@ class motors_api():
 
         # Ensure integers, or integer like numbers are passed
         r_steps = int(_n.round(r_steps))
-        a_steps  = int(_n.round(a_steps))
-        if not self.is_safe_ra_steps(r_steps, a_steps/2):
-            if self._unsafe._shape == "square":
-                raise ValueError("Radial position %d outside safe range %d for angular steps %d" %
-                                 (r_steps, self.get_squine_max_steps(a_steps), a_steps))
-            if self._unsafe._shape == "circle":
-                raise ValueError("Radial position %d outside safe range %d" %
-                                 (r_steps, _RAD_MAX_SAFE))
+        a_steps = int(_n.round(a_steps))
+        
+        # Make sure it's within bounds.
+        if not self.is_safe_ra_steps(r_steps, a_steps):
+            raise ValueError("Out of bounds: r_steps=%d, a_steps=%d" % (r_steps, a_steps))
 
         # Take absolute position around single rotation of circle
         ang_delta = (a_steps % _ANG_MAX_STEPS) - self._unsafe._angle_steps
@@ -647,7 +614,7 @@ class motors_api():
         # Return the actual values
         return self.get_ra_steps()
 
-    def set_ra(self, r_target, a_target):
+    def set_ra(self, r, a):
         """
         Sets the radius and angle of the sensor head using the motor and
         threading specifications. Note the stepper motors will lead to roundoff
@@ -657,7 +624,7 @@ class motors_api():
 
         Parameters
         ----------
-        r_target, a_target : float
+        r, a : float
             Desired radius (mm) and angle (degrees).
 
         Returns
@@ -665,8 +632,8 @@ class motors_api():
         r, a : (float, float)
             Actual values after rounding to the nearest step.
         """
-        r_steps = r_target * _RAD_STEPS_PER_MM
-        a_steps = a_target * _ANG_STEPS_PER_DEG
+        r_steps = r * _RAD_STEPS_PER_MM
+        a_steps = a * _ANG_STEPS_PER_DEG
         self.set_ra_steps(r_steps, a_steps)
         return self.get_ra()
 
@@ -767,27 +734,26 @@ class motors_api():
             Will return an error if the given coordinates are outisde the range set
             by +/- the maximum safe radius.
         """
-        #     TODO: Maybe a better approach is to leave x_steps and y_steps as floating point, then
-        #           round the radial and angular motor steps at the very end. No reason to enforce
-        #           integer x and y.
+        # TODO: Test that non-integer x_step and y_steps are ok.
 
-        self._unsafe._debug_print('set_xy_steps(%d, %d)' % (x_steps, y_steps))
-
-        # Ensure integers, or integer like numbers are passed
-        x = int(x_steps)
-        y = int(y_steps)
+        self._unsafe._debug_print('set_xy_steps(%f, %f)' % (x_steps, y_steps))
 
         # Assert values are within range
-        if not self.is_safe_xy_steps(x,y):
+        if not self.is_safe_xy_steps(x_steps,y_steps):
+            
+            # Squarror
             if self._unsafe._shape == "square":
-                raise ValueError("Position (%d, %d) contains value outside safe range of %d-%d." %
-                                (x,y, -_RAD_MAX_SAFE, _RAD_MAX_SAFE))
-                raise ValueError("Position (%d, %d) produces radius %d outside limit of %d." %
-                                (x,y, int(round(_n.sqrt(x**2+y**2))), _RAD_MAX_SAFE))
+                raise ValueError("Position (%f, %f) contains value outside safe range of %d-%d." %
+                                (x_steps, y_steps, -_RAD_MAX_SAFE, _RAD_MAX_SAFE))
+            
+            # Circle
+            else:
+                raise ValueError("Position (%f, %f) produces radius %d outside limit of %d." %
+                                (x_steps, y_steps, int(round(_n.sqrt(x_steps**2+y_steps**2))), _RAD_MAX_SAFE))
 
         # Convert x,y to r,theta
-        r     = _n.sqrt(x**2 + y**2)
-        theta = _n.degrees(_n.arctan2(y,x))
+        r     = _n.sqrt(x_steps**2 + y_steps**2)
+        theta = _n.degrees(_n.arctan2(y_steps,x_steps))
 
         # Convert to steps
         # This will probably introduce some rounding error...
@@ -799,17 +765,17 @@ class motors_api():
         # Return the actual values.
         return self.get_xy_steps()
 
-    def set_xy(self, x_target, y_target):
+    def set_xy(self, x, y):
         """
         Sets the cartesian coordinates of the sensor head using the motor and
         threading specifications. Note the stepper motors will lead to roundoff
-        error. Returns the "actual" values based on the same specs.
-
+        error. 
+        
         Returns the actual values after rounding to the motor resolution.
 
         Parameters
         ----------
-        x_target, y_target : float
+        x, y : float
             Desired x and y positions (mm).
 
         Returns
@@ -817,8 +783,9 @@ class motors_api():
         x, y : (float, float)
             Actual values after rounding to the nearest step.
         """
-        r_target, a_target = self.get_ra(x_target,y_target)
-        self.set_ra(r_target, a_target)
+        # Get the non-step radius and angle and set it, and then get the actual
+        r, a = self.get_ra(x,y)
+        self.set_ra(r, a)
         return self.get_xy()
 
 
@@ -840,7 +807,7 @@ class motors_api():
     #     """
     #     # Get current position in cartesian
     #     r = self._unsafe._radius_steps
-    #     a = self._unsafe._angle_steps # TODO: This is the motor's calibration?
+    #     a = self._unsafe._angle_steps 
     #     x_cur = r * _n.cos(_n.radians(a))
     #     y_cur = r * _n.sin(_n.radians(a))
 
@@ -862,10 +829,11 @@ class motors_api():
 
         Parameters
         ----------
-        r : int or float
+        r_steps : int or float
             The radius of the given position. To be safe, this value must be within
             the minimal safe radius, and the maximum safe radius for the given angle.
-        theta : int or float
+        
+        a_steps : int or float
             The angle of the given position. This has no limitations as the angle
             will be automatically wrapped if it exceeds a full turn.
 
@@ -876,20 +844,35 @@ class motors_api():
         """
         r_steps = int(round(r_steps))
         a_steps = int(round(a_steps))
-        if self._unsafe._shape == "square":
-            return not (r_steps < _RAD_MIN_STEPS or r_steps > self.get_squine_max_steps(a_steps))
-        elif self._unsafe._shape == "circle":
-            return not (r_steps < _RAD_MIN_STEPS)
+        x_steps, y_steps = self.get_xy_steps(r_steps, a_steps)
+ 
+        return self.is_safe_xy_steps(x_steps, y_steps)
 
     def is_safe_ra(self, r, a):
         """
-        TODO:
+        Returns True if the given radius r (mm) and angle a (degrees) is within
+        the bounds of the selected shape.
+        
+        Parameters
+        ----------
+        r, a : float
+            Radius r (mm) and angle a (degrees) of the sensor head.
+        
+        Returns
+        -------
+        bool
+            True if position is safe, False otherwise.
         """
+        r_steps = r * _RAD_STEPS_PER_MM
+        a_steps = a * _ANG_STEPS_PER_DEG
+        return self.is_safe_ra_steps(r_steps, a_steps)
+        
 
     def is_safe_xy_steps(self, x_steps, y_steps):
-        """ Returns true if the given cartesian coordinates are safe for the vibrating drum.
-            Tip: You can use this to filter a list of coordinates to ensure that no errors occur
-                while scanning through them.
+        """ 
+        Returns true if the given cartesian coordinates are safe for the vibrating drum.
+        Pro Tip: You can use this to filter a list of coordinates to ensure that no errors occur
+                 while scanning through them.
 
         Parameters
         ----------
@@ -906,7 +889,7 @@ class motors_api():
             Returns true if the position is safe, and false otherwise.
         """
         if self._unsafe._shape == "square":
-            checks = [(pos < -_RAD_MAX_SAFE or pos > _RAD_MAX_SAFE) for pos in [x_steps,y_steps]]
+            checks = [(p < -_RAD_MAX_SAFE or p > _RAD_MAX_SAFE) for p in [x_steps,y_steps]]
             return not any(checks)
         if self._unsafe._shape == "circle":
             r = _n.sqrt(x_steps**2 + y_steps**2)
@@ -914,25 +897,65 @@ class motors_api():
 
     def is_safe_xy(self, x, y):
         """
-        TODO:
+        Returns True if the given x (mm) and y (mm) are within
+        the bounds of the selected shape.
+        
+        Parameters
+        ----------
+        x, y : float
+            Cartesian coordinates (mm) of the sensor head.
+        
+        Returns
+        -------
+        bool
+            True if position is safe, False otherwise.
         """
+        x_steps = _RAD_STEPS_PER_MM * x
+        y_steps = _RAD_STEPS_PER_MM * y
+        return self.is_safe_xy_steps(x_steps,y_steps)
 
 # Testing will remove
 if __name__ == "__main__":
 
-    plate = motors_api('COM5')
+    # plate = motors_api('COM5')
 
-    # Test Polar Bounds
-    for i in range(0,360,60):
-        print('\nangle', i)
-        plate.set_ra_steps(plate.get_squine_max_steps(i),i)
+    # # Test Polar Bounds
+    # for i in range(0,360,60):
+    #     print('\nangle', i)
+    #     plate.set_ra_steps(plate.get_squine_max_steps(i),i)
 
-    # Test Cartesian Bounds
-    for i in range(-7000,7200,200):
-        print('\nposition', i)
-        plate.set_xy_steps(i,i)
+    # # Test Cartesian Bounds
+    # for i in range(-7000,7200,200):
+    #     print('\nposition', i)
+    #     plate.set_xy_steps(i,i)
 
-    plate.set_ra_steps(0,0)
+    # plate.set_ra_steps(0,0)
+    
+    # Test is_safe
+    self = motors_api('COM5', shape='circle')
+    import pylab
+    
+    pylab.figure(1)
+    pylab.ioff()
+    N = 100
+    for x in _n.linspace(-N, N, 50):
+        for y in _n.linspace(-N, N, 50):
+            if self.is_safe_xy(x,y):
+                pylab.plot([x],[y], marker='o', ls='')
+    pylab.ion()
+    pylab.show()
+    
+    pylab.figure(2)
+    pylab.ioff()
+    N = 100
+    for r in _n.linspace(0, N, 20):
+        for a in _n.linspace(-360, 360, 50):
+            if self.is_safe_ra(r,a):
+                pylab.plot([r*_n.cos(_n.radians(a))],
+                           [r*_n.sin(_n.radians(a))], marker='o', ls='')
+    pylab.ion()
+    pylab.show()
+    
 
 """
 
