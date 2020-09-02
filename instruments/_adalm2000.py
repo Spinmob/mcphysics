@@ -5,7 +5,6 @@
 # NOTE: See gui_tools rather than copying code from here. A lot of the general
 # device-indepenedent functionality lives there, and was used in soundcard.py.
 
-import os        as _os
 import time      as _t
 import numpy     as _n
 import mcphysics as _mp
@@ -435,7 +434,6 @@ class _adalm2000_analog_out(_adalm2000_object):
             # This is a hack that made it work reliably.
             # Without messing with the buffer, it would only do
             # one at a time.
-            self.zero()
             self.more.setCyclic(0, loop1)
             self.more.setCyclic(1, loop2)
             self.zero()
@@ -482,7 +480,8 @@ class _adalm2000_analog_out(_adalm2000_object):
         -------
         self
         """
-        if not self.simulation_mode: self.more.push([V1, V2])
+        if not self.simulation_mode:
+            self.more.push([V1, V2])
         return self
 
     def zero(self):
@@ -491,7 +490,7 @@ class _adalm2000_analog_out(_adalm2000_object):
         """
         if not self.simulation_mode:
             self.set_enabled(True, True)
-            self.send_samples_dual(_n.zeros(1), _n.zeros(1))
+            self.send_samples_dual(_n.zeros(4), _n.zeros(4))
 
 class _adalm2000_power(_adalm2000_object):
 
@@ -614,6 +613,8 @@ class adalm2000():
         Whether to block the console when showing the window.
     """
     def __init__(self, name='adalm2000', show=True, block=False):
+
+        self.timer_exceptions = _g.TimerExceptions()
 
         if _mp._libm2k == None: _s._warn('You need to install libm2k to access the adalm2000s.')
 
@@ -1314,8 +1315,8 @@ class adalm2000():
 
         # Individual channel basis
         else:
-            if s['Ch1']: self.ao.send_samples(1, p['V1'])
-            if s['Ch2']: self.ao.send_samples(2, p['V2'])
+            if s['Ch1']: self.ao.send_samples(1, p['Ch1'])
+            if s['Ch2']: self.ao.send_samples(2, p['Ch2'])
 
         # Clear and replace the send plot info
         ps = self.waveform_designer.plot_sent
