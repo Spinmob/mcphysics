@@ -4,6 +4,7 @@ import struct    as _struct
 import numpy     as _n
 import os        as _os
 import mcphysics as _mp
+import glob      as _glob
 
 
 
@@ -80,15 +81,20 @@ def load_chn(path=None, **kwargs):
 
     return d
 
-def load_chns(paths=None, **kwargs):
+def load_chns(paths=None, combine=False, **kwargs):
     """
     Loads multiple chn files, returning a list of databoxes.
 
     Parameters
     ----------
-    paths=None
+    paths=None : list of paths
         If None, a dialog will pop up, allowing you to select multiople files.
         Otherwise, specify a valid *list* of paths, e.g. ['C:/test/path.chn', 'C:/test/path2.chn']
+    
+    combine=False : bool
+        If True, the counts from all files will be summed into a single databox, rather
+        than returning a list of databoxes. The header of the returned databox
+        will be the header of the first file in the list.
 
     Optional keyword arguments (e.g., delimiter=',') are sent to load_chn()
     """
@@ -97,9 +103,17 @@ def load_chns(paths=None, **kwargs):
 
     ds = []
     for path in paths: ds.append(load_chn(path, **kwargs))
-    return ds
 
-def plot_chns(xscript='d[0]', yscript='d[1]', eyscript='sqrt(d[1])', marker='+', linestyle='', xlabel='Channel', ylabel='Counts', paths=None, **kwargs):
+    # If we're not combining    
+    if not combine: return ds
+    
+    # Otherwise, make a master databox.
+    dm = ds.pop(0)
+    for d in ds: dm[1] += d[1]
+    
+    return dm
+
+def plot_chns(xscript='d[0]', yscript='d[1]', eyscript='sqrt(d[1])', marker='+', linestyle='', xlabel='Channel', ylabel='Counts', paths=None, combine=False, **kwargs):
     """
     Opens a bunch of chn files and plots the specified script for each. You can
     get the same result by loading multiple chn files (returns a list of databoxes)
@@ -116,6 +130,9 @@ def plot_chns(xscript='d[0]', yscript='d[1]', eyscript='sqrt(d[1])', marker='+',
 
     marker, linestyle, xlabel, ylabel
         Some common plot options.
+        
+    combine=False : bool
+        If True, will sum the selected data into a single curve.
 
     Additional optional keyword arguments are sent to spinmob.plot.databoxes,
     spinmob.plot.data, and pylab.errorbar.
@@ -124,7 +141,10 @@ def plot_chns(xscript='d[0]', yscript='d[1]', eyscript='sqrt(d[1])', marker='+',
     if paths==None: return
 
     # Load the files
-    ds = load_chns(paths)
+    ds = load_chns(paths, combine)
+    
+    # If it's combined
+    if not type(ds) is list: ds = [ds]
 
     # Get the title
     title = _os.path.split(ds[0].path)[0]
@@ -133,6 +153,49 @@ def plot_chns(xscript='d[0]', yscript='d[1]', eyscript='sqrt(d[1])', marker='+',
                          marker=marker, linestyle=linestyle,
                          xlabel=xlabel, ylabel=ylabel,
                          title=title, **kwargs)
+
+def load_chns_directory(path=None, **kwargs):
+    """
+    Calls load_chns() on all the *.Chn files in the specified directory.
+    
+    Parameters
+    ----------
+    path=None : str
+        Optional directory. If None, a dialog will pop up to ask for a directory.
+        
+    Additional keyword arguments are sent to load_chns()
+    
+    Returns
+    -------
+    The result of load_chns()
+    """
+    if path is None: path = _s.dialogs.select_directory('Select a directory containing Chn files!')
+    if path is None: return
+    
+    paths = _glob.glob(_os.path.join(path,'*.Chn'))
+    return load_chns(paths, **kwargs)
+    
+def plot_chns_directory(path=None, **kwargs):
+    """
+    Calls plot_chns() on all the *.Chn files in the specified directory.
+    
+    Parameters
+    ----------
+    path=None : str
+        Optional directory. If None, a dialog will pop up to ask for a directory.
+        
+    Additional keyword arguments are sent to plot_chns()
+    
+    Returns
+    -------
+    The result of plot_chns()
+    """
+    if path is None: path = _s.dialogs.select_directory('Select a directory containing Chn files!')
+    if path is None: return
+    
+    paths = _glob.glob(_os.path.join(path,'*.Chn'))
+    return plot_chns(paths=paths, **kwargs)
+    
 
 def convert_chn_to_csv(chn_paths=None, output_dir=None):
     """
