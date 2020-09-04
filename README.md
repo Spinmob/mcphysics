@@ -56,7 +56,9 @@ The McPhysics library is organized heirarchically, and you should use Spyder's c
 ### mcphysics.data
  * __load_chn():__ Loads a Maestro .Chn file, returning a [spinmob databox](https://github.com/Spinmob/spinmob/wiki/2.-Data-Handling).
  * __load_chns():__ Load multiple .Chn files, returning a list of [spinmob databoxes](https://github.com/Spinmob/spinmob/wiki/2.-Data-Handling).
+ * __load_chns_directory():__ Load all the .Chn files from a single directory, returning a list of [spinmob databoxes](https://github.com/Spinmob/spinmob/wiki/2.-Data-Handling).
  * __plot_chns():__ Shortcut function for analyzing / plotting multiple .Chn files on the same axes.
+ * __plot_chns_directory():__ Shortcut function for analyzing / plotting all the .Chn files from a single directory on the same axes.
  * __convert_chn_to_csv():__ Loads multiple .Chn files, converts them to csv, and dumps them in a directory of your choice.
  * __load_image():__ Loads an image file (jpg, png, etc...), returning 3d numpy array (1 dimension for x, 1 dimension for y, and 1 for the color channel).
  * __load_images():__ Loads multiple images, returning a list of such arrays.
