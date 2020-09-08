@@ -134,8 +134,8 @@ def plot_chns(xscript='d[0]', yscript='d[1]', eyscript='sqrt(d[1])', marker='+',
     combine=False : bool
         If True, will sum the selected data into a single curve.
 
-    Additional optional keyword arguments are sent to spinmob.plot.databoxes,
-    spinmob.plot.data, and pylab.errorbar.
+    Additional optional keyword arguments are sent to spinmob.plot.xy.databoxes,
+    spinmob.plot.xy.data, and pylab.errorbar.
     """
     if paths==None: paths = _s.dialogs.load_multiple(filters='*.Chn')
     if paths==None: return
