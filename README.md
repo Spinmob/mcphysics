@@ -13,6 +13,9 @@ The installation discussed below automatically installs Spinmob, and you can rea
 2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the requisite packages available in the conda and pypi repositories:
    ```
    conda install imageio matplotlib numpy pyqtgraph pyopengl scipy spyder pyserial
+   ```
+   then
+   ```
    pip install lmfit pyvisa minimalmodbus
    ```
 
