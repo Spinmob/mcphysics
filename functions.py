@@ -3,13 +3,43 @@ from scipy.special import wofz as _wofz
 from scipy.special import erf  as _erf
 import scipy.stats as _stats
 
-_ROOT2 = 2.0**0.5 # Code speedup
 
-def erfcx(x):
+# Code speedup
+_ROOT2   = 2.0**0.5 
+_ROOT2PI = (2.0*_n.pi)**0.5
+
+
+def gaussian(x, sigma=1):
     """
-    Scaled complementary error function.
+    Gaussian probability distribution normalized so that the area is 1, and 
+    the standard deviation is sigma. Specifically:
+        
+        exp(-0.5*(x/sigma)**2)/(sigma*sqrt(2*pi))
+    
+    Parameters
+    ----------
+    x:
+        Distance from the center of the peak.
+    sigma:
+        Standard deviation of the Gaussian distribution.
     """
-    return _n.exp(x**2)*(1-_erf(x))
+    return _n.exp(-0.5*(x/sigma)**2)/(sigma*_ROOT2PI)
+
+def gaussian_cdf(x, sigma=1):
+    """
+    Cumulative distribution function of a Gaussian distribution having area
+    1 and standard deviation sigme (i.e., the running integral of gaussian(x,sigma)).
+    
+    Parameters
+    ----------
+    x:
+        Distance from the center of the peak.
+    sigma:
+        Standard deviation of the underlying Gaussian distribution.
+    
+    """
+    return 0.5*_erf(x/(_ROOT2*sigma)) + 0.5
+
 
 def em_gaussian(x, sigma=1, tau=1):
     """
