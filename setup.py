@@ -1,4 +1,4 @@
-__version__ = '1.5.4' # Keep this on the first line
+__version__ = '1.5.5' # Keep this on the first line
 
 
 
