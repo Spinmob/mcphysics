@@ -68,7 +68,8 @@ The McPhysics library is organized heirarchically, and you should use Spyder's c
  
  ### mcphysics.functions
   * __em_gaussian():__ Exponentially modified Gaussian probability density function.
-  * __erfcx():__ A scaled complementary error function.
+  * __gaussian():__ Gaussian probability density function.
+  * __gaussian_cdf():__ Cumulative density function (running integral) of the above Gaussian probability density function.
   * __reduced_chi2():__ Reduced chi^2 probability density function.
   * __voigt():__ Voigt probability density function.
  
@@ -84,7 +85,7 @@ The McPhysics library is organized heirarchically, and you should use Spyder's c
   * __[soundcard()](https://github.com/Spinmob/mcphysics/wiki/instruments.soundcard):__ Scriptable graphical interface for interacting with sound cards.
   
  ### mcphysics.playground
-  * __fitting_statistics_demo():__ Graphical fake data generator and fitter. Useful for visualizing fit statistics.
+  * __[fitting_statistics_demo()](https://github.com/Spinmob/mcphysics/wiki/playground.fitting_statistics_demo):__ Graphical fake data generator and fitter. Useful for visualizing fit statistics.
   * __plot_and_integrate_reduced_chi2():__ Plots the reduced chi^2 distribution for the specified degrees of freedom, then numerically integrates it. This is useful if you want to know how reasonable a given value of chi^2 is.
 
  ### mcphysics.experiments
