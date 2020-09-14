@@ -695,7 +695,7 @@ class arduino(_serial_tools.arduino_base):
         self.settings.send_to_databox_header(self.tab_cal.plot)
 
         # Log the raw values.
-        self.tab_raw.plot.append_log(
+        self.tab_raw.plot.append_row(
 
             [_time.time()-self.t_connect,
              V1, V2, V3,
@@ -708,7 +708,7 @@ class arduino(_serial_tools.arduino_base):
         ).plot()
 
         # Log the calibrated values
-        self.tab_cal.plot.append_log(
+        self.tab_cal.plot.append_row(
 
             [_time.time()-self.t_connect,
 

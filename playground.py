@@ -16,6 +16,7 @@
 
 import numpy       as _n
 import scipy.stats as _stats
+import time as _t
 
 # For embedding matplotlib figures
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg    as _canvas
@@ -75,7 +76,7 @@ class fitting_statistics_demo():
         
         self._build_gui(block)
 
-    def _build_gui(self, block_command_line=False):
+    def _build_gui(self, block=False):
         """
         Builds the GUI for taking fake data.
         """
@@ -95,6 +96,8 @@ class fitting_statistics_demo():
         self.button_fit    .signal_clicked.connect(self.button_fit_clicked)
         self.button_loop   .signal_clicked.connect(self.button_loop_clicked)
         self.button_clear  .signal_clicked.connect(self.button_clear_clicked)
+        
+        self.button_loop.set_colors_checked('white', 'red')
         
         # Create an populate the settings tree
         self.grid_controls.new_autorow()
@@ -146,7 +149,7 @@ class fitting_statistics_demo():
         # Tab for running total of fit parameters
         self.tab_parameters  = self.tabs_plotting.add_tab('Fit Parameters')
         self.plot_parameters = self.tab_parameters.place_object(
-                _g.DataboxPlot(autosettings_path='plot_parameters.cfg'),
+                _g.DataboxPlot(autosettings_path='plot_parameters.cfg', show_logger=True),
                 alignment=0)
         # Give it a handle on the fitter for the script
         self.plot_parameters.fitter = self.fitter
@@ -171,7 +174,7 @@ class fitting_statistics_demo():
         self.tree_settings.load()
         
         # Show the window
-        self.window.show(block_command_line)
+        self.window.show(block)
     
     def _autoscript_raw(self):
         """
@@ -416,11 +419,213 @@ class fitting_statistics_demo():
         """
         self.button_loop.set_checked(False)
         
-        
-if __name__ == '__main__':
-    import os as _os
-    import shutil as _sh
-    if _os.path.exists('egg_settings'): _sh.rmtree('egg_settings')
 
+class geiger_simulation():
+    """
+    Graphical interface for simulating a Geiger counter.
     
-    self = fitting_statistics_demo()
+    Parameters
+    ----------
+    block=False : bool
+        Whether to block the console while the window is open.
+    """
+    def __init__(self, name='geiger_simulation', block=False):
+        
+        self.name   = name
+        self.exception_timer = _g.TimerExceptions()
+        
+        # Assemble the main layout
+        self.window = _g.Window('Geiger Simulation', autosettings_path=name+'.window', size=[900,700])
+        self.grid_top = gt = self.window.add(_g.GridLayout(margins=False))
+        self.window.new_autorow()
+        self.grid_bot = gb = self.window.add(_g.GridLayout(margins=False), alignment=0)
+        self.tabs_settings = gb.add(_g.TabArea(autosettings_path=name+'.tabs_settings'))
+        self.tabs_data     = gb.add(_g.TabArea(autosettings_path=name+'.tabs_data'), alignment=0)
+        
+        #################################
+        # Top controls
+        
+        self.button_acquire = gt.add(_g.Button(
+            'Acquire', checkable=True,
+            tip='Aquire fake Geiger data according to the settings below.',
+            signal_toggled = self._button_acquire_toggled,
+            style_checked   = 'font-size:20px; color:white; background-color:red',
+            style_unchecked = 'font-size:20px; color:None;  background-color:None',
+            )).set_width(100)
+  
+        gt.add(_g.Label('Counts: ')).set_style('font-size:20px;')
+        self.number_counts = gt.add(_g.NumberBox(
+            0, 1, bounds=(0,None), int=True,
+            )).set_style('font-size:20px')
+        
+        gt.add(_g.Label('  Time:')).set_style('font-size:20px;')
+        self.number_time = gt.add(_g.NumberBox(
+            0, 1, bounds=(0,None), siPrefix=True, suffix='s',
+            )).set_style('font-size:20px').set_width(100)
+        
+        self.button_reset = gt.add(_g.Button(
+            text='Reset', signal_clicked=self._button_reset_clicked,
+            tip='Reset counts and time.')).set_style('font-size:20px;')
+        
+        #################################
+        # Settings
+        
+        self.tab_settings = ts = self.tabs_settings.add('Settings')
+        
+        ts.new_autorow()
+        self.settings = s = ts.add(_g.TreeDictionary(autosettings_path=name+'.settings')).set_width(290)
+        
+        s.add_parameter('Source-Detector Distance', 0.001, step=0.001,
+                        siPrefix=True, suffix='m', bounds=(1e-3, None), 
+                        tip='Distance from the source to the detector.')
+        
+        
+        s.add_parameter('Acquisition Time', 1.0, dec=True, 
+                        siPrefix=True, suffix='s', bounds=(1e-9, None),
+                        tip='How long to acquire data for.')
+        
+        s.add_parameter('Iterations', 1, dec=True, bounds=(0,None),
+                        tip='How many times to repeat the acquisition. 0 means "keep looping".')
+        
+        s.add_parameter('Iterations/Completed', 0, readonly=True, 
+                        tip='How many acquisitions have been completed.')
+        
+        s.add_parameter('Iterations/Reset Each Time', True, 
+                        tip='Click the reset button at the start of each iteration.')
+        
+        s.add_parameter('Engine/Rate at 1 mm', 20.0, bounds=(0, None), 
+                        siPrefix=True, suffix='Counts/s',
+                        tip='Average counts per second when positioned at 1 mm.')
+        
+        s.add_parameter('Engine/Time Resolution', 1e-4, 
+                        siPrefix=True, suffix='s', dec=True, bounds=(1e-12,None),
+                        tip='Time resolution of the detector. Should be small enough\n'
+                           +'that only one click happens per time step, but large enough\n'
+                           +'that the random number generator will not bottom out.')
+        
+        s.add_parameter('Engine/Chunk Size', 0.25, 
+                        siPrefix=True, suffix='s', dec=True, bounds=(1e-10,None),
+                        tip='How long each chunk should be during acquisition.')
+        
+        s.add_parameter('Engine/Simulate Delay', True, 
+                        tip='Whether to pause appropriately during acquisition.')
+        
+        ###################################
+        # Plots
+        
+        self.tab_raw  = tr = self.tabs_data.add('Raw Data')
+        self.plot_raw = tr.add(_g.DataboxPlot('*.raw', autosettings_path=name+'.plot_raw'), alignment=0)
+        
+        self.tab_log  = tl = self.tabs_data.add('Logger')
+        self.plot_log = tl.add(_g.DataboxPlot('*.log', autosettings_path=name+'.plot_log', show_logger=True), alignment=0)
+        
+        ###################################
+        # Start the show!
+        
+        self.window.show(block)
+    
+    def _button_reset_clicked(self, *a):
+        """
+        Reset the time and counts.
+        """
+        self.number_counts(0)
+        self.number_time(0)
+        self.plot_raw.clear()
+        
+    def _button_acquire_toggled(self, *a):
+        """
+        Someone toggled "Acquire".
+        """
+        # Let the loop finish itself
+        if not self.button_acquire.is_checked(): return
+        
+        # Shortcut
+        s = self.settings
+        
+        # Loop
+        s['Iterations/Completed'] = 0
+        while self.button_acquire.is_checked() and s['Iterations/Completed'] < s['Iterations']:
+
+            # Get a data set
+            self.acquire_data()            
+            
+            s['Iterations/Completed'] += 1
+            self.window.process_events()
+        
+        # Uncheck it.
+        self.button_acquire.set_checked(False)
+
+    def acquire_data(self):
+        """
+        Acquires data and processes / plots it, as per the shown settings.
+        """
+        # Shortcuts
+        s = self.settings
+        d = self.plot_raw
+        l = self.plot_log
+        
+        # Get the mean rate using naive 1/r^2 fall off
+        rate = s['Engine/Rate at 1 mm'] * (1e-3 / s['Source-Detector Distance'])**2
+        dt   = s['Engine/Time Resolution']
+        DT   = s['Engine/Chunk Size']
+        n    = min(int(_n.round(DT/dt)), 100000)
+        
+        # Get the probability per time step of a tick
+        p = rate*dt
+        
+        # Remaining time to count down
+        T = s['Acquisition Time']
+        
+        # If we're supposed to
+        if s['Iterations/Reset Each Time']: self.button_reset.click()
+        
+        # Acquire in chunks until it's done.
+        t0 = _t.time()
+        while T > 0 and self.button_acquire.is_checked():
+            
+            # Get the last time
+            if 't' in d.ckeys: t_start = d['t'][-1]+dt
+            else:              t_start = dt
+            
+            # Clear the data
+            d.clear()
+            s.send_to_databox_header(d)
+                        
+            # Generate the time data
+            d['t']     = _n.linspace(t_start,t_start+(n-1)*dt,n)
+            d['Count'] = _n.zeros(n)
+            
+            # Now get the time bins with a click
+            d['Count'][_n.random.rand(n)<p] = 1
+            d.plot()
+            
+            # Update the master numbers
+            self.number_counts.increment(len(_n.where(d['Count'] == 1)[0]))
+            self.number_time  .increment(n*dt)
+            
+            # Update remaining time
+            T -= n*dt
+            
+            # Update GUI, then wait for the chunk time minus processing time
+            self.window.process_events()
+            if s['Engine/Simulate Delay']: self.window.sleep(DT - (_t.time()-t0), 0.005)
+            
+            # Update t0
+            t0 = _t.time()
+        
+        # All done! Send this info to the logger.
+        if not 'Run #' in l.ckeys: i = 0
+        else:                      i = l['Run #'][-1]
+        l.append_row(
+            [i+1, s['Source-Detector Distance'], s['Acquisition Time'], self.number_time(), self.number_counts()],
+            ['Run #', 'Distance (m)', 'Acquisition (s)', 'Time (s)', 'Counts'])
+        
+        l.plot()
+            
+            
+            
+
+if __name__ == '__main__':
+    _egg.clear_egg_settings()
+    
+    self = geiger_simulation()

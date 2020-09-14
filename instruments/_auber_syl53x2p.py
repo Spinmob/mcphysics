@@ -220,7 +220,7 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         self.number_setpoint.set_value(S, block_signals=True)
 
         # Append this to the databox
-        self.plot.append_log([t, T, S, P], ckeys=['Time (s)', 'Temperature (C)', 'Setpoint (C)', 'Power (%)'])
+        self.plot.append_row([t, T, S, P], ckeys=['Time (s)', 'Temperature (C)', 'Setpoint (C)', 'Power (%)'])
         self.plot.plot()
 
         # Update the big red text.
