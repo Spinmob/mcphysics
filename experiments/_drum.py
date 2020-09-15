@@ -281,55 +281,47 @@ class _unsafe_motors:
 # Safe Motor Control Class           #
 ######################################
 class motors_api():
-    def __init__(self, port, shape, debug=False):
-        """
-        A safe wrapper for controlling the drum stepper motors lab.
-        Everytime an instance is opened, the experiment is homed, this uses
-        limit switches to set the apparatus to its (0,0) position.
+    """
+    A safe wrapper for controlling the drum stepper motors lab.
+    Everytime an instance is opened, the experiment is homed, this uses
+    limit switches to set the apparatus to its (0,0) position.
 
-        Moving the equpiment is then done using "safe" functions.
+    Moving the equpiment is then done using "safe" functions.
 
-        WARNING: You should have no reason to access and functions/fields prefixed
-                 with an underscore '_'. Python leaves these fully accessible and you can
-                 100% break the equipment if you mess with them. If you really
-                 think you need to for some fantastic new functionality that will
-                 make the experiment go better, please contact a TA/Prof first.
+    WARNING: You should have no reason to access and functions/fields prefixed
+             with an underscore '_'. Python leaves these fully accessible and you can
+             100% break the equipment if you mess with them. If you really
+             think you need to for some fantastic new functionality that will
+             make the experiment go better, please contact a TA/Prof first.
 
-        To initialize, simply define a new drum object:
-        ```
-        import safe_drum as sd
-        drum = sd.motors_api()
-        ```
+    Prior to creating an instance, make sure you can see the sensor (e.g., via
+    a webcam) so you know whether it's actually moving.
 
-        This will print out some connection messages, and assuming the device connects
-        properly, will home the instrument. If any errors occur during homing, a large
-        warning will be displayed, please watch-out for that.
+    When a new instance is created, it will print out some connection messages,
+    and assuming the device connects properly, will home the instrument. If
+    any errors occur during homing, a large warning will be displayed, please
+    watch-out for that.
 
-        Once homed, you have control of the instrument.  The main moving function is
-        `drum.set_ra_steps(r_steps, a_steps)` which sets the scanner to an
-        absolute position defined by a radius and angle.
+    Parameters
+    ----------
+    port='COM5' : str or None
+        Port to assume is the controlling arduino.
+        Setting to None or "Simulation" means simulation mode.
 
-        Both numbers should be in number of steps for the motor with rough conversion:
-        1 Radial step ~ 0.01 mm
-        1 Angular step ~ 0.5 degrees of rotaton.
+    debug : bool, optional
+        Whether to print verbose debug messages, by default True
 
-        There are a bunch of wrappers to this motion function, allowing for relative
-        motion and cartesian coordinates. See those functions for more info.
+    shape : str, optional
+        The shape of the plate in the apparatus. Can be one of
+        "circle" or "square", by default circle, for safety.
+    """
 
+    def __init__(self, port=None, shape=None, debug=False):
 
-        Parameters
-        ----------
-        port='COM5' : str or None
-            Port to assume is the controlling arduino.
-            Setting to None or "Simulation" means simulation mode.
-
-        debug : bool, optional
-            Whether to print verbose debug messages, by default True
-
-        shape : str, optional
-            The shape of the plate in the apparatus. Can be one of
-            "circle" or "square", by default circle, for safety.
-        """
+        if port is None:
+            print('ERROR: You must specify a port.')
+            _mp.experiments.drum.list_com_ports()
+            return
 
         if not shape in ['square', 'circle']:
             raise Exception('"shape" argument must be either "square" or "circle".')
@@ -424,7 +416,7 @@ class motors_api():
 
         Parameters
         ----------
-        a_steps : int, optional
+        a : int, optional
             The angle in degrees to calculate the max radius at, only relevant for a square plate.
             If not given, will take the current angular position.
 
@@ -668,7 +660,7 @@ class motors_api():
         # Return the actual values
         return self.get_ra_steps()
 
-    def set_ra(self, r, a):
+    def set_ra(self, r_mm, a_degrees):
         """
         Sets the radius and angle of the sensor head using the motor and
         threading specifications. Note the stepper motors will lead to roundoff
@@ -686,8 +678,8 @@ class motors_api():
         r, a : (float, float)
             Actual values after rounding to the nearest step.
         """
-        r_steps = r * _RAD_STEPS_PER_MM
-        a_steps = a * _ANG_STEPS_PER_DEG
+        r_steps = r_mm      * _RAD_STEPS_PER_MM
+        a_steps = a_degrees * _ANG_STEPS_PER_DEG
         self.set_ra_steps(r_steps, a_steps)
         return self.get_ra()
 
@@ -809,12 +801,12 @@ class motors_api():
         # This will probably introduce some rounding error...
         r_steps, a_steps = self.get_ra_steps(x_steps, y_steps)
 
-        self.set_ra_steps(radial, angular)
+        self.set_ra_steps(r_steps, a_steps)
 
         # Return the actual values.
         return self.get_xy_steps()
 
-    def set_xy(self, x, y):
+    def set_xy(self, x_mm, y_mm):
         """
         Sets the cartesian coordinates of the sensor head using the motor and
         threading specifications. Note the stepper motors will lead to roundoff
@@ -833,7 +825,7 @@ class motors_api():
             Actual values after rounding to the nearest step.
         """
         # Get the non-step radius and angle and set it, and then get the actual
-        r, a = self.get_ra(x,y)
+        r, a = self.get_ra(x_mm,y_mm)
         self.set_ra(r, a)
         return self.get_xy()
 

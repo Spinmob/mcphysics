@@ -22,21 +22,23 @@ def get_com_ports():
         return ports
 
     else:
-        raise Exception('You need to install pyserial to use get_com_ports().')
-
+        raise Exception('You need to install pyserial and have Windows to use get_com_ports().')
 
 def list_com_ports():
     """
     Prints a "nice" list of available COM ports.
     """
     ports = get_com_ports()
+
+    # Empty dictionary is skipped.
     if ports:
         keys = list(ports.keys())
         keys.sort()
+        print('Available Ports:')
         for key in keys:
-            print(key, ':', ports[key])
+            print(' ', key, ':', ports[key])
 
-    else: raise Exception('And you definitely need it for list_com_ports().')
+    else: raise Exception('No ports available. :(')
 
 class serial_gui_base(_g.BaseObject):
     """
