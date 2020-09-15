@@ -16,7 +16,7 @@ The installation discussed below automatically installs Spinmob, and you can rea
    ```
    then
    ```
-   pip install lmfit pyvisa minimalmodbus
+   pip install lmfit pyvisa minimalmodbus sounddevice
    ```
 
 3. Install spinmob and mcphysics via pip:
