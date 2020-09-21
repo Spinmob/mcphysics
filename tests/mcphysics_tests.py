@@ -87,10 +87,8 @@ class errthing(_ut.TestCase):
         global b
 
         b = _m.playground.fitting_statistics_demo(block=True)
-
-        print()
         _m.playground.plot_and_integrate_reduced_chi2()
-
+        _m.playground.geiger_simulation(block=True)
 
 if __name__ == "__main__":
     _ut.main()

@@ -451,17 +451,17 @@ class geiger_simulation():
             signal_toggled = self._button_acquire_toggled,
             style_checked   = 'font-size:20px; color:white; background-color:red',
             style_unchecked = 'font-size:20px; color:None;  background-color:None',
-            )).set_width(100)
+            )).set_width(120)
   
-        gt.add(_g.Label('Counts: ')).set_style('font-size:20px;')
+        gt.add(_g.Label('  Counts: ')).set_style('font-size:20px;')
         self.number_counts = gt.add(_g.NumberBox(
             0, 1, bounds=(0,None), int=True,
-            )).set_style('font-size:20px')
+            )).set_style('font-size:20px').set_width(150)
         
         gt.add(_g.Label('  Time:')).set_style('font-size:20px;')
         self.number_time = gt.add(_g.NumberBox(
             0, 1, bounds=(0,None), siPrefix=True, suffix='s',
-            )).set_style('font-size:20px').set_width(100)
+            )).set_style('font-size:20px').set_width(150)
         
         self.button_reset = gt.add(_g.Button(
             text='Reset', signal_clicked=self._button_reset_clicked,
@@ -475,7 +475,7 @@ class geiger_simulation():
         ts.new_autorow()
         self.settings = s = ts.add(_g.TreeDictionary(autosettings_path=name+'.settings')).set_width(290)
         
-        s.add_parameter('Source-Detector Distance', 0.001, step=0.001,
+        s.add_parameter('Source-Detector Distance', 0.01, step=0.001,
                         siPrefix=True, suffix='m', bounds=(1e-3, None), 
                         tip='Distance from the source to the detector.')
         
@@ -493,7 +493,7 @@ class geiger_simulation():
         s.add_parameter('Iterations/Reset Each Time', True, 
                         tip='Click the reset button at the start of each iteration.')
         
-        s.add_parameter('Engine/Rate at 1 mm', 20.0, bounds=(0, None), 
+        s.add_parameter('Engine/Rate at 1 mm', 2000.0, bounds=(0, None), 
                         siPrefix=True, suffix='Counts/s',
                         tip='Average counts per second when positioned at 1 mm.')
         
@@ -503,7 +503,7 @@ class geiger_simulation():
                            +'that only one click happens per time step, but large enough\n'
                            +'that the random number generator will not bottom out.')
         
-        s.add_parameter('Engine/Chunk Size', 0.25, 
+        s.add_parameter('Engine/Chunk Size', 0.1, 
                         siPrefix=True, suffix='s', dec=True, bounds=(1e-10,None),
                         tip='How long each chunk should be during acquisition.')
         
@@ -544,7 +544,8 @@ class geiger_simulation():
         
         # Loop
         s['Iterations/Completed'] = 0
-        while self.button_acquire.is_checked() and s['Iterations/Completed'] < s['Iterations']:
+        while self.button_acquire.is_checked() \
+        and  (s['Iterations/Completed'] < s['Iterations'] or s['Iterations'] <= 0):
 
             # Get a data set
             self.acquire_data()            
@@ -568,20 +569,20 @@ class geiger_simulation():
         rate = s['Engine/Rate at 1 mm'] * (1e-3 / s['Source-Detector Distance'])**2
         dt   = s['Engine/Time Resolution']
         DT   = s['Engine/Chunk Size']
-        n    = min(int(_n.round(DT/dt)), 100000)
         
         # Get the probability per time step of a tick
         p = rate*dt
         
         # Remaining time to count down
-        T = s['Acquisition Time']
+        N = int(_n.round(s['Acquisition Time']/dt))  # Total number of steps
+        n = min(int(_n.ceil(DT/dt)), 100000)
         
         # If we're supposed to
         if s['Iterations/Reset Each Time']: self.button_reset.click()
         
         # Acquire in chunks until it's done.
         t0 = _t.time()
-        while T > 0 and self.button_acquire.is_checked():
+        while N > 0 and self.button_acquire.is_checked():
             
             # Get the last time
             if 't' in d.ckeys: t_start = d['t'][-1]+dt
@@ -604,7 +605,7 @@ class geiger_simulation():
             self.number_time  .increment(n*dt)
             
             # Update remaining time
-            T -= n*dt
+            N -= n
             
             # Update GUI, then wait for the chunk time minus processing time
             self.window.process_events()
@@ -613,14 +614,20 @@ class geiger_simulation():
             # Update t0
             t0 = _t.time()
         
-        # All done! Send this info to the logger.
-        if not 'Run #' in l.ckeys: i = 0
-        else:                      i = l['Run #'][-1]
-        l.append_row(
-            [i+1, s['Source-Detector Distance'], s['Acquisition Time'], self.number_time(), self.number_counts()],
-            ['Run #', 'Distance (m)', 'Acquisition (s)', 'Time (s)', 'Counts'])
-        
-        l.plot()
+        # All done! Send this info to the logger if we didn't cancel
+        if self.button_acquire():
+            
+            # If we don't have a "last" run number, set it to 0 (incremented later)
+            if not 'Run #' in l.ckeys: i = 0
+            
+            # Otherwise, use the actual last run number
+            else: i = l['Run #'][-1]
+            
+            # Append the data to the logger.
+            l.append_row(
+                [i+1, s['Source-Detector Distance'], s['Acquisition Time'], self.number_time(), self.number_counts()],
+                ['Run #', 'Distance (m)', 'Acquisition (s)', 'Total (s)', 'Counts'])
+            l.plot()
             
             
             
