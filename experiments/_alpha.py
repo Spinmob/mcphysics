@@ -271,10 +271,10 @@ class arduino(_serial_tools.arduino_base):
                tip='Pressure (Pa) = P_offset + P_scale * 10**(V2*Attenuation-Offset)')
 
 
-        sr.add('SPT25/P_offset', 700,  decimals=4, suffix='Pa', siPrefix=True,
+        sr.add('SPT25/P_offset', 700.0,  decimals=4, suffix='Pa', siPrefix=True,
                tip='Pressure (Pa) = P_offset + Ratio*V3')
 
-        sr.add('SPT25/Ratio', 123340, decimals=4, suffix='Pa/V', siPrefix=True,
+        sr.add('SPT25/Ratio', 123340.0, decimals=4, suffix='Pa/V', siPrefix=True,
                tip='Pressure (Pa) = P_offset + Ratio*V3')
 
 
