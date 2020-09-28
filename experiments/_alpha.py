@@ -277,7 +277,6 @@ class arduino(_serial_tools.arduino_base):
         sr.add('SPT25/Ratio', 123340.0, decimals=4, suffix='Pa/V', siPrefix=True,
                tip='Pressure (Pa) = P_offset + Ratio*V3')
 
-
         sr.add('Vent_Valve/Scale', 5.0, suffix='%/V',
                tip='Overall scale factor.\n'+
                    'Percentage Open = Scale*(V_PWM2 * Gain_LPF - V_offset)')
