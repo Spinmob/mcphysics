@@ -1,21 +1,22 @@
 import numpy as _n
 from scipy.special import wofz as _wofz
 from scipy.special import erf  as _erf
+from scipy.special import erfcx as _erfcx
 import scipy.stats as _stats
 
 
 # Code speedup
-_ROOT2   = 2.0**0.5 
+_ROOT2   = 2.0**0.5
 _ROOT2PI = (2.0*_n.pi)**0.5
 
 
 def gaussian(x, sigma=1):
     """
-    Gaussian probability distribution normalized so that the area is 1, and 
+    Gaussian probability distribution normalized so that the area is 1, and
     the standard deviation is sigma. Specifically:
-        
+
         exp(-0.5*(x/sigma)**2)/(sigma*sqrt(2*pi))
-    
+
     Parameters
     ----------
     x:
@@ -29,14 +30,14 @@ def gaussian_cdf(x, sigma=1):
     """
     Cumulative distribution function of a Gaussian distribution having area
     1 and standard deviation sigme (i.e., the running integral of gaussian(x,sigma)).
-    
+
     Parameters
     ----------
     x:
         Distance from the center of the peak.
     sigma:
         Standard deviation of the underlying Gaussian distribution.
-    
+
     """
     return 0.5*_erf(x/(_ROOT2*sigma)) + 0.5
 
@@ -60,8 +61,8 @@ def em_gaussian(x, sigma=1, tau=1):
     t = abs(tau)
     s = sigma
 
-    if tau >= 0: return 0.5/t*_n.exp(-0.5*( x/s)**2)*erfcx((s/t - x/s)*0.5**0.5)
-    else:        return 0.5/t*_n.exp(-0.5*(-x/s)**2)*erfcx((s/t + x/s)*0.5**0.5)
+    if tau >= 0: return 0.5/t*_n.exp(-0.5*( x/s)**2)*_erfcx((s/t - x/s)*0.5**0.5)
+    else:        return 0.5/t*_n.exp(-0.5*(-x/s)**2)*_erfcx((s/t + x/s)*0.5**0.5)
 
 def voigt(x, sigma=1, gamma=1):
     """
