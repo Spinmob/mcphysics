@@ -287,7 +287,7 @@ class arduino(_serial_tools.arduino_base):
         sr.add('Vent_Valve/Gain_LPF', 6.783,
                tip='Gain from the (active) low-pass filter on the PWM output.\nPercentage Open = Scale*(V_PWM2 * Gain_LPF - V_offset)')
 
-        sr.add('Vent_Valve/V_offset', 0, suffix='V',
+        sr.add('Vent_Valve/V_offset', 0.0, suffix='V',
                tip='Offset from transistor emitter-follower after low-pass filter.\nPercentage Open = Scale*(V_PWM2 * Gain_LPF - V_offset)')
 
 
@@ -295,7 +295,7 @@ class arduino(_serial_tools.arduino_base):
         self.tab_cal.plot = self.tab_cal.add(_g.DataboxPlot(
             autosettings_path = name+'.tab_cal.plot',
             name              = name+'.tab_cal.plot',
-            show_logger       = True), alignment=0, row_span=2)
+            show_logger       = True), alignment=0)
 
 
 
@@ -316,20 +316,14 @@ class arduino(_serial_tools.arduino_base):
         """
         Someone wants to save the settings.
         """
-        d = _s.data.databox()
-        self.settings.send_to_databox_header(d)
-        d.save_file(header_only=True, filters='*.settings', force_extension=True)
+        self.settings.save(path='ask', short_keys=True, include_expanded=False, 
+                           filters='*.settings', force_extension=True)
 
     def _button_load_settings_clicked(self, *a):
         """
         Someone wants to load settings.
         """
-        d = _s.data.load(filters='*.settings', header_only=True)
-        print(d.h())
-        if d:
-            print(d)
-            self.settings.load_from_databox_header(d)
-
+        self.settings.load('ask', filters='*.settings')
 
     def _button_vent_close_clicked(self, *a):
         """
@@ -586,7 +580,7 @@ class arduino(_serial_tools.arduino_base):
         """
         Called when one of the cal settings changes.
         """
-        print(a)
+        #print(a)
 
     def get_bias_from_V1(self, V1):
         """
@@ -757,6 +751,6 @@ class arduino(_serial_tools.arduino_base):
 
 
 if __name__ == '__main__':
-    _egg.clear_egg_settings()
-    self = arduino(enable_settings_edit=True)
+    #_egg.clear_egg_settings()
+    self = arduino(enable_settings_edit=False)
     #self.button_connect(True)
