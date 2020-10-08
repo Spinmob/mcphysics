@@ -135,14 +135,6 @@ class arduino(_serial_tools.arduino_base):
         # Plot raw
         self.tab_raw.new_autorow()
 
-        # self.button_raw_show_plot = self.tab_raw.add(_g.Button(
-        #     '^^^^^^^', checkable=True, checked=True,
-        #     autosettings_path = name+'.button_raw_show_plot',
-        #     signal_toggled    = self._button_raw_show_plot_toggled,
-        #     tip='Show / hide the plot.'), alignment=0)
-
-        # self.tab_raw.new_autorow()
-
         self.tab_raw.plot = self.tab_raw.add(_g.DataboxPlot(
             autosettings_path = name+'.tab_raw.plot',
             name              = name+'.tab_raw.plot',
@@ -156,8 +148,6 @@ class arduino(_serial_tools.arduino_base):
         self.grid_cal_state = self.tab_cal.add(_g.GridLayout(margins=False), column_span=2)
 
         ####### BIAS
-
-        #self.grid_cal_state.add(_g.Label('BIAS')).set_style(header_style)
 
         self.grid_cal_state.add(_g.Label('Bias Setpoint:'), alignment=2)
         self.number_bias_setpoint = self.grid_cal_state.add(_g.NumberBox(
@@ -240,14 +230,27 @@ class arduino(_serial_tools.arduino_base):
 
 
 
-        # Plot raw
+        # Plot row
         self.tab_cal.new_autorow()
+        self.grid_settings = self.tab_cal.add(_g.GridLayout(margins=False))
 
         # Settings
-        sr = self.settings = self.tab_cal.settings = self.tab_cal.add(_g.TreeDictionary(
+        sr = self.settings = self.tab_cal.settings = self.grid_settings.add(_g.TreeDictionary(
             autosettings_path = name+'.tab_cal.settings',
             name              = name+'.tab_cal.settings',
-            new_parameter_signal_changed=self._settings_cal_changed)).set_width(230)
+            new_parameter_signal_changed=self._settings_cal_changed),
+            column_span=3).set_width(240)
+
+        self.grid_settings.set_column_stretch(2)
+
+        self.grid_settings.new_autorow()
+        self.button_save_settings = self.grid_settings.add(_g.Button('Save Settings')).set_width(100)
+        self.button_load_settings = self.grid_settings.add(_g.Button('Load Settings')).set_width(100)
+
+        # Signals
+        self.button_save_settings.signal_clicked.connect(self._button_save_settings_clicked)
+        self.button_load_settings.signal_clicked.connect(self._button_load_settings_clicked)
+
 
         if not enable_settings_edit: sr.disable()
 
@@ -292,7 +295,8 @@ class arduino(_serial_tools.arduino_base):
         self.tab_cal.plot = self.tab_cal.add(_g.DataboxPlot(
             autosettings_path = name+'.tab_cal.plot',
             name              = name+'.tab_cal.plot',
-            show_logger       = True), alignment=0)
+            show_logger       = True), alignment=0, row_span=2)
+
 
 
         ######################################
@@ -307,6 +311,25 @@ class arduino(_serial_tools.arduino_base):
         self.serial_gui_base._after_button_connect_toggled = self._after_button_connect_toggled
 
         self.window.show(block)
+
+    def _button_save_settings_clicked(self, *a):
+        """
+        Someone wants to save the settings.
+        """
+        d = _s.data.databox()
+        self.settings.send_to_databox_header(d)
+        d.save_file(header_only=True, filters='*.settings', force_extension=True)
+
+    def _button_load_settings_clicked(self, *a):
+        """
+        Someone wants to load settings.
+        """
+        d = _s.data.load(filters='*.settings', header_only=True)
+        print(d.h())
+        if d:
+            print(d)
+            self.settings.load_from_databox_header(d)
+
 
     def _button_vent_close_clicked(self, *a):
         """
@@ -735,5 +758,5 @@ class arduino(_serial_tools.arduino_base):
 
 if __name__ == '__main__':
     _egg.clear_egg_settings()
-    self = arduino()
+    self = arduino(enable_settings_edit=True)
     #self.button_connect(True)
