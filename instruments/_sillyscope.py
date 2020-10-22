@@ -525,7 +525,7 @@ class sillyscope_api(_visa_tools.visa_api_base):
             self.write(':WAV:FORM BYTE') # Use WORD to have two bytes per point.
 
         else:
-            _debug('  ERROR: unhandled model '+str(self.model))
+            _debug('  ERROR: unhandled scope model '+str(self.model))
 
     def set_channel(self, channel=1):
         """
@@ -544,7 +544,7 @@ class sillyscope_api(_visa_tools.visa_api_base):
             self.write(':WAV:SOUR CHAN%d' % channel)
 
         else:
-            _debug('  ERROR: unhandled model '+str(self.model))
+            _debug('  ERROR: unhandled scope model '+str(self.model))
 
         # Keep this for future use.
         self._channel = channel
@@ -990,12 +990,26 @@ class sillyscope(_visa_tools.visa_gui_base):
         _debug('  beginning loop')
 
         # Continue until unchecked
-        while self.button_acquire.is_checked(): self._acquire_and_plot()
+        while self.button_acquire.is_checked(): 
+            self._acquire_and_plot()
+            self.after_acquire_iteration()
 
         _debug('  loop done')
 
         # Fixes up the GUI and unlocks the scope
         self._post_acquisition()
+        self.after_acquire_finished()
+
+    def after_acquire_iteration(self):
+        """
+        Dummy function you can overwrite. Called after each acquisition iteration.
+        """
+        
+    def after_acquire_finished(self):
+        """
+        Dummy function you can overwrite. Called after the acquisition loop is 
+        complete.
+        """
 
     def _event_close(self, *a):
         """

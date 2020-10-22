@@ -34,8 +34,13 @@ class auber_syl53x2p_api():
 
     timeout=2000 : number
         How long to wait for responses before giving up (ms). Must be >300 for this instrument.
+        
+    temperature_limit=450 : float
+        Upper limit on the temperature setpoint (C).
     """
-    def __init__(self, port='COM3', address=1, baudrate=9600, timeout=2000):
+    def __init__(self, port='COM3', address=1, baudrate=9600, timeout=2000, temperature_limit=500):
+
+        self._temperature_limit = temperature_limit        
 
         # Check for installed libraries
         if not _mp._minimalmodbus or not _mp._serial:
@@ -119,10 +124,25 @@ class auber_syl53x2p_api():
         if self.simulation_mode: return 24.5
         else:                    return self.modbus.read_register(0x1002, 1)
 
-    def set_temperature_setpoint(self, T=20.0):
+    def set_temperature_setpoint(self, T=20.0, temperature_limit=None):
         """
         Sets the temperature setpoint to the supplied value in Celcius.
+        
+        Parameters
+        ----------
+        T=20.0 : float
+            Temperature setpoint (C).
+            
+        temperature_limit=None : None or float
+            If None, uses self._temperature_limit. Otherwise uses the specified
+            value to place an upper bound on the setpoint (C).
         """
+        if temperature_limit is None: temperature_limit = self._temperature_limit
+        
+        if T > temperature_limit:
+            print('Setpoint above the limit! Doing nothing.')
+            return self.get_temperature_setpoint()
+        
         if not self.simulation_mode:
             self.modbus.write_register(0x00, T, number_of_decimals=1, functioncode=6)
             return T
@@ -139,6 +159,9 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         Unique name to give this instance, so that its settings will not
         collide with other egg objects.
 
+    temperature_limit=450 : float
+        Upper limit on the temperature setpoint (C).
+    
     show=True : bool
         Whether to show the window after creating.
 
@@ -149,12 +172,15 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         Dimensions of the window.
 
     """
-    def __init__(self, name='auber_syl53x2p', show=True, block=False, window_size=[1,300]):
+    def __init__(self, name='auber_syl53x2p', temperature_limit=500, show=True, block=False, window_size=[1,300]):
         if not _mp._minimalmodbus or not _mp._serial: _s._warn('You need to install pyserial and minimalmodbus to use the Auber SYL-53X2P.')
+
+        # Remember the limit
+        self._temperature_limit = temperature_limit
 
         # Run the base class stuff, which shows the window at the end.
         _serial_tools.serial_gui_base.__init__(self, api_class=auber_syl53x2p_api, name=name, show=False, window_size=window_size)
-
+        
         self.window.set_size([0,0])
 
         style_big_blue = 'font-size: 20pt; font-weight: bold; color: '+('cyan' if _s.settings['dark_theme_qt'] else 'blue')
@@ -165,7 +191,7 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         self.grid_bot.add(_g.Label('Setpoint:'), alignment=2).set_style(style_big_blue)
 
         self.number_setpoint = self.grid_bot.add(_g.NumberBox(
-            -273.16, bounds=(-273.16, 500), suffix='°C',
+            -273.16, bounds=(-273.16, temperature_limit), suffix='°C',
             signal_changed=self._number_setpoint_changed
             )).set_width(200).set_style(style_big_blue)
         self.label_temperature_status = self.grid_bot.add(_g.Label(
@@ -203,7 +229,7 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
         Called when someone changes the number.
         """
         # Set the temperature setpoint
-        self.api.set_temperature_setpoint(self.number_setpoint.get_value())
+        self.api.set_temperature_setpoint(self.number_setpoint.get_value(), self._temperature_limit)
 
 
 
@@ -254,5 +280,5 @@ class auber_syl53x2p(_serial_tools.serial_gui_base):
 if __name__ == '__main__':
     _egg.clear_egg_settings()
     #self = _serial_gui_base(auber_syl53x2p_api)
-    self = auber_syl53x2p()
+    self = auber_syl53x2p(temperature_limit=700)
     #self = auber_syl53x2p_api()
