@@ -162,7 +162,8 @@ def plot_chns(xscript='d[0]', yscript='d[1]', eyscript='sqrt(d[1])', marker='+',
 
 def load_chns_directory(path=None, **kwargs):
     """
-    Calls load_chns() on all the *.Chn files in the specified directory.
+    Calls load_chns() on all the *.Chn files in the specified directory. Will
+    alphabetize the list of files.
 
     Parameters
     ----------
@@ -179,11 +180,13 @@ def load_chns_directory(path=None, **kwargs):
     if path is None: return
 
     paths = _glob.glob(_os.path.join(path,'*.Chn'))
+    paths.sort()
     return load_chns(paths, **kwargs)
 
 def plot_chns_directory(path=None, **kwargs):
     """
-    Calls plot_chns() on all the *.Chn files in the specified directory.
+    Calls plot_chns() on all the *.Chn files in the specified directory. Will
+    sort the files in the directory alphabetically.
 
     Parameters
     ----------
@@ -200,6 +203,7 @@ def plot_chns_directory(path=None, **kwargs):
     if path is None: return
 
     paths = _glob.glob(_os.path.join(path,'*.Chn'))
+    paths.sort()
     return plot_chns(paths=paths, **kwargs)
 
 
