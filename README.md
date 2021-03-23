@@ -10,11 +10,11 @@ The installation discussed below automatically installs Spinmob, and you can rea
 
 1. Download and install [Anaconda Python 3](https://www.anaconda.com/distribution/) or [Miniconda Python 3](https://docs.conda.io/en/latest/miniconda.html). See additional instructions below for OSX.
 
-2. From the Anaconda Prompt (or system terminal, depending on your installation options), install `pip`, then install all the "core" packages:
+2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the "core" packages:
    ```
    conda install pip
    ```
-   then
+   to allow pip/pypi installations, then
    ```
    pip install numpy scipy lmfit matplotlib imageio pyopengl pyqtgraph sounddevice spyder spinmob mcphysics
    ```
