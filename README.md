@@ -14,7 +14,7 @@ The installation discussed below automatically installs Spinmob, and you can rea
    ```
    conda install pip
    ```
-   to allow pip/pypi installations, then
+   to make sure you have `pip`, then
    ```
    pip install numpy scipy lmfit matplotlib imageio pyopengl pyqtgraph sounddevice spyder spinmob mcphysics
    ```
