@@ -10,27 +10,22 @@ The installation discussed below automatically installs Spinmob, and you can rea
 
 1. Download and install [Anaconda Python 3](https://www.anaconda.com/distribution/) or [Miniconda Python 3](https://docs.conda.io/en/latest/miniconda.html). See additional instructions below for OSX.
 
-2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the requisite packages available in the conda and pypi repositories:
+2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the "core" packages:
    ```
-   conda install imageio matplotlib numpy pyqtgraph pyopengl scipy spyder pyserial
+   conda install pip
    ```
-   then
+   to allow pip/pypi installations, then
    ```
-   pip install lmfit pyvisa minimalmodbus sounddevice
-   ```
-
-3. Install spinmob and mcphysics via pip:
-   ```
-   pip install spinmob mcphysics
+   pip install numpy scipy lmfit matplotlib imageio pyopengl pyqtgraph sounddevice spyder spinmob mcphysics
    ```
 
-4. Open Spyder and start playing. Example script:
+3. Open Spyder and start playing. Example script:
    ```
    import mcphysics
    mcphysics.playground.fitting_statistics_demo()
    ```
 
-Note the last entries above (pyserial, pyvisa, minimalmodbus) are only required to access the instruments discussed below, and can be excluded if you do not need this functionality.
+Note if you want to access the actual lab equipment through the interfaces below, you will also need `pyserial`, `pyvisa`, `minimalmodbus`, and `libm2k`.
 
 ## OSX Notes
 You may need to tell your system where the `Anaconda3/bin` folder is located manually. A method that worked is to create a text file named `.bash_profile` in your home directory, and add the line `export PATH="/path/to/Anaconda3/bin:$PATH"`, replacing `/path/to` with the appropriate path. Log out and back in, and the terminal should now "know about" `conda` and `pip`.
@@ -44,14 +39,14 @@ To upgrade to the latest stable versions,
 
 If you need to talk to the supported equipment, you may also need to install some drivers.
 
-### VISA instruments
-To access VISA-based instruments (see below) you will also need a "standard" VISA driver, such as Rhode & Schwartz VISA or National Instruments VISA. I recommend [Rhode & Schwarz](https://www.rohde-schwarz.com/ca/driver-pages/remote-control/3-visa-and-tools_231388.html) because it's lightweight and works with everything we've tested.
+### VISA and serial instruments
+To access VISA-based instruments (see below) you will also need a "standard" VISA driver, such as Rhode & Schwartz VISA or National Instruments VISA. I recommend [Rhode & Schwarz](https://www.rohde-schwarz.com/ca/driver-pages/remote-control/3-visa-and-tools_231388.html) because it's lightweight and works with everything we've tested. You will then need to run `pip install pyvisa pyserial` to get python access.
 
 ### ADALM2000
-To access an ADALM2000, you will need to install [libiio](https://github.com/analogdevicesinc/libiio) and [libm2k (with python bindings!)](https://github.com/analogdevicesinc/libm2k). On Windows, you will also need the [m2k driver](https://github.com/analogdevicesinc/plutosdr-m2k-drivers-win/releases), and you may have to download the appropriate `*.whl` file for your system, then manually run a `pip install [filename].whl` from the anaconda prompt to get it into python. On Linux (and probably osx), we are required to manually compile the libm2k library, so McPhysics may require a specific version to be installed. If this is the case, `import mcphysics` will complain and tell you which version is required when you try to access the device.
+To access an ADALM2000, you will need to install [libiio](https://github.com/analogdevicesinc/libiio) and [libm2k (with python bindings!)](https://github.com/analogdevicesinc/libm2k). On Windows, you will also need the [m2k driver](https://github.com/analogdevicesinc/plutosdr-m2k-drivers-win/releases), and you may have to download the appropriate `*.whl` file for your system, then manually run a `pip install [filename].whl` from the anaconda prompt to get it into python. On Linux (and probably osx), we are required to manually compile the libm2k library, so McPhysics may require a specific version to be installed. If this is the case, `import mcphysics` should complain and tell you which version is required when you try to access the device.
 
 ### Fancy sound cards
-Fancy sound cards may require their own drivers to be installed, but do not need anything more than the 
+Fancy sound cards may require their own drivers to be installed, but do not need anything more than the `sounddevice` library, which is installed by default above.
 
 ## Organization
 The McPhysics library is organized heirarchically, and you should use Spyder's code completion suggestions to navigate it. You can also type `<ctrl>-i` while your cursor is beside an object to access its documentation. Below is a list of the existing functionality. All of these objects are documented within the code itself, and detailed help is available via python's `help()` command or your favorite IDE's or ipython's built in help / autocomplete functionality. An introduction to some of the complex items is available on our (growing) [wiki](https://github.com/Spinmob/mcphysics/wiki).
