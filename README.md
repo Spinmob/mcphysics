@@ -8,7 +8,7 @@ The installation discussed below automatically installs Spinmob, and you can rea
 
 ## Recommended installation method
 
-1. Download and install [Anaconda Python 3](https://www.anaconda.com/distribution/) or [Miniconda Python 3](https://docs.conda.io/en/latest/miniconda.html). See additional instructions below for OSX.
+1. Download and install [Miniconda Python 3](https://docs.conda.io/en/latest/miniconda.html) or the full bloaty [Anaconda Python 3](https://www.anaconda.com/distribution/). See additional instructions below for OSX.
 
 2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the "core" packages:
    ```
