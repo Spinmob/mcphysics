@@ -35,7 +35,7 @@ adalm2000  = _mp.instruments.adalm2000
 sillyscope = _mp.instruments.sillyscope
 soundcard  = _mp.instruments.soundcard
 
-import serial    as _serial
+_serial = _mp._safe_import('serial')
 import threading as _threading
 import queue     as _queue
 import numpy     as _n
