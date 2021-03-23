@@ -14,7 +14,7 @@ The installation discussed below automatically installs Spinmob, and you can rea
    ```
    conda install pip
    ```
-   to make sure you have `pip`, then
+   then
    ```
    pip install numpy scipy lmfit matplotlib imageio pyopengl pyqtgraph sounddevice spyder spinmob mcphysics
    ```
@@ -25,7 +25,7 @@ The installation discussed below automatically installs Spinmob, and you can rea
    mcphysics.playground.fitting_statistics_demo()
    ```
 
-Note if you want to access the actual lab equipment through the interfaces below, you will also need `pyserial`, `pyvisa`, `minimalmodbus`, and `libm2k`.
+Note if you get a warning about `rtree` missing when launching spyder, you can just close spyder and then run `pip install rtree`. This will probably be fixed soon.
 
 ## OSX Notes
 You may need to tell your system where the `Anaconda3/bin` folder is located manually. A method that worked is to create a text file named `.bash_profile` in your home directory, and add the line `export PATH="/path/to/Anaconda3/bin:$PATH"`, replacing `/path/to` with the appropriate path. Log out and back in, and the terminal should now "know about" `conda` and `pip`.
