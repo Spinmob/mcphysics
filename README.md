@@ -12,11 +12,11 @@ The installation discussed below automatically installs Spinmob, and you can rea
 
 2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the "core" packages:
    ```
-   conda install pip numpy scipy matplotlib pyopengl pyqtgraph spyder
+   conda install pip
    ```
    then
    ```
-   pip install lmfit imageio sounddevice spinmob mcphysics
+   pip install spinmob mcphysics imageio sounddevice spyder
    ```
 
 3. Open Spyder and start playing. Example script:
