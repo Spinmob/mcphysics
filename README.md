@@ -12,7 +12,7 @@ The installation discussed below automatically installs Spinmob, and you can rea
 
 2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the "core" packages:
    ```
-   conda install pip spyder
+   conda install pip spyder pyqtgraph
    ```
    then
    ```
