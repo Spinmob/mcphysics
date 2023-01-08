@@ -8,15 +8,15 @@ The installation discussed below automatically installs Spinmob, and you can rea
 
 ## Recommended installation method
 
-1. Download and install [Miniconda Python 3](https://docs.conda.io/en/latest/miniconda.html) or the full bloaty [Anaconda Python 3](https://www.anaconda.com/distribution/). See additional instructions below for OSX.
+1. Download and install [Miniconda Python 3](https://docs.conda.io/en/latest/miniconda.html) or the full bloaty [Anaconda Python 3](https://www.anaconda.com/). See additional instructions below for OSX.
 
 2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the "core" packages:
    ```
-   conda install pip
+   conda install pip spyder pyqtgraph
    ```
    then
    ```
-   pip install spinmob mcphysics imageio sounddevice spyder
+   pip install spinmob mcphysics imageio sounddevice
    ```
 
 3. Open Spyder and start playing. Example script:
