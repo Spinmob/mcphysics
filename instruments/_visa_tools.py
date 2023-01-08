@@ -317,3 +317,11 @@ class visa_gui_base(_g.BaseObject):
 
 if __name__ == '__main__':
     self = visa_gui_base()
+    
+    def f(a): print('pants, please')
+    
+    self.button = self.grid_bot.add(_egg.gui.Button('Push me!', checkable=True))
+    
+    self.button.signal_clicked.connect(f)
+    
+    self.pants  = self.grid_bot.add(_egg.gui.DataboxPlot(autosettings_path='pants'))
