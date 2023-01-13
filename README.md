@@ -8,7 +8,7 @@ The installation discussed below automatically installs Spinmob, and you can rea
 
 ## Recommended installation method
 
-Below is the standard installation method that works most reliably. Note many people already have a conda python installation and either do not want to mess with it or cannot make the following installation work due to library conflicts; in these cases, we recommend creating a new conda environment as discussed below.
+Below is the standard installation method that works most reliably. Note many people already have a conda python installation and either do not want to mess with it or cannot make the following installation work due to library conflicts; in these cases, we recommend [creating a new conda environment](https://github.com/Spinmob/mcphysics#creating-and-activating-a-new-environment) as discussed below.
 
 1. Download and install [Miniconda Python 3](https://docs.conda.io/en/latest/miniconda.html) or the full bloaty [Anaconda Python 3](https://www.anaconda.com/). See additional instructions below for OSX. 
 
