@@ -101,7 +101,7 @@ class fitting_statistics_demo():
         
         # Create an populate the settings tree
         self.grid_controls.new_autorow()
-        self.tree_settings  = self.grid_controls.place_object(_g.TreeDictionary(), column_span=4)
+        self.tree_settings  = self.grid_controls.place_object(_g.TreeDictionary(), column_span=4, alignment=0)
         
         self.tree_settings.add_parameter('Acquire/reality', '1.7*x+1.2')
         self.tree_settings.add_parameter('Acquire/x_noise',        0)
@@ -633,6 +633,4 @@ class geiger_simulation():
             
 
 if __name__ == '__main__':
-    _egg.clear_egg_settings()
-    
-    self = geiger_simulation()
+    self = fitting_statistics_demo()
