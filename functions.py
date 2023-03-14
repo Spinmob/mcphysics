@@ -2,6 +2,7 @@ import numpy as _n
 from scipy.special import wofz as _wofz
 from scipy.special import erf  as _erf
 from scipy.special import erfcx as _erfcx
+from scipy.special import voigt_profile as voigt
 import scipy.stats as _stats
 
 
@@ -64,22 +65,22 @@ def em_gaussian(x, sigma=1, tau=1):
     if tau >= 0: return 0.5/t*_n.exp(-0.5*( x/s)**2)*_erfcx((s/t - x/s)*0.5**0.5)
     else:        return 0.5/t*_n.exp(-0.5*(-x/s)**2)*_erfcx((s/t + x/s)*0.5**0.5)
 
-def voigt(x, sigma=1, gamma=1):
-    """
-    Returns a Voigt function (a convolution of a Lorentzian and Gaussian)
-    centered at x=0 with Gaussian standard deviation sigma and Lorentzian
-    half-width gamma. The function is normalized to have unity area.
+# def voigt(x, sigma=1, gamma=1):
+#     """
+#     Returns a Voigt function (a convolution of a Lorentzian and Gaussian)
+#     centered at x=0 with Gaussian standard deviation sigma and Lorentzian
+#     half-width gamma. The function is normalized to have unity area.
 
-    Parameters
-    ----------
-    x:
-        Distance from center of peak.
-    sigma = 1:
-        Standard deviation of Gaussian ~ exp(-x**2/(2*sigma**2))
-    gamma = 1:
-        Halfwidth of Lorentzian ~ 1/(1+x**2/gamma**2)
-    """
-    return _n.real(_wofz((x + 1j*gamma)/sigma/_ROOT2)) / sigma / (2*_n.pi)**0.5
+#     Parameters
+#     ----------
+#     x:
+#         Distance from center of peak.
+#     sigma = 1:
+#         Standard deviation of Gaussian ~ exp(-x**2/(2*sigma**2))
+#     gamma = 1:
+#         Halfwidth of Lorentzian ~ 1/(1+x**2/gamma**2)
+#     """
+#     return _n.real(_wofz((x + 1j*gamma)/sigma/_ROOT2)) / sigma / (2*_n.pi)**0.5
 
 def reduced_chi2(x, dof):
     """
