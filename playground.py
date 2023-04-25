@@ -629,8 +629,125 @@ class geiger_simulation():
                 ['Run #', 'Distance (m)', 'Acquisition (s)', 'Total (s)', 'Counts'])
             l.plot()
             
-            
-            
+class _power_spectral_densities_demo():
+    """
+    This is a fake data taker that can generate noisy data, FFT, and eventually PSD.
+    
+    Parameters
+    ----------
+    block=True
+        Whether to block the command line when the window is first shown.
+    
+    """
+    def __init__(self, block=False):
+        
+        # Window that holds everything
+        self.window = _g.Window('Power Spectral Densities Demo', autosettings_path='window')
+
+        # Controls above settings
+        self.grid_controls = self.window.add(_g.GridLayout(False))
+
+        # Button to collect data according to the settings below
+        self.button_acquire = self.grid_controls.add(_g.Button('Acquire',
+                                signal_clicked=self._button_acquire_clicked))
+
+        # Tabs on the right
+        self.tabs = self.window.add(_g.TabArea(autosettings_path='tabs'), row_span=2)
+
+        # Add a tab for raw data
+        self.tab_raw = self.tabs.add_tab('Raw')
+        self.plot_raw = self.tab_raw.add(_g.DataboxPlot(autosettings_path='plot_raw'), alignment=0)
+
+        # Add tab for FFT
+        self.tab_fft = self.tabs.add_tab('Variance |FFT|^2')
+        self.plot_power = self.tab_fft.add(_g.DataboxPlot(autosettings_path='plot_power'))
+
+        # Settings on the left
+        self.window.new_autorow()
+        self.settings = self.window.add(_g.TreeDictionary(autosettings_path='settings'))
+
+        self.settings.add('Sampling/Duration', 0.2, suffix='s', siPrefix=True, bounds=(0.01, 10), dec=True,
+                          tip='How long the acquisition should run.')
+        self.settings.add('Sampling/Rate', ['1 kHz', '3.33 kHz', '10 kHz', '33.3 kHz', '100 kHz', '333 kHz', '1 MHz'],
+                          tip='What sampling rate to use. Note that data will be generated at the full rate\n'+
+                              'then either sub-sampled or coarsened as specified below to get the new rate.')
+        self._coarsens = {
+            '1 kHz'     : 1000,
+            '3.33 kHz'  : 300,
+            '10 kHz'    : 100,
+            '33.3 kHz'  : 30,
+            '100 kHz'   : 10,
+            '333 kHz'   : 3,
+            '1 MHz'     : 1,
+        }
+        self.settings.add('Sampling/Method', ['Coarsen', 'Subsample'])
+
+        self.settings.add('Signal/Waveform', ['Sine'])
+        self.settings.add('Signal/Waveform/Frequency',         100.0, siPrefix=True, suffix='Hz')
+        self.settings.add('Signal/Waveform/Amplitude',           1.0, siPrefix=True, suffix='V')
+        self.settings.add('Signal/Waveform/Offset',              0.0, siPrefix=True, suffix='V')
+        self.settings.add('Signal/Waveform/Phase Noise Steps', 0.005, siPrefix=True, suffix='rad', step=0.001)
+
+
+        # Show it
+        self.window.show(block)
+
+    def __getitem__(self, key): return self.settings[key]
+    def __setitem__(self, key, value): self.settings[key] = value
+
+    def _button_acquire_clicked(self, *a):
+        """
+        Someone clicked the "Acquire" button. Get raw time-domain data.
+        """
+        self.acquire(plot=True)
+    
+    def acquire(self, plot=True):
+        """
+        Get a new raw data set and plot it if plot==True
+        """
+        print('acquire()', plot)
+
+        # Get the relevant parameters
+        dt_full = 1/1e6 
+        N_full  = int(self['Sampling/Duration'] * 1e6)
+        coarsen = self._coarsens[self['Sampling/Rate']]
+        dp = self['Signal/Waveform/Phase Noise Steps']
+        f1 = self['Signal/Waveform/Frequency']
+        V1 = self['Signal/Waveform/Amplitude']
+        V0 = self['Signal/Waveform/Offset']
+
+        # Get the fully sampled data
+        t_full = dt_full*_n.array(range(N_full))
+
+        # Phase noise random walk.
+        V_full = V0 + V1*_n.sin(2*_n.pi*f1*t_full + _n.cumsum(dp*_n.random.normal(size=N_full)))
+
+        # Coarsen it or subsample it
+        if self['Sampling/Method'] == 'Coarsen': 
+            t, V = _s.fun.coarsen_data(t_full, V_full, level=coarsen)
+        else:
+            t = t_full[::coarsen]
+            V = V_full[::coarsen]
+
+        # Transfer the data to the raw plotter
+        d = self.plot_raw
+        d['t'] = t
+        d['V'] = V
+
+        # Now do the power
+        p = self.plot_power
+        f, fft = _s.fun.fft(t,V)
+        
+        # Transfer to the power plotter
+        p['f'] = f
+        p['Variance'] = abs(fft)**2
+
+        if plot:
+            d.plot()
+            p.plot()
+
+        
+        
 
 if __name__ == '__main__':
-    self = fitting_statistics_demo()
+    self = _power_spectral_densities_demo()
