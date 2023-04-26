@@ -641,6 +641,9 @@ class _power_spectral_densities_demo():
     """
     def __init__(self, block=False):
         
+        self.timer_error = _g.TimerExceptions()
+        self.timer_error.start()
+
         # Window that holds everything
         self.window = _g.Window('Power Spectral Densities Demo', autosettings_path='window')
 
@@ -650,6 +653,15 @@ class _power_spectral_densities_demo():
         # Button to collect data according to the settings below
         self.button_acquire = self.grid_controls.add(_g.Button('Acquire',
                                 signal_clicked=self._button_acquire_clicked))
+        
+        # Button to loop
+        self.button_loop = self.grid_controls.add(_g.Button('Loop', checkable=True,
+                                signal_toggled=self._button_loop_toggled)).set_width(50)
+        self.number_counter = self.grid_controls.add(_g.NumberBox(0)).set_width(50)
+
+        # Button to reset the averages
+        self.button_reset = self.grid_controls.add(_g.Button('Reset',
+                                signal_clicked=self._button_reset_clicked)).set_width(50)
 
         # Tabs on the right
         self.tabs = self.window.add(_g.TabArea(autosettings_path='tabs'), row_span=2)
@@ -659,34 +671,48 @@ class _power_spectral_densities_demo():
         self.plot_raw = self.tab_raw.add(_g.DataboxPlot(autosettings_path='plot_raw'), alignment=0)
 
         # Add tab for FFT
-        self.tab_fft = self.tabs.add_tab('Variance |FFT|^2')
+        self.tab_fft = self.tabs.add_tab('|FFT|^2')
         self.plot_power = self.tab_fft.add(_g.DataboxPlot(autosettings_path='plot_power'))
 
         # Settings on the left
         self.window.new_autorow()
-        self.settings = self.window.add(_g.TreeDictionary(autosettings_path='settings'))
+        self.settings = self.window.add(_g.TreeDictionary(autosettings_path='settings',
+            new_parameter_signal_changed=self.reset))
 
         self.settings.add('Sampling/Duration', 0.2, suffix='s', siPrefix=True, bounds=(0.01, 10), dec=True,
                           tip='How long the acquisition should run.')
-        self.settings.add('Sampling/Rate', ['1 kHz', '3.33 kHz', '10 kHz', '33.3 kHz', '100 kHz', '333 kHz', '1 MHz'],
+        self.settings.add('Sampling/Rate', ['1 kHz', '3.33 kHz', '10 kHz', '33.3 kHz', '100 kHz'],
                           tip='What sampling rate to use. Note that data will be generated at the full rate\n'+
                               'then either sub-sampled or coarsened as specified below to get the new rate.')
         self._coarsens = {
-            '1 kHz'     : 1000,
-            '3.33 kHz'  : 300,
-            '10 kHz'    : 100,
-            '33.3 kHz'  : 30,
-            '100 kHz'   : 10,
-            '333 kHz'   : 3,
-            '1 MHz'     : 1,
+            '1 kHz'     : 100,
+            '3.33 kHz'  : 30,
+            '10 kHz'    : 10,
+            '33.3 kHz'  : 3,
+            '100 kHz'   : 1,
+            # '333 kHz'   : 3,
+            # '1 MHz'     : 1,
         }
-        self.settings.add('Sampling/Method', ['Coarsen', 'Subsample'])
+        self.settings.add('Sampling/Method', ['Subsample', 'Coarsen'])
 
         self.settings.add('Signal/Waveform', ['Sine'])
         self.settings.add('Signal/Waveform/Frequency',         100.0, siPrefix=True, suffix='Hz')
         self.settings.add('Signal/Waveform/Amplitude',           1.0, siPrefix=True, suffix='V')
         self.settings.add('Signal/Waveform/Offset',              0.0, siPrefix=True, suffix='V')
-        self.settings.add('Signal/Waveform/Phase Noise Steps', 0.005, siPrefix=True, suffix='rad', step=0.001)
+        self.settings.add('Signal/Waveform/Phase Noise Steps', 0.000, siPrefix=True, suffix='rad', step=0.001)
+
+        self.settings.add('Background/Standard Deviation',  0.0, siPrefix=True, suffix='V', step=0.1)
+
+        # Averager for the variance
+        self.average_variance = _s.fun.averager()
+
+        # Bottom stuff
+        self.window.new_autorow()
+        self.grid_bottom = self.window.add(_g.GridLayout(False))
+
+        # Info label
+        self.label_info = self.grid_bottom.add(_g.Label())
+        self.label_info('Raw (Time-Domain) Variance:')
 
 
         # Show it
@@ -694,6 +720,30 @@ class _power_spectral_densities_demo():
 
     def __getitem__(self, key): return self.settings[key]
     def __setitem__(self, key, value): self.settings[key] = value
+
+    def _button_reset_clicked(self, *a):
+        """
+        Reset the averages
+        """
+        self.reset()
+
+    def reset(self, *a):
+        """
+        Reset the averages.
+        """
+        self.average_variance.reset()
+
+    def _button_loop_toggled(self, *a):
+        """
+        Someone toggled the loop button.
+        """
+        # If we're unlooping, let the thing finish on its own.
+        if not self.button_loop(): return
+
+        # Otherwise we toggled the button to enabled mode
+        while self.button_loop():
+            self.acquire()
+            self.window.sleep(0.1)
 
     def _button_acquire_clicked(self, *a):
         """
@@ -705,22 +755,27 @@ class _power_spectral_densities_demo():
         """
         Get a new raw data set and plot it if plot==True
         """
-        print('acquire()', plot)
-
+       
         # Get the relevant parameters
-        dt_full = 1/1e6 
-        N_full  = int(self['Sampling/Duration'] * 1e6)
+        dt_full = 1/1e5 
+        N_full  = int(self['Sampling/Duration'] * 1e5)
         coarsen = self._coarsens[self['Sampling/Rate']]
-        dp = self['Signal/Waveform/Phase Noise Steps']
         f1 = self['Signal/Waveform/Frequency']
         V1 = self['Signal/Waveform/Amplitude']
         V0 = self['Signal/Waveform/Offset']
+
+        # Noise
+        dp = self['Signal/Waveform/Phase Noise Steps']
+        dV = self['Background/Standard Deviation']
 
         # Get the fully sampled data
         t_full = dt_full*_n.array(range(N_full))
 
         # Phase noise random walk.
         V_full = V0 + V1*_n.sin(2*_n.pi*f1*t_full + _n.cumsum(dp*_n.random.normal(size=N_full)))
+        
+        # Add the noise
+        V_full += dV*_n.random.normal(size=N_full)
 
         # Coarsen it or subsample it
         if self['Sampling/Method'] == 'Coarsen': 
@@ -728,7 +783,7 @@ class _power_spectral_densities_demo():
         else:
             t = t_full[::coarsen]
             V = V_full[::coarsen]
-
+        
         # Transfer the data to the raw plotter
         d = self.plot_raw
         d['t'] = t
@@ -740,12 +795,23 @@ class _power_spectral_densities_demo():
         
         # Transfer to the power plotter
         p['f'] = f
-        p['Variance'] = abs(fft)**2
+        p['variance'] = abs(fft)**2
+
+        self.average_variance += p['variance']
+        p['average'] = self.average_variance.mean
+
+        p['cumulative_variance'] = _n.cumsum(p['variance'])
+        p['cumulative_average']  = _n.cumsum(p['average'])
 
         if plot:
             d.plot()
             p.plot()
 
+        # Get the time-domain variance
+        self.label_info('Raw (Time-Domain) Variance: %.3g' % _n.average(d['V']**2))
+
+        # Increment the counter
+        self.number_counter(self.average_variance.N)
         
         
 
