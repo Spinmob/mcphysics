@@ -679,7 +679,7 @@ class _power_spectral_densities_demo():
         self.settings = self.window.add(_g.TreeDictionary(autosettings_path='settings',
             new_parameter_signal_changed=self.reset))
 
-        self.settings.add('Sampling/Duration', 0.2, suffix='s', siPrefix=True, bounds=(0.01, 10), dec=True,
+        self.settings.add('Sampling/Duration', 0.2, suffix='s', siPrefix=True, bounds=(0.01, 10), step='0.1',
                           tip='How long the acquisition should run.')
         self.settings.add('Sampling/Rate', ['1 kHz', '3.33 kHz', '10 kHz', '33.3 kHz', '100 kHz'],
                           tip='What sampling rate to use. Note that data will be generated at the full rate\n'+
