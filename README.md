@@ -2,7 +2,7 @@
 
 ![](https://raw.githubusercontent.com/wiki/Spinmob/spinmob/Egg/10-dark-theme.png)
 
-This is a library of tools spefically aimed at the McGill undergraduate physics labs, namely PHYS 439/469 at the moment. It can be thought of as an augmentation of the [Spinmob](https://github.com/Spinmob/spinmob/wiki) library, which provides general-purpose, broadly applicable data handling, plotting, fitting, graphical interface, and other analysis tools. 
+This is a library of tools spefically aimed at the McGill undergraduate physics labs, namely PHYS 359/469 at the moment. It can be thought of as an augmentation of the [Spinmob](https://github.com/Spinmob/spinmob/wiki) library, which provides general-purpose, broadly applicable data handling, plotting, fitting, graphical interface, and other analysis tools. 
 
 The installation discussed below automatically installs Spinmob, and you can read the [Spinmob wiki](https://github.com/Spinmob/spinmob/wiki), which provides a lot of information about Python, data handling, automated fitting, and graphical interface building.
 
