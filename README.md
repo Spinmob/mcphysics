@@ -28,7 +28,7 @@ Below is the standard installation method that works most reliably. Note many pe
    ```
 
 ## OSX Notes
-You may need to tell your system where the `Anaconda3/bin` folder is located manually. A method that worked is to create a text file named `.bash_profile` in your home directory, and add the line `export PATH="/path/to/Anaconda3/bin:$PATH"`, replacing `/path/to` with the appropriate path. Log out and back in, and the terminal should now "know about" `conda` and `pip`.
+You may need to tell your system where Anaconda's `bin` folder is located manually. A method that worked is to create a text file named `.bash_profile` in your home directory, and add the line `export PATH="/path/to/Anaconda3/bin:$PATH"`, replacing `/path/to/Anaconda3` with the appropriate location of the `bin` folder. Log out and back in, and the terminal should now "know about" `conda` and `pip`.
 
 ## Creating and Activating a New Environment
 
