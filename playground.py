@@ -317,8 +317,13 @@ class fitting_statistics_demo():
         """
         Someone clears the data.
         """
-        self.plot_parameters.clear()
-        self.update_all_plots()
+        
+        
+        self.plot_parameters.button_clear.click()
+        self.figure_stats.clf()
+        self.figure_stats.canvas.draw()
+        
+        self.window.process_events()
     
     def update_fit_plot(self):
         """
@@ -816,4 +821,4 @@ class _power_spectral_densities_demo():
         
 
 if __name__ == '__main__':
-    self = _power_spectral_densities_demo()
+    self = fitting_statistics_demo()
