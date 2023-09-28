@@ -97,3 +97,17 @@ def reduced_chi2(x, dof):
     """
     return dof*_stats.chi2.pdf(x*dof,dof)
 
+def piecewise_parabola(x):
+    """
+    Sinusoid-like oscillatory function of x that is constructed from parabolas alternating every 0.5.
+    """
+    # First get the non-integer part of x to find the "phase"
+    x = (_n.array(x))%1
+
+    # Assuming this is an array, we need complementary arrays of 0's and 1's to 
+    # multiply by the two parabolas
+    a = 0+(x<0.5)
+    b = 0+(x>=0.5)
+
+    # Now return the functions
+    return a*(1-(4*x-1)**2) + b*((4*x-3)**2-1)
