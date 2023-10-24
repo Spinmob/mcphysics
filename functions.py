@@ -102,11 +102,11 @@ def piecewise_parabola(x):
     Sinusoid-like oscillatory function of x that is constructed from parabolas alternating every 0.5.
     """
     # First get the non-integer part of x to find the "phase"
-    x = (_n.array(x)) % 1
+    x = (_n.array(x))%1
 
     # Assuming this is an array, we need complementary arrays of 0's and 1's to 
     # multiply by the two parabolas
-    a = 0+(x < -0.5)
+    a = 0+(x <  0.5)
     b = 0+(x >= 0.5)
 
     # Now return the functions
