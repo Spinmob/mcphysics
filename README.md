@@ -86,6 +86,7 @@ The McPhysics library is organized heirarchically, and you should use Spyder's c
   * __gaussian():__ Gaussian probability density function.
   * __gaussian_cdf():__ Cumulative density function (running integral) of the above Gaussian probability density function.
   * __reduced_chi2():__ Reduced chi^2 probability density function.
+  * __piecewise_parabola():__ Sinusoid-like oscillatory function composed of connected parabolic segments.
   * __voigt():__ Voigt probability density function.
  
  ### mcphysics.instruments
