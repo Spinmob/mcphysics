@@ -25,7 +25,7 @@ def _safe_import(lib):
 
 _imageio        = _safe_import('imageio')
 _libm2k         = _safe_import('libm2k')
-_visa           = _safe_import('visa')
+_visa           = _safe_import('pyvisa')
 _serial         = _safe_import('serial')
 _minimalmodbus  = _safe_import('minimalmodbus')
 _sounddevice    = _safe_import('sounddevice')
