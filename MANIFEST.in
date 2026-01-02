@@ -1,0 +1,6 @@
+include setup.py
+recursive-include plot_scripts *
+recursive-include tests *
+
+# If you have specific non-py files like CSVs or PDFs:
+global-exclude *.pyc

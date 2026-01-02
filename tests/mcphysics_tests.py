@@ -91,5 +91,10 @@ class errthing(_ut.TestCase):
         _m.playground.geiger_simulation(block=True)
 
 if __name__ == "__main__":
-    _ut.main()
+    _ut.main(
+        argv=['first-arg-is-ignored'], 
+        exit=False, 
+        buffer=False, 
+        verbosity=2
+    )
     #_ut.main(defaultTest='errthing.test_data_chn')

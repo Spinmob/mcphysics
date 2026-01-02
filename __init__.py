@@ -1,5 +1,6 @@
 import sys as _sys
 import os  as _os
+import importlib as _importlib
 import traceback as _traceback
 _p = _traceback.print_last
 
@@ -16,20 +17,18 @@ try: exec(spinmob.fun.read_lines(_os.path.join(__path__[0],'setup.py'))[0])
 except: __version__ = 'unknown'
 
 # Import all the other semi-optional libraries
-def _safe_import(lib):
+def _safe_import(lib_name):
     try:
-        exec('import '+lib)
-        return eval(lib)
-    except:
+        return _importlib.import_module(lib_name)
+    except ImportError:
         return None
 
-_imageio        = _safe_import('imageio')
+_imageio        = _safe_import('imageio.v3')
 _libm2k         = _safe_import('libm2k')
 _visa           = _safe_import('pyvisa')
 _serial         = _safe_import('serial')
 _minimalmodbus  = _safe_import('minimalmodbus')
 _sounddevice    = _safe_import('sounddevice')
-
 
 _debug_enabled = False
 def _debug(*a):

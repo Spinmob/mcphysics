@@ -33,6 +33,9 @@ def load_chn(path=None, **kwargs):
     # Read the buffer
     buffer = fh.read()
 
+    # Close it
+    fh.close()
+
     # Unpack
     [type, unitnumber, segment_number] = _struct.unpack("hhh",buffer[0:6])
     ascii_seconds = buffer[6:8].decode()
@@ -283,3 +286,13 @@ def load_images(paths=None):
     return arrays
 
 
+if __name__ == '__main__':
+    import mcphysics as mp
+    import spinmob as sm
+
+    # Loading / Plotting Chn files
+    mp.data.plot_chns_directory(_os.path.join('tests','data'))
+
+    # Load / plot image
+    i = mp.data.load_image(_os.path.join('tests','data','image.jpg'))
+    sm.plot.image.data(i[:,:,1])
