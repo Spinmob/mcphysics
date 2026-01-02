@@ -4,51 +4,21 @@
 
 This is a library of tools spefically aimed at the McGill undergraduate physics labs, namely PHYS 359/469 at the moment. It can be thought of as an augmentation of the [Spinmob](https://github.com/Spinmob/spinmob/wiki) library, which provides general-purpose, broadly applicable data handling, plotting, fitting, graphical interface, and other analysis tools. 
 
-The installation discussed below automatically installs Spinmob, and you can read the [Spinmob wiki](https://github.com/Spinmob/spinmob/wiki), which provides a lot of information about Python, data handling, automated fitting, and graphical interface building.
-
 ## Recommended installation method
 
-Below is the standard installation method that works most reliably. Note many people already have a conda python installation and either do not want to mess with it or cannot make the following installation work due to library conflicts; in these cases, we recommend [creating a new conda environment](https://github.com/Spinmob/mcphysics#creating-and-activating-a-new-environment) as discussed below.
+1. Install [Spinmob](https://github.com/Spinmob/spinmob/wiki)
 
-1. Download and install [Miniconda Python 3](https://docs.conda.io/en/latest/miniconda.html) or the full bloaty [Anaconda Python 3](https://www.anaconda.com/). See additional instructions below for OSX. 
-
-2. From the Anaconda Prompt (or system terminal, depending on your installation options), install the "core" packages:
+2. From a console with your Python environment activated, install the "core" packages:
    ```
-   conda install pip spyder pyqtgraph
-   ```
-   then
-   ```
-   pip install spinmob mcphysics imageio sounddevice
+   pip install mcphysics
    ```
 
-3. Open Spyder and start playing. Example script:
+3. Start playing. For example:
    ```
    import mcphysics
-   mcphysics.playground.fitting_statistics_demo()
+   playground.fitting_statistics_demo()
    ```
 
-## OSX Notes
-You may need to tell your system where Anaconda's `bin` folder is located manually. A method that worked is to create a text file named `.bash_profile` in your home directory, and add the line `export PATH="/path/to/Anaconda3/bin:$PATH"`, replacing `/path/to/Anaconda3` with the appropriate location of the `bin` folder. Log out and back in, and the terminal should now "know about" `conda` and `pip`.
-
-## Creating and Activating a New Environment
-
-If you wish to create a completely "clean" conda environment, you can do so with the following commands. Once a new environment is activated, you can then install packages as discussed above.
-
-1. To create a clean environment named `pants`, use the command below (following the resulting instructions):
-   ```
-   conda create --name pants
-   ```
-   
-2. To activate the environment:
-   ```
-   conda activate pants
-   ```
-
-3. To see which environments exist and which is activated (has a `*` next to it):
-   ```
-   conda env list
-   ```
-   
 ## Upgrading
 To upgrade to the latest stable versions,
    ```
@@ -57,7 +27,10 @@ To upgrade to the latest stable versions,
 
 ## Optional instrument drivers
 
-If you need to talk to the supported equipment, you may also need to install some drivers.
+If you need to talk to the supported equipment, you may also need to install some drivers. You can see which are installed and missing with the function
+```
+mcphysics.check_installation()
+```
 
 ### VISA and serial instruments
 To access VISA-based instruments (see below) you will also need a "standard" VISA driver, such as Rhode & Schwartz VISA or National Instruments VISA. I recommend [Rhode & Schwarz](https://www.rohde-schwarz.com/ca/driver-pages/remote-control/3-visa-and-tools_231388.html) because it's lightweight and works with everything we've tested. You will then need to run `pip install pyvisa pyserial` to get python access.
