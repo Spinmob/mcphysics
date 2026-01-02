@@ -1,4 +1,4 @@
-__version__ = '3.12.1' # Keep this on the first line
+__version__ = '3.13.0' # Keep this on the first line
 # We will now match the first two digits to the spinmob version against 
 # which this is tested, and increment the last digit as we make changes.
 
