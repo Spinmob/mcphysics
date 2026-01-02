@@ -7,13 +7,13 @@ mkdir dist
 
 :: Build the package
 :: This requires the 'build' package: pip install build
-echo
+echo.
 echo Building McPhysics...
 python -m build
 
 :: Upload to PyPI
 :: This requires 'twine' and a .pypirc file in your user folder
-echo
+echo.
 echo Uploading to PyPI...
 python -m twine upload --skip-existing dist/*
 
