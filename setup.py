@@ -1,8 +1,8 @@
-__version__ = '3.13.0' # Keep this on the first line
+__version__ = '3.13.1' # Keep this on the first line
 # We will now match the first two digits to the spinmob version against 
 # which this is tested, and increment the last digit as we make changes.
 
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
     name             = 'McPhysics',
@@ -12,9 +12,16 @@ setup(
     author_email     = 'jack.sankey@gmail.com',
     url              = 'https://github.com/sankeylab/mcphysics',
 
-    # find_packages() handles the code folders with __init__.py
-    packages         = find_packages(),
+    # 1. Manually define the packages again since find_packages() failed 
+    # due to the root-level (flat) structure.
+    packages         = ['mcphysics', 'mcphysics.instruments', 'mcphysics.experiments'],
 
-    # This tells setuptools to trust your MANIFEST.in file
+    # 2. Map the package name to the current directory ('.')
+    package_dir      = {'mcphysics': '.'},
+
     include_package_data = True,
+
+    install_requires = [
+        'imageio',
+    ]
 )
