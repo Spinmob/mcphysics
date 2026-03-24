@@ -1,6 +1,6 @@
- # This file is part of the Macrospyn distribution 
- # (https://github.com/Spinmob/macrospyn).
- # Copyright (c) 2002-2020 Jack Childress (Sankey).
+ # This file is part of the McPhysics distribution 
+ # (https://github.com/Spinmob/mcphysics).
+ # Copyright (c) Jack Childress (Sankey).
  # 
  # This program is free software: you can redistribute it and/or modify  
  # it under the terms of the GNU General Public License as published by  
@@ -56,6 +56,96 @@ def plot_and_integrate_reduced_chi2(dof=10, xmin=1e-6, xmax=5, steps=1e5):
     _s.tweaks.ubertidy(window_size=[800,950])
 
 
+
+class shot_noise_demo():
+    """
+    Graphical interface for generating fake shot-noise data, and generating power
+    spectral densities.
+
+    Parameters
+    ----------
+    block=True
+        Whether to block the command line when the window is first shown.
+    """
+
+    def __init__(self, block=False):
+
+        self._build_gui(block)
+
+    def _build_gui(self, block):
+        """
+        Builds the GUI for taking fake data.
+        """
+        # Make a window with a left grid for settings and controls, and
+        # a right grid for visualization.
+        self.window = _g.Window('Fake Data Taker', size=[1000,700], autosettings_path='shot_window.cfg')
+        self.window.event_close = self.event_close
+        self.grid_controls = self.window.place_object(_g.GridLayout(False))
+        self.grid_plotting = self.window.place_object(_g.GridLayout(False), alignment=0)
+    
+        # Add the acquire button & connect the signal
+        self.button_acquire = self.grid_controls.place_object(_g.Button('Acquire'),    alignment=0).set_width(70)
+        self.button_acquire.signal_clicked.connect(self.button_acquire_clicked)
+        
+        # Create an populate the settings tree
+        self.grid_controls.new_autorow()
+        self.tree_settings  = self.grid_controls.place_object(_g.TreeDictionary(), column_span=4, alignment=0)
+        
+        self.tree_settings.add_parameter('Duration',     1.0,   tip='Duration of acquisition (seconds).')
+        self.tree_settings.add_parameter('Samples',   100000,   tip='Number of samples over this duration.')
+        self.tree_settings.add_parameter('Packet Rate',  100,   tip='Average number of packets per second.')
+        self.tree_settings.add_parameter('Packet Area',  1,     tip='Integrated area of each packet in the time-domain.')
+        
+
+        # Add the tabs and plotter to the other grid
+        self.tabs_plotting = self.grid_plotting.place_object(_g.TabArea('shot_tabs_plotting.cfg'), alignment=0)
+        
+        # Tab for raw data
+        self.tab_raw  = self.tabs_plotting.add_tab('Raw Data')
+        self.plot_raw = self.tab_raw.place_object(
+                _g.DataboxPlot(autosettings_path='shot_plot_raw.cfg', autoscript=1), 
+                alignment=0)
+        
+        self.tab_psd  = self.tabs_plotting.add_tab('Analysis')
+        self.plot_analysis = self.tab_psd.place_object(
+                _g.DataboxProcessor(databox_source=self.plot_raw), 
+                alignment=0)
+        
+
+        self.window.show(block)
+        
+    def button_acquire_clicked(self, *a): 
+        """
+        Generates fake data for the raw data tab.
+        """
+        N = self.tree_settings['Samples']
+        T = self.tree_settings['Duration']
+        dt = T/N # Time step
+        A = self.tree_settings['Packet Area']
+        R = self.tree_settings['Packet Rate']
+
+        # Generate the time array
+        t = _n.linspace(T/N,T,N)
+
+        # Get the number of packets that arrive in this time
+        Np = int(T*R)
+
+        # Get poissonian distributed counts in each bin, weighted so the area is A
+        y = _n.random.poisson(Np/N, size=N) * A / dt
+        
+        # Plot
+        self.plot_raw['t'] = t
+        self.plot_raw['y'] = y
+        self.plot_raw.plot()
+
+        # Do whatever is set up in the Analysis tab
+        self.plot_analysis.run()
+
+    def event_close(self):
+        """
+        Just shut down gracefully.
+        """
+        return
 
 
 
@@ -821,4 +911,4 @@ class _power_spectral_densities_demo():
         
 
 if __name__ == '__main__':
-    self = fitting_statistics_demo()
+    self = shot_noise_demo()
