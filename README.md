@@ -13,7 +13,7 @@ This is a library of tools spefically aimed at the McGill undergraduate physics 
    pip install mcphysics
    ```
 
-3. Start playing. For example:
+3. Change to a personal working directory and start playing. For example:
    ```
    import mcphysics
    playground.fitting_statistics_demo()
