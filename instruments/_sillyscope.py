@@ -69,9 +69,10 @@ class sillyscope_api(_visa_tools.visa_api_base):
             m = self.idn.split(',')[1]
 
             # Find out if it's a d/e or a z:
-            if   m[-1] in ['Z']: self.model='RIGOLZ'
-            elif m[-1] in ['B']: self.model='RIGOLB'
-            else:                self.model='RIGOLDE'
+            if 'DHO' in m.upper(): self.model='RIGOLZ' # DHO804 orks just like a RIGOLZ for our purposes
+            elif m[-1] in ['Z']:   self.model='RIGOLZ'
+            elif m[-1] in ['B']:   self.model='RIGOLB'
+            else:                  self.model='RIGOLDE'
 
         # Poop out.
         else: self.model=None
